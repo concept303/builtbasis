@@ -2200,7 +2200,7 @@ git commit -m "feat(server): people, trades and zone types API"
 
 Rules (design §9.3): names are unique per language (matching key from `tagKey`). Creating or renaming into **one** existing tag's name answers `409 tag_name_taken` with `details.existingTagId` — the browser then offers to use that tag (create) or to merge into it (rename). A rename whose names hit **two different** tags answers `409 tag_names_conflict`.
 
-- [ ] **Step 1: Write the failing test `tests/server/tags-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/tags-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2280,12 +2280,12 @@ describe('tags (design §9.3)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/tags-api.test.ts`
 Expected: FAIL — `404 not_found` (no tag routes yet).
 
-- [ ] **Step 3: Create `src/server/lists/tags.ts`**
+- [x] **Step 3: Create `src/server/lists/tags.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2406,15 +2406,15 @@ export function registerTagRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Register the routes in `src/server/app.ts`**
+- [x] **Step 4: Register the routes in `src/server/app.ts`**
 
 Add `import { registerTagRoutes } from './lists/tags';` below the other `./lists/...` imports, and `registerTagRoutes(app, db);` after `registerZoneTypeRoutes(app, db);`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/tags-api.test.ts` → PASS (6 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/lists/tags.ts src/server/app.ts tests/server/tags-api.test.ts
