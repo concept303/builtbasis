@@ -236,7 +236,7 @@ git commit -m "feat(server): dependencies and configuration"
 - Create: `src/server/db/connection.ts`, `src/server/db/migrations.ts`, `src/server/db/migrate.ts`, `src/server/db/backup.ts`, `src/server/db/update.ts`, `src/server/db/sqlite-errors.ts`
 - Test: `tests/server/db.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/server/db.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/db.test.ts`**
 
 ```ts
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -321,12 +321,12 @@ describe('database (design §11.3, §11.7)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/db.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/db/backup"`.
 
-- [ ] **Step 3: Create `src/server/db/connection.ts`**
+- [x] **Step 3: Create `src/server/db/connection.ts`**
 
 ```ts
 import Database from 'better-sqlite3';
@@ -345,7 +345,7 @@ export function openDatabase(path: string): Db {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/db/migrations.ts`**
+- [x] **Step 4: Create `src/server/db/migrations.ts`**
 
 ```ts
 export interface Migration {
@@ -445,7 +445,7 @@ export const MIGRATIONS: readonly Migration[] = [
 ];
 ```
 
-- [ ] **Step 5: Create `src/server/db/backup.ts`**
+- [x] **Step 5: Create `src/server/db/backup.ts`**
 
 ```ts
 import Database from 'better-sqlite3';
@@ -475,7 +475,7 @@ export function backupDatabase(db: Db, backupsDir: string, label: string, now: D
 }
 ```
 
-- [ ] **Step 6: Create `src/server/db/migrate.ts`**
+- [x] **Step 6: Create `src/server/db/migrate.ts`**
 
 ```ts
 import { backupDatabase } from './backup';
@@ -516,7 +516,7 @@ export function migrate(db: Db, options: MigrateOptions): string[] {
 }
 ```
 
-- [ ] **Step 7: Create `src/server/db/update.ts`**
+- [x] **Step 7: Create `src/server/db/update.ts`**
 
 ```ts
 import type { Db } from './connection';
@@ -543,7 +543,7 @@ export function updateColumns(
 }
 ```
 
-- [ ] **Step 8: Create `src/server/db/sqlite-errors.ts`**
+- [x] **Step 8: Create `src/server/db/sqlite-errors.ts`**
 
 ```ts
 export function isUniqueViolation(error: unknown): boolean {
@@ -553,11 +553,11 @@ export function isUniqueViolation(error: unknown): boolean {
 }
 ```
 
-- [ ] **Step 9: Run to verify it passes**
+- [x] **Step 9: Run to verify it passes**
 
 Run: `npx vitest run tests/server/db.test.ts` → PASS (4 tests). Then `npm run typecheck` → no output.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/server/db tests/server/db.test.ts
