@@ -1013,7 +1013,7 @@ git commit -m "feat(server): login limiter and Cloudflare-aware visitor IP"
 - Create: `tests/server/helpers.ts`
 - Test: `tests/server/auth-api.test.ts`
 
-- [ ] **Step 1: Create the test helpers `tests/server/helpers.ts`**
+- [x] **Step 1: Create the test helpers `tests/server/helpers.ts`**
 
 ```ts
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -1087,7 +1087,7 @@ export function get(ctx: TestContext, cookie: string, url: string) {
 }
 ```
 
-- [ ] **Step 2: Write the failing test `tests/server/auth-api.test.ts`**
+- [x] **Step 2: Write the failing test `tests/server/auth-api.test.ts`**
 
 ```ts
 import { afterEach, describe, expect, it } from 'vitest';
@@ -1236,12 +1236,12 @@ describe('authentication and request rules (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 Run: `npx vitest run tests/server/auth-api.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/app"`.
 
-- [ ] **Step 4: Create `src/server/errors.ts`**
+- [x] **Step 4: Create `src/server/errors.ts`**
 
 ```ts
 /** An error with an HTTP status and a stable, machine-readable code; sent as { error: code, details? }. */
@@ -1257,7 +1257,7 @@ export class HttpError extends Error {
 }
 ```
 
-- [ ] **Step 5: Create `src/server/http/params.ts`**
+- [x] **Step 5: Create `src/server/http/params.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -1269,7 +1269,7 @@ export const ItemParams = z.object({
 });
 ```
 
-- [ ] **Step 6: Create `src/server/http/guards.ts`**
+- [x] **Step 6: Create `src/server/http/guards.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1322,7 +1322,7 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
 }
 ```
 
-- [ ] **Step 7: Create `src/server/routes/health.ts`**
+- [x] **Step 7: Create `src/server/routes/health.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1333,7 +1333,7 @@ export function registerHealthRoutes(app: FastifyInstance): void {
 }
 ```
 
-- [ ] **Step 8: Create `src/server/routes/auth.ts`**
+- [x] **Step 8: Create `src/server/routes/auth.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1400,7 +1400,7 @@ export function registerAuthRoutes(
 }
 ```
 
-- [ ] **Step 9: Create `src/server/lists/projects.ts`**
+- [x] **Step 9: Create `src/server/lists/projects.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1447,7 +1447,7 @@ export function registerProjectRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 10: Create `src/server/app.ts`**
+- [x] **Step 10: Create `src/server/app.ts`**
 
 ```ts
 import cookie from '@fastify/cookie';
@@ -1504,12 +1504,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 }
 ```
 
-- [ ] **Step 11: Run to verify it passes**
+- [x] **Step 11: Run to verify it passes**
 
 Run: `npx vitest run tests/server/auth-api.test.ts`
 Expected: PASS (12 tests). Then `npm test` → all files pass, and `npm run typecheck` → no output.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add src/server/errors.ts src/server/http src/server/routes src/server/lists/projects.ts src/server/app.ts tests/server/helpers.ts tests/server/auth-api.test.ts
