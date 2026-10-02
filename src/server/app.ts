@@ -7,6 +7,9 @@ import type { Db } from './db/connection';
 import { HttpError } from './errors';
 import { registerGuards } from './http/guards';
 import { registerProjectRoutes } from './lists/projects';
+import { registerPeopleRoutes } from './lists/people';
+import { registerTradeRoutes } from './lists/trades';
+import { registerZoneTypeRoutes } from './lists/zone-types';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 
@@ -48,5 +51,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerHealthRoutes(app);
   registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
   registerProjectRoutes(app, db);
+  registerPeopleRoutes(app, db);
+  registerTradeRoutes(app, db);
+  registerZoneTypeRoutes(app, db);
   return app;
 }

@@ -1701,7 +1701,7 @@ git commit -m "feat(domain): managed-list input schemas, name rule and tag match
 
 All list routes live under `/api/projects/:projectId/...`, return camelCase JSON, answer `201` on create, and `404 <list>_not_found` for an item of another project.
 
-- [ ] **Step 1: Write the failing test `tests/server/lists-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/lists-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1841,12 +1841,12 @@ describe('zone types (design §9.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/lists-api.test.ts`
 Expected: FAIL — the project test passes; the people, trades and zone-type tests fail with `404` (`not_found`), because those routes do not exist yet.
 
-- [ ] **Step 3: Replace `src/server/db/sqlite-errors.ts`**
+- [x] **Step 3: Replace `src/server/db/sqlite-errors.ts`**
 
 ```ts
 import { HttpError } from '../errors';
@@ -1864,7 +1864,7 @@ export function rethrowUnique(error: unknown, code: string): never {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/lists/names.ts`**
+- [x] **Step 4: Create `src/server/lists/names.ts`**
 
 ```ts
 import { hasAName } from '../../domain';
@@ -1876,7 +1876,7 @@ export function assertHasAName(names: { nameEn: string; nameEl: string }): void 
 }
 ```
 
-- [ ] **Step 5: Create `src/server/lists/people.ts`**
+- [x] **Step 5: Create `src/server/lists/people.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1975,7 +1975,7 @@ export function registerPeopleRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 6: Create `src/server/lists/trades.ts`**
+- [x] **Step 6: Create `src/server/lists/trades.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2076,7 +2076,7 @@ export function registerTradeRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 7: Create `src/server/lists/zone-types.ts`**
+- [x] **Step 7: Create `src/server/lists/zone-types.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2161,7 +2161,7 @@ export function registerZoneTypeRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 8: Register the routes in `src/server/app.ts`**
+- [x] **Step 8: Register the routes in `src/server/app.ts`**
 
 Add these imports below `import { registerProjectRoutes } from './lists/projects';`:
 
@@ -2179,11 +2179,11 @@ and these lines directly after `registerProjectRoutes(app, db);`:
   registerZoneTypeRoutes(app, db);
 ```
 
-- [ ] **Step 9: Run to verify it passes**
+- [x] **Step 9: Run to verify it passes**
 
 Run: `npx vitest run tests/server/lists-api.test.ts` → PASS (8 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/server/db/sqlite-errors.ts src/server/lists src/server/app.ts tests/server/lists-api.test.ts
