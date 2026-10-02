@@ -1,7 +1,7 @@
 # Plan 2 — Server Foundation Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Approved
+> **Status:** In progress
 > **Retention:** Active until executed; historical afterwards.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §3 (bilingual managed-list names), §9 (managed lists), §11.1–11.3 (stack, layout, data), §11.5 (owner login, sessions, request rules), §11.6 (hosting facts from the trial), §11.7 (backup function, pre-migration backup), §15 (seed data).
 > **Depends on:** Plan 0 (GO, 2026-10-03), Plan 1 (merged, `2f5f860`).
@@ -90,7 +90,7 @@
 - Create: `src/server/config.ts`
 - Test: `tests/server/config.test.ts`
 
-- [ ] **Step 1: Install dependencies**
+- [x] **Step 1: Install dependencies**
 
 Run (repository root):
 
@@ -102,7 +102,7 @@ npm install -D tsx@4 @types/better-sqlite3@7 exceljs@4
 
 Expected: each command ends with `added N packages`; `package.json` lists `"better-sqlite3": "13.0.3"` (no caret).
 
-- [ ] **Step 2: Add scripts and allowScripts to package.json**
+- [x] **Step 2: Add scripts and allowScripts to package.json**
 
 Add these entries to the existing `scripts` object, and add the top-level `allowScripts` object (keep everything else npm wrote):
 
@@ -120,7 +120,7 @@ Add these entries to the existing `scripts` object, and add the top-level `allow
 }
 ```
 
-- [ ] **Step 3: Replace `tsconfig.json`**
+- [x] **Step 3: Replace `tsconfig.json`**
 
 ```json
 {
@@ -143,7 +143,7 @@ Add these entries to the existing `scripts` object, and add the top-level `allow
 }
 ```
 
-- [ ] **Step 4: Write the failing test `tests/server/config.test.ts`**
+- [x] **Step 4: Write the failing test `tests/server/config.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -179,12 +179,12 @@ describe('loadConfig (design §11.6)', () => {
 });
 ```
 
-- [ ] **Step 5: Run to verify it fails**
+- [x] **Step 5: Run to verify it fails**
 
 Run: `npx vitest run tests/server/config.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/config"`.
 
-- [ ] **Step 6: Create `src/server/config.ts`**
+- [x] **Step 6: Create `src/server/config.ts`**
 
 ```ts
 import { join } from 'node:path';
@@ -218,11 +218,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 }
 ```
 
-- [ ] **Step 7: Run to verify it passes**
+- [x] **Step 7: Run to verify it passes**
 
 Run: `npx vitest run tests/server/config.test.ts` → PASS (3 tests). Then `npm run typecheck` → no output.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add package.json package-lock.json tsconfig.json src/server/config.ts tests/server/config.test.ts
