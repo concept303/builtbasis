@@ -490,7 +490,7 @@ Fields: **code**, **name EN**, **name EL**, **definition EN**, **definition EL**
 
 ### 9.3 Tags (Ετικέτες)
 
-Fields: **name EL**, **name EN**. At least one name is required. Names are **unique within each language** after trimming and ignoring letter case.
+Fields: **name EL**, **name EN**. At least one name is required. Names are **unique within each language** after trimming and ignoring letter case — and, because Greek capitals drop their accents, ignoring accents and final sigma too («ΠΕΤΡΑ» = «Πέτρα»).
 
 Operations:
 
@@ -609,7 +609,7 @@ All database access is confined to `src/server` data-access modules, so a later 
 ### 11.6 Hosting
 
 - Hetzner Webhosting L, addon domain **`builtbasis.ktimanet.com`**, Node.js enabled for that domain only. `ktimanet.com` and its WordPress installation are untouched.
-- **Served through Cloudflare** (DNS for ktimanet.com is on Cloudflare): the `builtbasis` records are proxied, SSL/TLS mode Full (strict); the edge uses Cloudflare's Universal certificate and Hetzner serves the Cloudflare Origin Certificate for `*.ktimanet.com`. The server must therefore take the visitor IP from `CF-Connecting-IP`, trusting it only from Cloudflare (login rate limiting, logs).
+- **Served through Cloudflare** (DNS for ktimanet.com is on Cloudflare): the `builtbasis` records are proxied, SSL/TLS mode Full (strict); the edge uses Cloudflare's Universal certificate and Hetzner serves the Cloudflare Origin Certificate for `*.ktimanet.com`. The server takes the visitor IP from `CF-Connecting-IP` when `BEHIND_CLOUDFLARE=1` (login rate limiting, logs). The application cannot check that a request really came through Cloudflare — Hetzner's web server is its direct peer — so the login limiter also caps failed logins globally. Restricting the origin to Cloudflare's address ranges is decided in Plan 6.
 - **How the app listens:** `server.listen()` without arguments; Hetzner supplies a Unix socket and starts the app on demand (trial, §11.9). Locally a `PORT` is used.
 - **Dependencies:** the server has no C++ compiler, and npm runs install scripts only for packages listed in `allowScripts`. Use only dependencies that ship prebuilt binaries or need no build step (better-sqlite3 13 does).
 - Directory layout on the server:

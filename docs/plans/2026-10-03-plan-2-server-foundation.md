@@ -1,16 +1,18 @@
 # Plan 2 — Server Foundation Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** In progress
-> **Retention:** Active until executed; historical afterwards.
+> **Status:** Completed
+> **Retention:** Historical — do not execute.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §3 (bilingual managed-list names), §9 (managed lists), §11.1–11.3 (stack, layout, data), §11.5 (owner login, sessions, request rules), §11.6 (hosting facts from the trial), §11.7 (backup function, pre-migration backup), §15 (seed data).
 > **Depends on:** Plan 0 (GO, 2026-10-03), Plan 1 (merged, `2f5f860`).
-> **Implemented by:** Not implemented
-> **Verified:** Not verified
+> **Implemented by:** `d0e80fa..352b9bc` (first through last implementation commit, inclusive; documentation closeout follows).
+> **Verified:** 2026-10-03 — `npm test`: 155 tests passed in 18 files; `npm run typecheck`: exit 0, no TypeScript diagnostics.
+> **Merged to main:** Not merged.
+> **Checklist note:** Preserved execution history. The checked steps record completion; historical snippets and expected failures are not current instructions.
 > **Plan check:** 2026-10-03 — every file in this plan was materialised into a scratch clone of `main` with the Task 1 dependencies: `npm run typecheck` clean; `npm test` 18 files, 136 tests passed; every `git add` path stages without an ignore error; local server answered as in Task 10; the real seed produced the Task 11 output, and a second run refused with exit code 1. The clone and its seeded database were deleted.
 > **Review:** 2026-10-03, second agent, on `6e259c3` — three findings, all reproduced and fixed: (1) the owner command now enforces the login form's username and password limits before writing anything, with the limits shared between both (Tasks 3, 5, 10); (2) `verifyPassword` accepts only hashes in exactly the stored format, so a malformed or altered hash never verifies (Task 3); (3) `.gitignore` un-ignores `.env.example` (Task 10 Step 5).
 >
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
+> **Historical execution instructions (do not execute):** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
 
 **Goal:** A running Fastify/TypeScript server on SQLite with owner login, the managed-list APIs (projects, people, trades, zone types, tags, location tree) and a seed for Gennadi 822A — all test-first, runnable locally.
 
@@ -25,16 +27,25 @@
 - npm on the server runs install scripts only for packages listed in `allowScripts`; there is no C++ compiler. better-sqlite3 13 ships prebuilt binaries. Pin it exactly (`13.0.3`) to match the `allowScripts` key.
 - Restart = stop the Node process; it restarts on the next request. `main.ts` handles `SIGTERM` by closing the server and the database.
 
-**Decisions and deviations** (the design is updated in Task 12 where it changes):
+**Closeout (2026-10-03):** No separate maintained Specification is warranted at this intermediate plan boundary. The roadmap assigns consolidated v1 specifications and Architecture reconciliation to Plan 6. The approved design remains the active implementation baseline through v1 delivery and reconciliation. Delivered behavior is evidenced by `src/server/`, `src/domain/lists.ts` and their tests; code and tests are not a normative Specification.
+
+Task 10 verified local startup, health, request guards and SIGINT shutdown. Task 11 verified the real local seed: 19 people, 34 trades, 13 zone types, 25 tags and 93 locations; a repeat import refused with exit 1. No owner password was supplied. Production deployment remains Plan 6 work.
+
+The Task 1 audit reported four moderate development-dependency vulnerabilities across the Vitest/mocker and ExcelJS/uuid chains. They remain retained after review. The affected browser tooling is unused by these Node-only tests; ExcelJS uses uuid v4 without an output buffer, outside the affected v3/v5/v6 buffer paths. Reassess browser tooling in Plan 5. No dependency remediation is claimed.
+
+**Decisions and deviations** (design §9.3 and §11.6 reconciled in Task 12):
 
 1. **Input schemas live in `src/domain/lists.ts`** (design §11.2: shared Zod schemas). The server parses every request body with them.
-2. **Tag names match ignoring accents and final sigma, as well as letter case.** Design §9.3 says "ignoring letter case", but Greek capitals drop their accents, so «ΠΕΤΡΑ» must match «Πέτρα». *Assumption — the owner may overrule.* Design §9.3 is updated in Task 12.
-3. **`CF-Connecting-IP` cannot be checked against Cloudflare's addresses inside the app**, because Hetzner's web server is the app's direct peer. The header is trusted when `BEHIND_CLOUDFLARE=1`, and the login limiter adds a global cap. Design §11.6 is updated in Task 12; restricting the origin to Cloudflare's address ranges is left to Plan 6.
+2. **Tag names match ignoring accents and final sigma, as well as letter case.** Greek capitals drop their accents, so «ΠΕΤΡΑ» must match «Πέτρα». *Assumption — the owner may overrule.* Design §9.3 now records this rule.
+3. **`CF-Connecting-IP` cannot be checked against Cloudflare's addresses inside the app**, because Hetzner's web server is the app's direct peer. The header is trusted when `BEHIND_CLOUDFLARE=1`, and the login limiter adds a global cap. Design §11.6 now records this behavior; restricting the origin to Cloudflare's address ranges is left to Plan 6.
 4. **Projects are created only by seed scripts**, because §10 has no project screen.
 5. **The location tree has a project root node** («Γεννάδι 822Α»), as §15 implies ("ticking the project root").
 6. **A zone type can be deleted only while no location node uses it.** The design is silent on this.
 7. **Greek names of zone types, villas, levels and spaces are proposals**, because the source sheets are English only. The owner can rename them in Lists (Plan 5). *Assumption.*
 8. **Records arrive in Plan 3.** Until then, tag merge/delete and location delete have no record links to move or check; Plan 3 extends them (see "Hand-over to later plans").
+9. **Owner creation/reset uses an immediate transaction.** Lookup, count and write are serialized across connections to preserve the approved one-owner invariant. Password hashing happens before the lock. This corrects the original Task 3 snippet's race.
+10. **Content type uses exact normalized media-type comparison.** The guard rejects `application/json-extra`; the original prefix comparison accepted it. This enforces the design's JSON requirement.
+11. **Logout requires a valid session.** The original Task 5 snippet exempted logout. Missing, invalid or expired sessions now return 401, consistent with design §11.5. Only login is exempt from the session rule for state-changing requests.
 
 ---
 
@@ -3634,13 +3645,13 @@ git commit -m "feat(server): seed import for Gennadi 822A"
 - Modify: `docs/designs/2026-10-02-v1-records-design.md` (§9.3, §11.6)
 - Modify: `docs/plans/2026-10-03-plan-2-server-foundation.md` (metadata), `docs/plans/2026-10-02-v1-roadmap.md` (Plan 2 status)
 
-- [ ] **Step 1: Run the full suite and the type check**
+- [x] **Step 1: Run the full suite and the type check**
 
 Run: `npm test`
-Expected: `Test Files  18 passed (18)` and `Tests  136 passed (136)` (Plan 1: 69; Plan 2: config 3, db 4, passwords 4, sessions 8, login limiter 4, auth API 12, domain lists 5, lists API 8, tags 6, locations 7, seed 6).
-Run: `npm run typecheck` → no output.
+Verified at closeout: `Test Files  18 passed (18)` and `Tests  155 passed (155)` (Plan 1: 69; Plan 2: config 3, db 4, passwords 4, sessions 11, login limiter 10, auth API 16, domain lists 5, lists API 14, tags 6, locations 7, seed 6). The original 136-test forecast was superseded by added regression coverage; the preflight result above remains historical.
+Verified: `npm run typecheck` exited 0 with no TypeScript diagnostics.
 
-- [ ] **Step 2: Update design §9.3 (tag matching, Decision 2)**
+- [x] **Step 2: Update design §9.3 (tag matching, Decision 2)**
 
 Replace:
 
@@ -3654,7 +3665,7 @@ with:
 Fields: **name EL**, **name EN**. At least one name is required. Names are **unique within each language** after trimming and ignoring letter case — and, because Greek capitals drop their accents, ignoring accents and final sigma too («ΠΕΤΡΑ» = «Πέτρα»).
 ```
 
-- [ ] **Step 3: Update design §11.6 (visitor IP, Decision 3)**
+- [x] **Step 3: Update design §11.6 (visitor IP, Decision 3)**
 
 Replace:
 
@@ -3668,15 +3679,15 @@ with:
 The server takes the visitor IP from `CF-Connecting-IP` when `BEHIND_CLOUDFLARE=1` (login rate limiting, logs). The application cannot check that a request really came through Cloudflare — Hetzner's web server is its direct peer — so the login limiter also caps failed logins globally. Restricting the origin to Cloudflare's address ranges is decided in Plan 6.
 ```
 
-- [ ] **Step 4: Update this plan's metadata**
+- [x] **Step 4: Update this plan's metadata**
 
 Set `> **Status:** Completed`, `> **Retention:** Historical — do not execute.`, `> **Implemented by:**` the Plan 2 commit range (first..last hash), and `> **Verified:**` with the date and the two results of Step 1.
 
-- [ ] **Step 5: Update the roadmap**
+- [x] **Step 5: Update the roadmap**
 
 In `docs/plans/2026-10-02-v1-roadmap.md`, change the Plan 2 row's status from `Written` to `Completed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/designs/2026-10-02-v1-records-design.md docs/plans/2026-10-03-plan-2-server-foundation.md docs/plans/2026-10-02-v1-roadmap.md
