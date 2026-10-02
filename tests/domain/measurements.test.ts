@@ -28,6 +28,29 @@ const after: MeasurementSet = {
 };
 
 describe('measurement labels (design §5.7)', () => {
+  it('keeps distinct row identities when labels contain NUL characters', () => {
+    const first: MeasurementSet = {
+      id: 10,
+      date: '2026-10-01',
+      phase: 'before',
+      rows: [{ item: 'A\u0000B', quantity: 'C', value: 1, unit: 'cm' }],
+    };
+    const second: MeasurementSet = {
+      id: 11,
+      date: '2026-10-02',
+      phase: 'after',
+      rows: [{ item: 'A', quantity: 'B\u0000C', value: 2, unit: 'cm' }],
+    };
+
+    expect.soft(duplicateRowKeys([...first.rows, ...second.rows])).toEqual([]);
+    expect.soft(compareOverTime([first, second], 'A\u0000B', 'C', 'cm')).toEqual([
+      { setId: 10, date: '2026-10-01', phase: 'before', value: 1, changeFromPrevious: null },
+    ]);
+    expect.soft(compareOverTime([first, second], 'A', 'B\u0000C', 'cm')).toEqual([
+      { setId: 11, date: '2026-10-02', phase: 'after', value: 2, changeFromPrevious: null },
+    ]);
+  });
+
   it('normalises by trimming, collapsing whitespace and ignoring case, including Greek', () => {
     expect(normalizeLabel('  Stone   THICKNESS ')).toBe('stone thickness');
     expect(normalizeLabel('Πάχος  ΠΈΤΡΑΣ')).toBe(normalizeLabel('πάχος πέτρας'));

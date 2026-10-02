@@ -34,7 +34,7 @@ export function normalizeLabel(label: string): string {
 }
 
 function rowKey(row: Pick<MeasurementRow, 'item' | 'quantity' | 'unit'>): string {
-  return `${normalizeLabel(row.item)}\u0000${normalizeLabel(row.quantity)}\u0000${row.unit}`;
+  return JSON.stringify([normalizeLabel(row.item), normalizeLabel(row.quantity), row.unit]);
 }
 
 /** Normalised Item + Quantity + Unit keys that occur more than once (must be unique within a set). */

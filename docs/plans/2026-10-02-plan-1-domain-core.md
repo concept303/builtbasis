@@ -4,8 +4,8 @@
 > **Status:** Completed
 > **Retention:** Active until executed; historical afterwards.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §4.2 (IDs), §5–§6 (required fields, disposition and decision rules), §5.7 (measurement rules and comparisons), §7 (value lists), §8 (status rules).
-> **Implemented by:** `804a372..95e1bf4` (Tasks 1–6); final public exports and verification are in this completion commit (`feat(domain): public exports; complete Plan 1`).
-> **Verified:** 2026-10-03 (Australia/Sydney) — `npm test` (68 passed across 7 files), `npm run typecheck` clean.
+> **Implemented by:** `804a372..95e1bf4` (Tasks 1–6); public exports completed in `4c56699`; the post-review row-key fix is recorded below.
+> **Verified:** 2026-10-03 (Australia/Sydney) — `npm test` (69 passed across 7 files), `npm run typecheck` clean.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -1156,6 +1156,29 @@ const after: MeasurementSet = {
 };
 
 describe('measurement labels (design §5.7)', () => {
+  it('keeps distinct row identities when labels contain NUL characters', () => {
+    const first: MeasurementSet = {
+      id: 10,
+      date: '2026-10-01',
+      phase: 'before',
+      rows: [{ item: 'A\u0000B', quantity: 'C', value: 1, unit: 'cm' }],
+    };
+    const second: MeasurementSet = {
+      id: 11,
+      date: '2026-10-02',
+      phase: 'after',
+      rows: [{ item: 'A', quantity: 'B\u0000C', value: 2, unit: 'cm' }],
+    };
+
+    expect.soft(duplicateRowKeys([...first.rows, ...second.rows])).toEqual([]);
+    expect.soft(compareOverTime([first, second], 'A\u0000B', 'C', 'cm')).toEqual([
+      { setId: 10, date: '2026-10-01', phase: 'before', value: 1, changeFromPrevious: null },
+    ]);
+    expect.soft(compareOverTime([first, second], 'A', 'B\u0000C', 'cm')).toEqual([
+      { setId: 11, date: '2026-10-02', phase: 'after', value: 2, changeFromPrevious: null },
+    ]);
+  });
+
   it('normalises by trimming, collapsing whitespace and ignoring case, including Greek', () => {
     expect(normalizeLabel('  Stone   THICKNESS ')).toBe('stone thickness');
     expect(normalizeLabel('Πάχος  ΠΈΤΡΑΣ')).toBe(normalizeLabel('πάχος πέτρας'));
@@ -1281,7 +1304,7 @@ export function normalizeLabel(label: string): string {
 }
 
 function rowKey(row: Pick<MeasurementRow, 'item' | 'quantity' | 'unit'>): string {
-  return `${normalizeLabel(row.item)}\u0000${normalizeLabel(row.quantity)}\u0000${row.unit}`;
+  return JSON.stringify([normalizeLabel(row.item), normalizeLabel(row.quantity), row.unit]);
 }
 
 /** Normalised Item + Quantity + Unit keys that occur more than once (must be unique within a set). */
@@ -1340,7 +1363,7 @@ export function compareOverTime(
 - [x] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/measurements.test.ts`
-Expected: PASS — 8 tests.
+Expected: PASS — 9 tests.
 
 - [x] **Step 5: Commit**
 
@@ -1403,13 +1426,13 @@ export * from './measurements';
 - [x] **Step 4: Run the whole suite and the type check**
 
 Run: `npm test`
-Expected: PASS — 7 test files: vocabulary 23, ids 3, statuses 4, record-rules 9, transitions 20, measurements 8, index 1 (68 tests).
+Expected: PASS — 7 test files: vocabulary 23, ids 3, statuses 4, record-rules 9, transitions 20, measurements 9, index 1 (69 tests).
 Run: `npm run typecheck`
 Expected: no output, exit code 0.
 
 - [x] **Step 5: Update plan metadata and roadmap**
 
-In this file set `Status: Completed`, `Implemented by: <first>..<last commit>`, `Verified: <date> — npm test (68 passed), npm run typecheck clean`. In `docs/plans/2026-10-02-v1-roadmap.md` set Plan 1 status to `Completed`.
+In this file set `Status: Completed`, `Implemented by: <first>..<last commit>`, `Verified: <date> — npm test (69 passed), npm run typecheck clean`. In `docs/plans/2026-10-02-v1-roadmap.md` set Plan 1 status to `Completed`.
 
 - [x] **Step 6: Commit**
 
@@ -1420,8 +1443,18 @@ git commit -m "feat(domain): public exports; complete Plan 1"
 
 ## Completion evidence
 
-The final suite passed all 68 tests across seven files. TypeScript reported no errors. The public-export smoke test first failed because `src/domain/index.ts` was absent, then passed after the barrel module was added.
+The final suite passed all 69 tests across seven files. TypeScript reported no errors. The public-export smoke test first failed because `src/domain/index.ts` was absent, then passed after the barrel module was added.
 
 The declared Node minimum was raised from 22 to 22.12.0 in the package manifest, lockfile root and this plan to match the locked Vite tooling. This is a small implementation deviation from the original scaffold.
 
 Vitest 3 is retained for this Node-only domain slice. The Task 1 audit reported two moderate entries for [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9). The affected mocker dev-server endpoint is not used by this configuration. Upgrade to a maintained patched Vitest version before enabling the affected browser/dev-server mocker integration. Audit output has not been suppressed.
+
+## Caller contract for later plans
+
+These helpers take typed domain state. Future shared API schemas must validate dates, positive and valid IDs, finite measurement values, title length, and subtype/status legality. Ordinary updates must preserve the required On hold and Cancelled reasons. Persistence owns valid hold history, allocation and immutability, and atomic activity/verification writes. These are existing later-plan responsibilities, not additional Plan 1 functionality.
+
+## Post-review fix evidence
+
+On 2026-10-03 (Australia/Sydney), final review found that NUL-delimited row keys could confuse distinct item/quantity pairs. Row keys now encode the normalized item, normalized quantity and unit as a JSON tuple. There are no persisted keys or external key consumers to migrate.
+
+One regression covers distinct-row uniqueness and prevents cross-row over-time matches in both directions. Before the fix, the focused run failed all three assertions. After the fix, the measurement suite passed all 9 tests. Final verification passed all 69 tests across 7 files and `npm run typecheck` exited 0. The detailed commands and evidence are in `.superpowers/sdd/2026-10-02-plan-1-domain-core/final-fix-report.md`.
