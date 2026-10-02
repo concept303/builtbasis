@@ -14,7 +14,7 @@
 
 **Goal:** A running Fastify/TypeScript server on SQLite with owner login, the managed-list APIs (projects, people, trades, zone types, tags, location tree) and a seed for Gennadi 822A — all test-first, runnable locally.
 
-**Architecture:** `src/server` holds the HTTP app (`app.ts`), configuration, database access (better-sqlite3, migrations as TypeScript strings), owner authentication (scrypt passwords, hashed session tokens, login limiter) and one focused module per managed list (repository functions + routes). The managed-list input schemas (Zod) live in `src/domain/lists.ts`, so the browser can reuse them (design §11.2). Global hooks enforce the design's request rules: every state-changing request needs a matching `Origin` and a JSON body (multipart only where a route allows it), every `/api` route except health/login/logout needs a session, and GET handlers never write. Tests drive the app in-process with Fastify `inject` against a temporary SQLite file.
+**Architecture:** `src/server` holds the HTTP app (`app.ts`), configuration, database access (better-sqlite3, migrations as TypeScript strings), owner authentication (scrypt passwords, hashed session tokens, login limiter) and one focused module per managed list (repository functions + routes). The managed-list input schemas (Zod) live in `src/domain/lists.ts`, so the browser can reuse them (design §11.2). Global hooks enforce the design's request rules: every state-changing request needs a matching `Origin` and a JSON body (multipart only where a route allows it), every `/api` route except health/login needs a session, and GET handlers never write. Tests drive the app in-process with Fastify `inject` against a temporary SQLite file.
 
 **Tech Stack:** Node.js 24, TypeScript 5 (strict, ESM), Fastify 5, @fastify/cookie 11, better-sqlite3 13.0.3, Zod 4, Vitest 3, tsx 4 (dev runner), exceljs 4 (seed only).
 
@@ -1007,6 +1007,8 @@ git commit -m "feat(server): login limiter and Cloudflare-aware visitor IP"
 
 ### Task 5: HTTP app, request rules and authentication API
 
+Implementation refinement: logout requires a valid session, consistent with design §11.5. Only health and login are public. Content types are compared as exact normalized media types after removing parameters, so prefixes such as application/json-extra are rejected.
+
 **Files:**
 
 - Create: `src/server/errors.ts`, `src/server/http/params.ts`, `src/server/http/guards.ts`, `src/server/routes/health.ts`, `src/server/routes/auth.ts`, `src/server/lists/projects.ts`, `src/server/app.ts`
@@ -1280,7 +1282,7 @@ import { HttpError } from '../errors';
 
 export const SESSION_COOKIE = 'bb_session';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login', '/api/auth/logout']);
+const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login']);
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -1296,7 +1298,7 @@ declare module 'fastify' {
  * Request rules (design §11.5):
  * - every state-changing request needs Origin = the public origin and a JSON body
  *   (multipart only on routes that allow it);
- * - every /api route except health, login and logout needs a valid session;
+ * - every /api route except health and login needs a valid session;
  * - session lookup is read-only, so GET requests never write.
  */
 export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {
@@ -1305,10 +1307,10 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
   app.addHook('onRequest', async (request) => {
     if (SAFE_METHODS.has(request.method)) return;
     if (request.headers.origin !== config.publicOrigin) throw new HttpError(403, 'origin_rejected');
-    const contentType = request.headers['content-type'] ?? '';
-    const isJson = contentType.startsWith('application/json');
+    const contentType = (request.headers['content-type']?.split(';', 1)[0] ?? '').trim().toLowerCase();
+    const isJson = contentType === 'application/json';
     const isAllowedMultipart =
-      contentType.startsWith('multipart/form-data') && request.routeOptions.config?.multipart === true;
+      contentType === 'multipart/form-data' && request.routeOptions.config?.multipart === true;
     if (!isJson && !isAllowedMultipart) throw new HttpError(415, 'unsupported_content_type');
   });
 

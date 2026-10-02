@@ -6,7 +6,7 @@ import { HttpError } from '../errors';
 
 export const SESSION_COOKIE = 'bb_session';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login', '/api/auth/logout']);
+const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login']);
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -22,7 +22,7 @@ declare module 'fastify' {
  * Request rules (design §11.5):
  * - every state-changing request needs Origin = the public origin and a JSON body
  *   (multipart only on routes that allow it);
- * - every /api route except health, login and logout needs a valid session;
+ * - every /api route except health and login needs a valid session;
  * - session lookup is read-only, so GET requests never write.
  */
 export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {

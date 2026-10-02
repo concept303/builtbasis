@@ -89,6 +89,23 @@ describe('authentication and request rules (design §11.5)', () => {
     expect((await get(ctx, cookie, '/api/auth/me')).statusCode).toBe(401);
   });
 
+  it.each(['missing', 'invalid', 'expired'] as const)('rejects logout when the session is %s', async (state) => {
+    ctx = await makeContext();
+    let cookie: string | undefined;
+    if (state === 'invalid') cookie = 'bb_session=invalid-token';
+    if (state === 'expired') {
+      cookie = await loginAsOwner(ctx);
+      ctx.db.prepare('UPDATE sessions SET expires_at = ?').run('2000-01-01T00:00:00.000Z');
+    }
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ctx.origin, ...(cookie ? { cookie } : {}) },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthenticated' });
+  });
   it('rejects owner data changes without a session', async () => {
     ctx = await makeContext();
     const res = await ctx.app.inject({
@@ -142,6 +159,7 @@ describe('authentication and request rules (design §11.5)', () => {
     expect(res.statusCode).toBe(415);
     expect(res.json()).toEqual({ error: 'unsupported_content_type' });
   });
+
   it('GET requests never change the database', async () => {
     ctx = await makeContext();
     const cookie = await loginAsOwner(ctx);
