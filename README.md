@@ -2,7 +2,7 @@
 
 Lightweight construction-control application: quality issues, detail clarifications and tasks — with measurements, decisions, photos and read-only sharing — in English and Greek.
 
-**Status:** design approved for v1; implementation not started.
+**Status:** design approved for v1; implementation planned (see roadmap), not started.
 
 ## Documentation
 
