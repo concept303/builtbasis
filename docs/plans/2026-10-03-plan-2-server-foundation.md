@@ -2825,7 +2825,7 @@ git commit -m "feat(server): location tree API with move, retire, delete and cop
 - Create: `src/server/bootstrap.ts`, `src/server/main.ts`, `scripts/owner.ts`, `.env.example`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Create `src/server/bootstrap.ts`**
+- [x] **Step 1: Create `src/server/bootstrap.ts`**
 
 ```ts
 import { existsSync } from 'node:fs';
@@ -2845,7 +2845,7 @@ export function openMigratedDatabase(config: AppConfig): { db: Db; applied: stri
 }
 ```
 
-- [ ] **Step 2: Create `src/server/main.ts`**
+- [x] **Step 2: Create `src/server/main.ts`**
 
 ```ts
 import { buildApp } from './app';
@@ -2885,7 +2885,7 @@ if (config.port !== null) {
 }
 ```
 
-- [ ] **Step 3: Create `scripts/owner.ts`**
+- [x] **Step 3: Create `scripts/owner.ts`**
 
 ```ts
 import { stdin, stdout } from 'node:process';
@@ -2963,7 +2963,7 @@ try {
 }
 ```
 
-- [ ] **Step 4: Create `.env.example`**
+- [x] **Step 4: Create `.env.example`**
 
 ```bash
 # Local development settings. Copy to .env (git-ignored); never commit .env.
@@ -2975,7 +2975,7 @@ PUBLIC_BASE_URL=http://localhost:3000
 # BEHIND_CLOUDFLARE=1
 ```
 
-- [ ] **Step 5: Let git track `.env.example`**
+- [x] **Step 5: Let git track `.env.example`**
 
 The existing `.env.*` rule in `.gitignore` also matches `.env.example`. Directly below the line `.env.*`, add:
 
@@ -2985,13 +2985,13 @@ The existing `.env.*` rule in `.gitignore` also matches `.env.example`. Directly
 
 Check: `git check-ignore .env.example` prints nothing (exit code 1), and `git check-ignore .env` still prints `.env`.
 
-- [ ] **Step 6: Typecheck and check the owner command refuses piped input**
+- [x] **Step 6: Typecheck and check the owner command refuses piped input**
 
 Run: `npm run typecheck` → no output.
 Run: `npm run owner -- owner < /dev/null` (PowerShell: `$null | npm run owner -- owner`)
 Expected: `Run this command in an interactive terminal: …`, exit code 2, and no database change.
 
-- [ ] **Step 7: Run the server locally**
+- [x] **Step 7: Run the server locally**
 
 Run: `cp .env.example .env` (PowerShell: `Copy-Item .env.example .env`), then `npm start`.
 Expected log lines include `Server listening at http://127.0.0.1:3000`; `data/builtbasis.db` now exists.
@@ -3009,7 +3009,7 @@ curl -s http://127.0.0.1:3000/api/projects
 
 Stop the server with Ctrl+C. Expected log line: `SIGINT received, closing`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add .gitignore src/server/bootstrap.ts src/server/main.ts scripts/owner.ts .env.example

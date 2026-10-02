@@ -14,6 +14,7 @@ data/
 # Environment and secrets
 .env
 .env.*
+!.env.example
 
 # Private design notebook (DOCS-STANDARD §5)
 _AI/DESIGN_NOTEBOOK.md
