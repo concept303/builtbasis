@@ -30,14 +30,14 @@ The first project using it is Gennadi 822A (three villas, Rhodes). Nothing in th
 | **Anyone holding a share link** | Opens a link, no account | View one record, read-only, without private content |
 
 - There are no other accounts in v1. Nobody but the owner writes to the system.
-- **Private content** is visible only to the logged-in owner and is never included in share links or PDFs: the _Outside contract scope_ flag, _Estimated cost_, and notes marked private (§5.11).
+- **Private content** is visible only to the logged-in owner and is never included in share links or PDFs: the _Outside contract scope_ flag, _Estimated cost_, the _Notes_ field (§5.1), and log entries marked private together with their attachments (§5.11).
 
 ## 3. Language
 
 - **Every fixed value and every UI label exists in English and Greek.** The whole interface switches language at any time.
 - **Every value in every fixed list has a short definition** in both languages (given in §7). How definitions are presented (inline help, tap, hover) is decided at implementation; hover alone is insufficient because phones have no hover.
 - **Managed lists** (trades, tags, location nodes, zone types) have an English and a Greek name; if one is empty, the other is shown.
-- **Text the user types** (titles, descriptions, instruction text, notes, measurement labels) is stored and shown exactly as typed. It is never translated.
+- **Text the user types** (titles, descriptions, instruction text, notes, log entries, measurement labels) is stored and shown exactly as typed. It is never translated.
 - Values are stored as **language-neutral codes** (e.g. `in_progress`); labels and definitions are looked up from the code.
 - Language preference: the owner's choice is remembered. Share-link pages open in Greek by default and offer a language switch.
 
@@ -94,6 +94,7 @@ Field privacy: **P** = private (owner only). Shared record pages show every non-
 | Status | Κατάσταση | code (§7.2) | Required. Rules in §8. |
 | Status reason | Αιτιολογία κατάστασης | code (§7.3 / §7.4) + note | Required when status is On hold or Cancelled. |
 | Reference | Αναφορά | text | Free text: drawings, documents, other record IDs. |
+| Notes | Σημειώσεις | long text | Optional. **P.** Free-text working notes, separate from the Log (§5.11). |
 | Created / updated | Δημιουργία / ενημέρωση | timestamps + user | Automatic. |
 
 ### 5.2 People and responsibility
@@ -200,6 +201,8 @@ The record shows photos grouped by phase. The original file is always kept uncha
 
 Documents and drawings (PDF, images, office documents): file + title (optional) + original filename + upload date. Any number per record. Storage and access rules in §11.4.
 
+Attachments are added in two ways: **directly** to the record, or **through a log entry** (§5.11). The **Attachments pane lists all of the record's attachments**; those added through a log entry also show that entry's date and text (e.g. "Plans.pdf · 2026-05-01 · Architect sent plans"). Attachments of private log entries are private.
+
 ### 5.10 Verification
 
 Recorded on exactly two transitions (§8.1): **Ready for verification → Closed** (outcome _passed_) and **Ready for verification → In progress** (outcome _failed_). No other transition creates a verification entry (e.g. a DC superseded while Ready for verification creates none). A record can have several verification entries over time (e.g. one failed, then one passed).
@@ -212,9 +215,19 @@ Recorded on exactly two transitions (§8.1): **Ready for verification → Closed
 | Outcome | Αποτέλεσμα | code (§7.17) | Set by the transition: → Closed = _passed_; → In progress = _failed_. Not chosen separately. |
 | Note | Σημείωση | text | Optional. |
 
-### 5.11 Notes
+### 5.11 Log (Ημερολόγιο)
 
-A record has a list of notes (text, author, timestamp). Each note can be marked **Private (P)** by the owner; private notes never appear in share links or PDFs.
+A manual, dated record of what happened, entered by the user — e.g. "2026-05-01 · Architect sent plans", "2026-05-02 · Contractor confirmed receipt of plans". Any number of entries per record, shown newest first.
+
+| Field | Greek | Type | Rules |
+|---|---|---|---|
+| Date & time | Ημερομηνία & ώρα | date-time | Required. When it happened. Defaults to now; editable. |
+| Entry | Καταχώριση | long text | Required. |
+| Logged by | Καταχώρισε | user | Automatic: the logged-in user. |
+| Attachments | Συνημμένα | zero or more files | Optional. Stored as record attachments linked to this entry (§5.9). |
+| Private | Ιδιωτικό | checkbox | **P** when ticked: the entry and its attachments never appear in share links or PDFs. |
+
+Entries can be edited and deleted by the owner. The Log is separate from the automatic Activity log (§5.12), which records system changes.
 
 ### 5.12 Activity log
 
@@ -514,14 +527,14 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
    - Totals: count; sum of estimated cost for the filtered set, counting only records currently marked _Outside contract scope_ (owner only).
 3. **New record** — quick capture: subtype, title, optional photo(s) and location; saved as **Draft**; completed later.
 4. **Record page** — header (ID, title, subtype, status with allowed actions, ball in court, due date, severity, priority, completion bar, safety badge) and sections/tabs:
-   - **Overview** — description, location paths, responsible, trades, tags, reference, must be done before / requires first, private commercial fields (owner only).
+   - **Overview** — description, location paths, responsible, trades, tags, reference, must be done before / requires first; Notes field and private commercial fields (owner only).
    - **Classification** — subtype-specific fields (§6).
    - **Decision** — options considered, chosen option, decided by/on, instruction text (QI, DC).
    - **Measurements** — sets and rows; comparison views.
    - **Photos** — grouped by phase; full-screen viewer.
    - **Attachments.**
    - **Verification** — entries.
-   - **Notes** — with private marker.
+   - **Log** — dated entries with attachments; private marker.
    - **Activity.**
    - **Share & print** — create, copy and revoke share links; open the A3 print/PDF view.
 5. **Status change dialog** — shows only allowed transitions (§8.1) and asks for what each requires (reason, verification, disposition).
@@ -559,10 +572,10 @@ All database access is confined to `src/server` data-access modules, so a later 
 ### 11.4 Files
 
 - **Stored file (blob):** the bytes, stored once in the data folder and identified by their **SHA-256 content hash**, with size and content type.
-- **Occurrence:** each photo or attachment on a record is its own row, holding the record, the blob reference, the original filename, title/caption and uploaded by/at. The same file uploaded to two records gives two occurrences sharing one blob.
+- **Occurrence:** each photo or attachment on a record is its own row, holding the record, the blob reference, the original filename, title/caption, uploaded by/at and — for attachments added through the Log — the log entry. The same file uploaded to two records gives two occurrences sharing one blob.
 - **Photos** reference three blobs: original, display copy and thumbnail. The browser produces the display copy and thumbnail at upload, so the server needs no image-processing module.
 - **Originals are never modified or overwritten.** Corrections add new files.
-- **Access:** files are served only through an authorised application route. A request needs the owner's session, or a currently valid share token for a record that has an occurrence of that file. This applies to originals, display copies and thumbnails. Knowing a content hash grants no access.
+- **Access:** files are served only through an authorised application route. A request needs the owner's session, or a currently valid share token for a record that has a **non-private** occurrence of that file (not attached to a private log entry). This applies to originals, display copies and thumbnails. Knowing a content hash grants no access.
 - Limits: photos up to 25 MB, attachments up to 50 MB. Accepted: images (JPEG, PNG, HEIC), PDF, common office documents.
 
 ### 11.5 Authentication and sharing
@@ -642,7 +655,7 @@ One A3-landscape page per record (continuing to further pages if needed), in the
 - **QR code** to an existing active, non-expired share link of the record, chosen by the owner. If the record has none, the print view offers a button to create one first (an explicit action, §11.5).
 - Footer: generated date-time, record last-updated date-time.
 
-Notes and the activity log are not printed.
+The Notes field, the Log and the Activity log are not printed.
 
 ## 13. Tests
 
@@ -650,7 +663,8 @@ Notes and the activity log are not printed.
 - **API (Vitest + Fastify `inject`, temporary SQLite file):**
   - CRUD for records and managed lists; tag rename/merge/delete across records, including the two-tag collision rejection; location filter includes descendants and counts once; must-be-done-before cycle rejection.
   - **Security:** writes without a session are rejected; login, data changes and uploads with a wrong or missing `Origin` are rejected; GET requests change no records, evidence or access (only the share-page view count and last-viewed time); invalid direct API writes (rule violations) are rejected by the server; a password reset ends all sessions; session identifiers and share tokens are never stored in plain text, and raw share tokens never appear in activity entries or logs.
-  - **Sharing:** private fields absent from share responses; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
+  - **Log and attachments:** attachments added through a log entry appear in the record's attachments list with the entry's date and text; directly added attachments appear without one.
+  - **Sharing:** private fields (including the Notes field and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
 - **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content.
 - **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7), including session deletion and share-link revocation.
