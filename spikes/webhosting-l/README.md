@@ -23,6 +23,6 @@ BUILTBASIS_DATA_DIR=./data node backup-check.mjs
 | 6 | Playwright/Chromium runs | | |
 | 7 | Cron can run `node` (backup check) | | |
 
-**Listen mechanism used by Hetzner:** 
-**Node binary path for cron:** 
-**Go / no-go:** 
+**Listen mechanism used by Hetzner:** Documented (docs.hetzner.com, konsoleH → Node.js, Hello World example): the app calls `server.listen()` **without arguments** and the platform routes requests; no port, host or socket is specified. `server.mjs` therefore listens without arguments when `PORT` is unset (verified locally 2026-10-02: OS-assigned port, `/health` OK). To confirm on the server in Task 5 Step 3.
+**Node binary path for cron:** pending (Task 7)
+**Go / no-go:** pending (Task 8)

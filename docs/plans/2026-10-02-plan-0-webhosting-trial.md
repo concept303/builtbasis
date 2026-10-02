@@ -4,7 +4,7 @@
 > **Status:** Approved
 > **Retention:** Active until the trial is completed and its results are recorded; historical afterwards.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §11.9 (test deployment), informing §11.6 and §11.8.
-> **Implemented by:** Not implemented
+> **Implemented by:** In progress — Task 1 `f3ccc78`; Task 5 Step 1 done (listen mechanism)
 > **Verified:** Not verified
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 2–7 need the owner's Hetzner konsoleH access and SSH; an agent prepares commands and records results, the owner performs console actions.
@@ -240,7 +240,7 @@ git commit -m "chore(spike): Webhosting L trial spike"
 tar --exclude=node_modules --exclude=data -czf - -C spikes/webhosting-l . | ssh USER@HOST 'mkdir -p builtbasis-spike && tar -xzf - -C builtbasis-spike && ls builtbasis-spike'
 ```
 
-Expected: the listing shows `README.md backup-check.mjs package-lock.json package.json pdf-check.mjs server.mjs`. Also record whether `rsync` exists on the server (`ssh USER@HOST 'command -v rsync'`) — Plan 6 chooses the deploy transfer method from this.
+Expected: the listing shows `README.md backup-check.mjs db.mjs package-lock.json package.json pdf-check.mjs server.mjs`. Also record whether `rsync` exists on the server (`ssh USER@HOST 'command -v rsync'`) — Plan 6 chooses the deploy transfer method from this.
 
 - [ ] **Step 2: Install on the server**
 
@@ -262,7 +262,7 @@ Expected: a local filesystem type (e.g. `ext4`, `xfs`). **If the type is `nfs`, 
 
 ### Task 5: Run the app; verify domain isolation, restart and memory (checks 1, 4, 5)
 
-- [ ] **Step 1:** Read the Node.js examples on Hetzner's page _Node.js Configuration_ (docs.hetzner.com → konsoleH → Node.js) and note how the app must listen (port environment variable, fixed port, or socket). If it differs from `server.mjs` (PORT env, `0.0.0.0`), adjust `server.mjs`, re-upload (Task 3 Step 1) and record the mechanism in the README.
+- [x] **Step 1 (done 2026-10-02):** Hetzner's Hello World example calls `server.listen()` without arguments; `server.mjs` was adapted to do the same when `PORT` is unset (see spike README). Original instruction: read the Node.js examples on Hetzner's page _Node.js Configuration_ (docs.hetzner.com → konsoleH → Node.js) and note how the app must listen (port environment variable, fixed port, or socket). If it differs from `server.mjs` (PORT env, `0.0.0.0`), adjust `server.mjs`, re-upload (Task 3 Step 1) and record the mechanism in the README.
 - [ ] **Step 2:** In konsoleH → domain **builtbasis.ktimanet.com** → Services → Node.js configuration: script path `server.mjs` (relative to the working directory), working directory `builtbasis-spike/`, log file `builtbasis-spike/log.txt`, memory limit = **the highest value offered** (record it as check 5), version = 24 (preferred; with 22, `node:sqlite` needs 22.13 or later), environment variable `BUILTBASIS_DATA_DIR` = absolute path of `~/builtbasis-data`. Activate.
 - [ ] **Step 3: Verify**
 
