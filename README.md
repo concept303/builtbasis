@@ -12,6 +12,7 @@ Lightweight construction-control application: quality issues, detail clarificati
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System structure |
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | **Full v1 design** — records, fields, value lists, rules, screens, operations. Basis for the spec and implementation plan. |
+| [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Implementation roadmap: the sequence of v1 plans and their status |
 | [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research (non-authoritative input) |
 
 Documentation follows `X:\1976KN\Dev\Code\DOCS-STANDARD.md` (v1.4).
