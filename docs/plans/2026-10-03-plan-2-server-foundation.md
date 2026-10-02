@@ -571,7 +571,7 @@ git commit -m "feat(server): SQLite connection, migrations and verified backups"
 - Create: `src/server/auth/passwords.ts`, `src/server/auth/sessions.ts`, `src/server/auth/users.ts`
 - Test: `tests/server/passwords.test.ts`, `tests/server/sessions.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/server/passwords.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/passwords.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -616,7 +616,7 @@ describe('passwords (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Write the failing test `tests/server/sessions.test.ts`**
+- [x] **Step 2: Write the failing test `tests/server/sessions.test.ts`**
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -696,12 +696,12 @@ describe('sessions and the owner account (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 3: Run to verify they fail**
+- [x] **Step 3: Run to verify they fail**
 
 Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/auth/passwords"` (and `sessions`).
 
-- [ ] **Step 4: Create `src/server/auth/passwords.ts`**
+- [x] **Step 4: Create `src/server/auth/passwords.ts`**
 
 ```ts
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -747,7 +747,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 ```
 
-- [ ] **Step 5: Create `src/server/auth/sessions.ts`**
+- [x] **Step 5: Create `src/server/auth/sessions.ts`**
 
 ```ts
 import { createHash, randomBytes } from 'node:crypto';
@@ -802,7 +802,7 @@ export function deleteExpiredSessions(db: Db, now: Date = new Date()): number {
 }
 ```
 
-- [ ] **Step 6: Create `src/server/auth/users.ts`**
+- [x] **Step 6: Create `src/server/auth/users.ts`**
 
 ```ts
 import type { Db } from '../db/connection';
@@ -860,11 +860,11 @@ export function setOwnerPassword(
 }
 ```
 
-- [ ] **Step 7: Run to verify they pass**
+- [x] **Step 7: Run to verify they pass**
 
 Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (4 + 8 tests). Then `npm run typecheck`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/server/auth tests/server/passwords.test.ts tests/server/sessions.test.ts
