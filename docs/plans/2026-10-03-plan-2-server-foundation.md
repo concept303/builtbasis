@@ -840,29 +840,32 @@ export function setOwnerPassword(
     throw new RangeError(`Username must be 1 to ${MAX_USERNAME_LENGTH} characters`);
   }
   const passwordHash = hashPassword(password);
-  const existing = findUserByUsername(db, username);
-  if (existing) {
-    return db.transaction(() => {
+  // Reserve the write lock before checking ownership, including on first creation.
+  return db.transaction(() => {
+    const existing = findUserByUsername(db, username);
+    if (existing) {
       db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(
         passwordHash,
         now.toISOString(),
         existing.id,
       );
       return { userId: existing.id, created: false, sessionsRemoved: deleteUserSessions(db, existing.id) };
-    })();
-  }
-  const users = db.prepare('SELECT COUNT(*) FROM users').pluck().get() as number;
-  if (users > 0) throw new Error('An owner account already exists; v1 supports exactly one account');
-  const info = db
-    .prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)')
-    .run(username, passwordHash, now.toISOString(), now.toISOString());
-  return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+    }
+    const users = db.prepare('SELECT COUNT(*) FROM users').pluck().get() as number;
+    if (users > 0) throw new Error('An owner account already exists; v1 supports exactly one account');
+    const info = db
+      .prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)')
+      .run(username, passwordHash, now.toISOString(), now.toISOString());
+    return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+  }).immediate();
 }
 ```
 
+Review correction: Hash before acquiring the lock, then perform owner lookup, count, creation or reset in one immediate transaction. Tests also cover deterministic competing creation through two SQLite connections, expired-session cleanup and reset rollback.
+
 - [x] **Step 7: Run to verify they pass**
 
-Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (4 + 8 tests). Then `npm run typecheck`.
+Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (4 + 11 tests). Then `npm run typecheck`.
 
 - [x] **Step 8: Commit**
 

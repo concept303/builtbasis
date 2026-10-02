@@ -1,4 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_PASSWORD_LENGTH, verifyPassword } from '../../src/server/auth/passwords';
 import { createSession, deleteExpiredSessions, deleteSession, findSessionUser, SESSION_TTL_MS } from '../../src/server/auth/sessions';
 import { findUserByUsername, MAX_USERNAME_LENGTH, setOwnerPassword } from '../../src/server/auth/users';
@@ -62,6 +65,40 @@ describe('sessions and the owner account (design §11.5)', () => {
 
   it('allows exactly one owner account', () => {
     expect(() => setOwnerPassword(db, 'someone-else', 'yet another long password')).toThrow('one account');
+  });
+
+  it('prevents a competing connection from creating a second owner between the check and insert', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'builtbasis-owner-'));
+    const first = openDatabase(join(dir, 'owner.db'));
+    const competing = openDatabase(join(dir, 'owner.db'));
+    try {
+      migrate(first, { backupsDir: join(dir, 'backups') });
+      competing.pragma('busy_timeout = 0');
+      const prepare = first.prepare.bind(first);
+      let competingError: unknown;
+      // Pause at the vulnerable boundary without sleeps or process scheduling.
+      // Both account operations and all SQL still execute against real SQLite.
+      const interception = vi.spyOn(first, 'prepare').mockImplementation((sql: string) => {
+        if (sql.startsWith('INSERT INTO users')) {
+          try {
+            setOwnerPassword(competing, 'second-owner', 'correct horse battery');
+          } catch (error) {
+            competingError = error;
+          }
+        }
+        return prepare(sql);
+      });
+      setOwnerPassword(first, 'first-owner', 'correct horse battery');
+      interception.mockRestore();
+      expect(first.prepare('SELECT username FROM users').pluck().all()).toEqual(['first-owner']);
+      expect(competingError).toMatchObject({ code: 'SQLITE_BUSY' });
+      expect(() => setOwnerPassword(competing, 'second-owner', 'correct horse battery')).toThrow('one account');
+    } finally {
+      vi.restoreAllMocks();
+      competing.close();
+      first.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('a rejected password reset keeps the previous password and sessions', () => {

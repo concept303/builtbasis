@@ -33,21 +33,22 @@ export function setOwnerPassword(
     throw new RangeError(`Username must be 1 to ${MAX_USERNAME_LENGTH} characters`);
   }
   const passwordHash = hashPassword(password);
-  const existing = findUserByUsername(db, username);
-  if (existing) {
-    return db.transaction(() => {
+  // Reserve the write lock before checking ownership, including on first creation.
+  return db.transaction(() => {
+    const existing = findUserByUsername(db, username);
+    if (existing) {
       db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(
         passwordHash,
         now.toISOString(),
         existing.id,
       );
       return { userId: existing.id, created: false, sessionsRemoved: deleteUserSessions(db, existing.id) };
-    })();
-  }
-  const users = db.prepare('SELECT COUNT(*) FROM users').pluck().get() as number;
-  if (users > 0) throw new Error('An owner account already exists; v1 supports exactly one account');
-  const info = db
-    .prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)')
-    .run(username, passwordHash, now.toISOString(), now.toISOString());
-  return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+    }
+    const users = db.prepare('SELECT COUNT(*) FROM users').pluck().get() as number;
+    if (users > 0) throw new Error('An owner account already exists; v1 supports exactly one account');
+    const info = db
+      .prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)')
+      .run(username, passwordHash, now.toISOString(), now.toISOString());
+    return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+  }).immediate();
 }
