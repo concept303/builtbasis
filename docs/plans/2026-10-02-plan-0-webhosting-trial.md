@@ -13,7 +13,7 @@
 
 **Architecture:** A throwaway spike in `spikes/webhosting-l/`: a minimal Fastify server that writes to SQLite in a data folder outside the app folder, a Playwright PDF check, and a backup check using `VACUUM INTO` + `integrity_check` + rename. Results are recorded in the spike README and fed back into the design.
 
-**Tech Stack:** Node.js (22 or 24, as offered by konsoleH), Fastify 5, better-sqlite3, Playwright (Chromium), Hetzner konsoleH, SSH, cron.
+**Tech Stack:** Node.js (22 or 24, as offered by konsoleH), Fastify 5, better-sqlite3 (fallback: Node's built-in `node:sqlite`), Playwright (Chromium), Hetzner konsoleH, SSH, cron.
 
 ---
 
@@ -21,7 +21,8 @@
 
 | File | Responsibility |
 |---|---|
-| `spikes/webhosting-l/package.json` | Spike dependencies (fastify, better-sqlite3) and lockfile for `npm ci` |
+| `spikes/webhosting-l/package.json` | Spike dependencies (fastify; better-sqlite3 as an optional dependency) and lockfile for `npm ci` |
+| `spikes/webhosting-l/db.mjs` | Opens SQLite with better-sqlite3, falling back to Node's built-in `node:sqlite` |
 | `spikes/webhosting-l/server.mjs` | `/health`: Node/SQLite versions, journal mode, write counter, memory |
 | `spikes/webhosting-l/pdf-check.mjs` | Renders an A3 landscape PDF with Greek text via Playwright |
 | `spikes/webhosting-l/backup-check.mjs` | `VACUUM INTO` temp file → `integrity_check` → rename |
@@ -36,6 +37,7 @@ Server layout used by the trial (from design §11.6): application folder `~/buil
 **Files:**
 
 - Create: `spikes/webhosting-l/package.json`
+- Create: `spikes/webhosting-l/db.mjs`
 - Create: `spikes/webhosting-l/server.mjs`
 - Create: `spikes/webhosting-l/pdf-check.mjs`
 - Create: `spikes/webhosting-l/backup-check.mjs`
@@ -57,35 +59,65 @@ Server layout used by the trial (from design §11.6): application folder `~/buil
 
 - [ ] **Step 2: Install the runtime dependencies (creates `package-lock.json`)**
 
-Run (in `spikes/webhosting-l`): `npm install fastify@5 better-sqlite3@13`
-Expected: `added N packages` and a new `package-lock.json`. No `gyp ERR!` lines.
+Run (in `spikes/webhosting-l`): `npm install fastify@5` then `npm install --save-optional better-sqlite3@13`
+Expected: `added N packages` each time and a new `package-lock.json`. `better-sqlite3` is listed under `optionalDependencies`, so a failed native build on the server will not abort `npm ci`.
+
+- [ ] **Step 2b: Create `spikes/webhosting-l/db.mjs`** (same interface for both SQLite drivers)
+
+```js
+// Opens SQLite with better-sqlite3, or with Node's built-in node:sqlite as the fallback.
+// SQLITE_DRIVER=node forces the fallback; SQLITE_DRIVER=better-sqlite3 forbids it.
+function wrap(driver, db) {
+  return {
+    driver,
+    exec: (sql) => db.exec(sql),
+    run: (sql, ...params) => db.prepare(sql).run(...params),
+    get: (sql, ...params) => db.prepare(sql).get(...params),
+    close: () => db.close(),
+  };
+}
+
+export async function openDatabase(path, { readonly = false } = {}) {
+  if (process.env.SQLITE_DRIVER !== 'node') {
+    try {
+      const { default: Database } = await import('better-sqlite3');
+      return wrap('better-sqlite3', new Database(path, { readonly }));
+    } catch (error) {
+      if (process.env.SQLITE_DRIVER === 'better-sqlite3') throw error;
+      console.warn(`better-sqlite3 unavailable (${error.message}); using node:sqlite`);
+    }
+  }
+  const { DatabaseSync } = await import('node:sqlite');
+  return wrap('node:sqlite', new DatabaseSync(path, { readOnly: readonly }));
+}
+```
 
 - [ ] **Step 3: Create `spikes/webhosting-l/server.mjs`**
 
 ```js
 import Fastify from 'fastify';
-import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { openDatabase } from './db.mjs';
 
 const dataDir = process.env.BUILTBASIS_DATA_DIR;
 if (!dataDir) throw new Error('BUILTBASIS_DATA_DIR is not set');
 mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(join(dataDir, 'spike.db'));
+const db = await openDatabase(join(dataDir, 'spike.db'));
 db.exec('CREATE TABLE IF NOT EXISTS hits (id INTEGER PRIMARY KEY, at TEXT NOT NULL)');
 
 const app = Fastify({ logger: true });
 
 app.get('/health', async () => {
-  db.prepare('INSERT INTO hits (at) VALUES (?)').run(new Date().toISOString());
-  const { n } = db.prepare('SELECT COUNT(*) AS n FROM hits').get();
+  db.run('INSERT INTO hits (at) VALUES (?)', new Date().toISOString());
   return {
     ok: true,
     node: process.version,
-    sqlite: db.prepare('SELECT sqlite_version() AS v').get().v,
-    journalMode: db.pragma('journal_mode', { simple: true }),
-    hits: n,
+    driver: db.driver,
+    sqlite: db.get('SELECT sqlite_version() AS v').v,
+    journalMode: db.get('PRAGMA journal_mode').journal_mode,
+    hits: db.get('SELECT COUNT(*) AS n FROM hits').n,
     rssMb: Math.round(process.memoryUsage().rss / 1048576),
     dataDir,
   };
@@ -118,9 +150,9 @@ console.log(`PDF written: ${out}`);
 - [ ] **Step 5: Create `spikes/webhosting-l/backup-check.mjs`**
 
 ```js
-import Database from 'better-sqlite3';
 import { mkdirSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { openDatabase } from './db.mjs';
 
 const dataDir = process.env.BUILTBASIS_DATA_DIR;
 if (!dataDir) throw new Error('BUILTBASIS_DATA_DIR is not set');
@@ -131,19 +163,19 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const tmp = join(backupsDir, `spike-${stamp}.db.tmp`);
 const final = join(backupsDir, `spike-${stamp}.db`);
 
-const db = new Database(join(dataDir, 'spike.db'));
-db.prepare('VACUUM INTO ?').run(tmp);
+const db = await openDatabase(join(dataDir, 'spike.db'));
+db.run('VACUUM INTO ?', tmp);
 db.close();
 
-const check = new Database(tmp, { readonly: true });
-const result = check.pragma('integrity_check', { simple: true });
+const check = await openDatabase(tmp, { readonly: true });
+const result = check.get('PRAGMA integrity_check').integrity_check;
 check.close();
 if (result !== 'ok') {
   rmSync(tmp);
   throw new Error(`integrity_check failed: ${result}`);
 }
 renameSync(tmp, final);
-console.log(`backup ok: ${final}`);
+console.log(`backup ok (${db.driver}): ${final}`);
 ```
 
 - [ ] **Step 6: Create `spikes/webhosting-l/README.md`**
@@ -167,7 +199,7 @@ BUILTBASIS_DATA_DIR=./data node backup-check.mjs
 | # | Check (design §11.9) | Result | Evidence |
 |---|---|---|---|
 | 1 | Node active on builtbasis.ktimanet.com; ktimanet.com WordPress unaffected | | |
-| 2 | `npm ci` installs better-sqlite3 on the server | | |
+| 2 | SQLite works on the server (driver from /health: better-sqlite3, or fallback node:sqlite) | | |
 | 3 | Data folder on local disk (filesystem type) | | |
 | 4 | Restart mechanism after deployment | | |
 | 5 | Maximum memory limit for the Node process | | |
@@ -182,9 +214,10 @@ BUILTBASIS_DATA_DIR=./data node backup-check.mjs
 - [ ] **Step 7: Run locally and verify**
 
 Run (in `spikes/webhosting-l`, Git Bash): `BUILTBASIS_DATA_DIR=./data PORT=3000 node server.mjs` and, in a second terminal, `curl http://127.0.0.1:3000/health`
-Expected: JSON with `"ok":true`, a `node` version, an `sqlite` version, `"journalMode":"delete"`, `"hits":1`.
+Expected: JSON with `"ok":true`, `"driver":"better-sqlite3"`, a `node` version, an `sqlite` version, `"journalMode":"delete"`, `"hits":1`.
 Then stop the server and run `BUILTBASIS_DATA_DIR=./data node backup-check.mjs`
-Expected: `backup ok: data/backups/spike-<timestamp>.db`
+Expected: `backup ok (better-sqlite3): data/backups/spike-<timestamp>.db`
+Repeat both commands prefixed with `SQLITE_DRIVER=node` to prove the fallback (Node 24): expected `"driver":"node:sqlite"`, `"hits":2` and `backup ok (node:sqlite): …`. A Node `ExperimentalWarning` about SQLite is expected.
 
 - [ ] **Step 8: Commit** (the `data/` folder is git-ignored)
 
@@ -215,7 +248,7 @@ Expected: the listing shows `README.md backup-check.mjs package-lock.json packag
 ssh USER@HOST 'cd builtbasis-spike && node --version && npm ci'
 ```
 
-Expected: a Node version (v22.x or v24.x) and `added N packages`, with no `gyp ERR!`. Record the outcome as check 2. If `better-sqlite3` fails to build, record the error; the design's fallback is Node's built-in `node:sqlite`.
+Expected: a Node version (prefer v24.x, where `node:sqlite` needs no flag) and `added N packages`. If the optional `better-sqlite3` build fails, `npm ci` still succeeds with a warning: record the warning. The app then uses `node:sqlite` automatically; check 2 is judged in Task 5 from the `driver` reported by `/health`.
 
 ### Task 4: Check the data folder's filesystem (check 3)
 
@@ -230,7 +263,7 @@ Expected: a local filesystem type (e.g. `ext4`, `xfs`). **If the type is `nfs`, 
 ### Task 5: Run the app; verify domain isolation, restart and memory (checks 1, 4, 5)
 
 - [ ] **Step 1:** Read the Node.js examples on Hetzner's page _Node.js Configuration_ (docs.hetzner.com → konsoleH → Node.js) and note how the app must listen (port environment variable, fixed port, or socket). If it differs from `server.mjs` (PORT env, `0.0.0.0`), adjust `server.mjs`, re-upload (Task 3 Step 1) and record the mechanism in the README.
-- [ ] **Step 2:** In konsoleH → domain **builtbasis.ktimanet.com** → Services → Node.js configuration: script path `builtbasis-spike/server.mjs`, working directory `builtbasis-spike/`, log file `builtbasis-spike/log.txt`, memory limit = **the highest value offered** (record it as check 5), version = 24 (or 22), environment variable `BUILTBASIS_DATA_DIR` = absolute path of `~/builtbasis-data`. Activate.
+- [ ] **Step 2:** In konsoleH → domain **builtbasis.ktimanet.com** → Services → Node.js configuration: script path `server.mjs` (relative to the working directory), working directory `builtbasis-spike/`, log file `builtbasis-spike/log.txt`, memory limit = **the highest value offered** (record it as check 5), version = 24 (preferred; with 22, `node:sqlite` needs 22.13 or later), environment variable `BUILTBASIS_DATA_DIR` = absolute path of `~/builtbasis-data`. Activate.
 - [ ] **Step 3: Verify**
 
 ```bash
@@ -238,7 +271,7 @@ curl -s https://builtbasis.ktimanet.com/health
 curl -s -o /dev/null -w "%{http_code}\n" https://ktimanet.com
 ```
 
-Expected: JSON with `"ok":true` (record `node`, `sqlite`, `journalMode`, `rssMb`); WordPress returns `200`. Both together = check 1 passed.
+Expected: JSON with `"ok":true` (record `driver`, `node`, `sqlite`, `journalMode`, `rssMb`; any working `driver` passes check 2); WordPress returns `200`. Both together = check 1 passed.
 
 - [ ] **Step 4: Restart test (check 4).** Change `server.mjs` to add `restartCheck: 1` to the `/health` response, upload (Task 3 Step 1), then restart the app using konsoleH (try deactivate/activate, or any restart control offered). Run `curl -s https://builtbasis.ktimanet.com/health` and confirm `restartCheck` appears and `hits` continued counting (data survived). Record the exact restart procedure.
 
@@ -263,7 +296,7 @@ cd $HOME/builtbasis-spike && BUILTBASIS_DATA_DIR=$HOME/builtbasis-data /ABSOLUTE
 ```
 
 - [ ] **Step 3:** After the next run: `ssh USER@HOST 'tail -n 5 builtbasis-data/backup-check.log && ls -l builtbasis-data/backups'`
-Expected: `backup ok: …` and a `spike-<timestamp>.db` file, no `.tmp` left. Record as check 7. Then delete the cron job.
+Expected: `backup ok (<driver>): …` and a `spike-<timestamp>.db` file, no `.tmp` left. Record as check 7. Then delete the cron job.
 
 ### Task 8: Record results and decide
 
@@ -274,7 +307,7 @@ Expected: `backup ok: …` and a `spike-<timestamp>.db` file, no `.tmp` left. Re
 - Modify: `docs/plans/2026-10-02-plan-0-webhosting-trial.md` (metadata)
 
 - [ ] **Step 1:** Fill every row of the README results table with result (pass/fail) and evidence (command output excerpt), plus listen mechanism, Node path and memory limit.
-- [ ] **Step 2: Go / no-go.** **Go** requires checks 1, 2, 3, 4, 7 to pass. Check 5 is informational. Check 6 only selects the PDF path (§11.8). **No-go** (any required check fails): stop and report to the owner; alternative hosting is the owner's decision (§11.9).
+- [ ] **Step 2: Go / no-go.** **Go** requires checks 1, 2, 3, 4, 7 to pass. Check 2 passes with either driver; if it is `node:sqlite`, record that Plan 2 must use `node:sqlite` instead of `better-sqlite3` and update ADR 0001 and design §11.9 accordingly. Check 5 is informational. Check 6 only selects the PDF path (§11.8). **No-go** (any required check fails): stop and report to the owner; alternative hosting is the owner's decision (§11.9).
 - [ ] **Step 3:** Update the design: in §11.9 add "Trial completed YYYY-MM-DD — see `spikes/webhosting-l/README.md`"; in §16 resolve items 3 (restart, memory) and 4 (PDF path) with the findings.
 - [ ] **Step 4:** Update this plan's metadata (`Status: Completed`, `Verified:` date and evidence) and commit:
 

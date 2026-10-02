@@ -635,12 +635,14 @@ All database access is confined to `src/server` data-access modules, so a later 
 A half-day trial on Webhosting L must confirm:
 
 1. Node.js activates on `builtbasis.ktimanet.com` while `ktimanet.com` (WordPress) keeps working.
-2. `npm ci` installs `better-sqlite3` on the server. Fallback: Node's built-in `node:sqlite`.
+2. SQLite works on the server: `better-sqlite3` installs and runs, or — as the fallback — Node's built-in `node:sqlite` (Node 24) does. The result fixes the driver used by the implementation.
 3. **The data folder is on local disk, not a network filesystem.** SQLite is reliable only where file locking and durability are reliable; switching WAL off does not make network storage safe. If the data folder cannot be placed on local disk, **production does not go live on Webhosting L** and the owner decides on alternative hosting (e.g. a Hetzner Cloud server).
 4. How the application is restarted after deployment (konsoleH).
 5. The maximum memory limit for the Node process.
 6. Whether Playwright/Chromium runs (§11.8).
 7. Whether cron can run `node` (backups).
+
+**Sequencing:** server implementation (roadmap Plan 2 onward) starts only after a go result. Exception: Plan 1 — pure domain code with no hosting dependency — may be implemented before the trial.
 
 ## 12. A3 print view and PDF
 

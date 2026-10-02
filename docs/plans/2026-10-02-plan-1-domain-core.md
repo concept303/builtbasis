@@ -202,7 +202,8 @@ Expected: FAIL — `Failed to resolve import "../../src/domain/vocab"`.
 ```js
 // Extracts the value lists of design §7 into src/domain/vocabulary.data.ts.
 // Run while the design is the implementation baseline: npm run vocabulary:extract
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 const DESIGN = 'docs/designs/2026-10-02-v1-records-design.md';
 const OUTPUT = 'src/domain/vocabulary.data.ts';
@@ -270,6 +271,7 @@ const header =
 const body =
   `export const VOCABULARY = ${JSON.stringify(lists, null, 2)} as const satisfies Record<\n` +
   `  string,\n  readonly { code: string; en: string; el: string; defEn: string; defEl: string }[]\n>;\n`;
+mkdirSync(dirname(OUTPUT), { recursive: true });
 writeFileSync(OUTPUT, header + body, 'utf8');
 
 for (const [key, values] of Object.entries(lists)) console.log(`${key}: ${values.length}`);
@@ -627,6 +629,17 @@ describe('validateSave (design §6.1, §8.2)', () => {
   it('reports missing required fields with a required: prefix', () => {
     expect(validateSave(makeRecord({ title: null }))).toEqual(['required:title']);
   });
+
+  it('requires Decided by and Decided on for Repair and Accept as is in every active status', () => {
+    for (const status of ['open', 'awaiting_decision', 'on_hold'] as const) {
+      for (const disposition of ['repair', 'accept_as_is'] as const) {
+        expect(validateSave(makeRecord({ status, disposition })), `${status}/${disposition}`).toEqual([
+          'decision_required',
+        ]);
+      }
+    }
+    expect(validateSave(makeRecord({ status: 'draft', disposition: 'repair' }))).toEqual([]);
+  });
 });
 ```
 
@@ -696,9 +709,12 @@ export function needsDecision(record: Pick<RecordState, 'disposition' | 'decided
 /** Rules every save must satisfy in the record's current status (design §8.2). */
 export function validateSave(record: RecordState): RuleError[] {
   const errors: RuleError[] = missingRequired(record).map((field) => `required:${field}` as const);
-  if (record.subtype === 'quality_issue' && DISPOSITION_STATUSES.includes(record.status)) {
-    if (record.disposition === null) errors.push('disposition_required');
-    else if (needsDecision(record)) errors.push('decision_required');
+  if (record.subtype === 'quality_issue' && isActive(record.status)) {
+    if (DISPOSITION_STATUSES.includes(record.status) && record.disposition === null) {
+      errors.push('disposition_required');
+    }
+    // Repair and Accept as is need a recorded decision in every active status (design §5.6).
+    if (needsDecision(record)) errors.push('decision_required');
   }
   return errors;
 }
@@ -707,7 +723,7 @@ export function validateSave(record: RecordState): RuleError[] {
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/record-rules.test.ts`
-Expected: PASS — 8 tests.
+Expected: PASS — 9 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -886,6 +902,14 @@ describe('checkTransition (design §5.10, §6.1, §7.3, §7.4, §8)', () => {
     expect(checkTransition(closed, { to: 'open' })).toEqual({ ok: false, errors: ['note_required'] });
     expect(checkTransition(closed, { to: 'open', note: 'Crack reappeared' }).ok).toBe(true);
   });
+
+  it('any transition keeps Repair and Accept as is tied to a recorded decision', () => {
+    const issuedRepair = makeRecord({ status: 'issued', disposition: 'repair' });
+    expect(checkTransition(issuedRepair, { to: 'on_hold', reasonCode: 'weather' })).toEqual({
+      ok: false,
+      errors: ['decision_required'],
+    });
+  });
 });
 ```
 
@@ -955,9 +979,12 @@ export function needsDecision(record: Pick<RecordState, 'disposition' | 'decided
 /** Rules every save must satisfy in the record's current status (design §8.2). */
 export function validateSave(record: RecordState): RuleError[] {
   const errors: RuleError[] = missingRequired(record).map((field) => `required:${field}` as const);
-  if (record.subtype === 'quality_issue' && DISPOSITION_STATUSES.includes(record.status)) {
-    if (record.disposition === null) errors.push('disposition_required');
-    else if (needsDecision(record)) errors.push('decision_required');
+  if (record.subtype === 'quality_issue' && isActive(record.status)) {
+    if (DISPOSITION_STATUSES.includes(record.status) && record.disposition === null) {
+      errors.push('disposition_required');
+    }
+    // Repair and Accept as is need a recorded decision in every active status (design §5.6).
+    if (needsDecision(record)) errors.push('decision_required');
   }
   return errors;
 }
@@ -1033,18 +1060,18 @@ export function checkTransition(record: RecordState, input: TransitionInput): Tr
   const { to } = input;
   if (!allowedTargets(record).includes(to)) return { ok: false, errors: ['transition_not_allowed'] };
 
-  const errors: RuleError[] = missingRequired({ ...record, status: to }).map((field) => `required:${field}` as const);
+  // The resulting record must satisfy every save rule: required fields, disposition, decision.
+  const errors: RuleError[] = validateSave({ ...record, status: to });
   const leavesVerification = record.status === 'ready_for_verification' && (to === 'closed' || to === 'in_progress');
 
-  if (record.subtype === 'quality_issue' && (to === 'issued' || to === 'in_progress' || to === 'closed')) {
-    if (record.disposition === null) {
-      errors.push('disposition_required');
-    } else {
-      if (to === 'closed' && !leavesVerification && record.disposition !== 'accept_as_is') {
-        errors.push('accept_as_is_required');
-      }
-      if (needsDecision(record)) errors.push('decision_required');
-    }
+  if (
+    record.subtype === 'quality_issue' &&
+    to === 'closed' &&
+    !leavesVerification &&
+    record.disposition !== null &&
+    record.disposition !== 'accept_as_is'
+  ) {
+    errors.push('accept_as_is_required');
   }
 
   const checkReason = (list: 'onHoldReason' | 'cancellationReason', noteRequiredFor: readonly string[]): void => {
@@ -1080,7 +1107,7 @@ export function checkTransition(record: RecordState, input: TransitionInput): Tr
 - [ ] **Step 4: Run the transition and record-rule tests**
 
 Run: `npx vitest run tests/domain/transitions.test.ts tests/domain/record-rules.test.ts`
-Expected: PASS — 19 transition tests and 8 record-rule tests.
+Expected: PASS — 20 transition tests and 9 record-rule tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1160,10 +1187,23 @@ describe('comparison views (design §5.7)', () => {
   it('between items: same quantity and unit, difference from the first item', () => {
     expect(compareItems(before, 'stone thickness', 'cm')).toEqual([
       { item: 'Left side', value: 18, diffFromFirst: 0 },
-      { item: 'Right side', value: 15.3, diffFromFirst: -2.7 },
+      { item: 'Right side', value: 15.3, diffFromFirst: expect.closeTo(-2.7, 10) },
       { item: 'Top', value: 20, diffFromFirst: 2 },
     ]);
     expect(compareItems(before, 'Slope', 'percent')).toEqual([]);
+  });
+
+  it('between items: keeps sub-millimetre differences (no rounding in the domain)', () => {
+    const set: MeasurementSet = {
+      id: 3,
+      date: '2026-10-21',
+      phase: 'other',
+      rows: [
+        { item: 'A', quantity: 'Level', value: 1, unit: 'm' },
+        { item: 'B', quantity: 'Level', value: 1.0004, unit: 'm' },
+      ],
+    };
+    expect(compareItems(set, 'Level', 'm')[1]?.diffFromFirst).toBeCloseTo(0.0004, 10);
   });
 
   it('over time: same item, quantity and unit across sets, later minus earlier', () => {
@@ -1171,6 +1211,22 @@ describe('comparison views (design §5.7)', () => {
       { setId: 1, date: '2026-09-14', phase: 'before', value: 18, changeFromPrevious: null },
       { setId: 2, date: '2026-10-20', phase: 'after', value: 15.5, changeFromPrevious: -2.5 },
     ]);
+  });
+
+  it('over time: keeps sub-millimetre changes', () => {
+    const first: MeasurementSet = {
+      id: 4,
+      date: '2026-10-01',
+      phase: 'before',
+      rows: [{ item: 'A', quantity: 'Level', value: 1, unit: 'm' }],
+    };
+    const second: MeasurementSet = {
+      id: 5,
+      date: '2026-10-02',
+      phase: 'after',
+      rows: [{ item: 'A', quantity: 'Level', value: 1.0004, unit: 'm' }],
+    };
+    expect(compareOverTime([first, second], 'A', 'Level', 'm')[1]?.changeFromPrevious).toBeCloseTo(0.0004, 10);
   });
 
   it('over time: skips sets without a matching row and never mixes units', () => {
@@ -1245,15 +1301,14 @@ export function orderSets<T extends { id: number; date: string }>(sets: readonly
   return [...sets].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
 }
 
-const round = (value: number): number => Math.round(value * 1000) / 1000;
-
-/** Between items: one set, one quantity and unit; each item compared with the first in display order. */
+/** Between items: one set, one quantity and unit; each item compared with the first in display order.
+ *  Differences keep full precision; rounding is a display concern. */
 export function compareItems(set: MeasurementSet, quantity: string, unit: Unit): ItemComparison[] {
   const wanted = normalizeLabel(quantity);
   const rows = set.rows.filter((row) => normalizeLabel(row.quantity) === wanted && row.unit === unit);
   const first = rows[0];
   if (!first) return [];
-  return rows.map((row) => ({ item: row.item, value: row.value, diffFromFirst: round(row.value - first.value) }));
+  return rows.map((row) => ({ item: row.item, value: row.value, diffFromFirst: row.value - first.value }));
 }
 
 /** Before vs after: one item + quantity + unit across sets in set order; later minus earlier. */
@@ -1274,7 +1329,7 @@ export function compareOverTime(
       date: set.date,
       phase: set.phase,
       value: row.value,
-      changeFromPrevious: previous === null ? null : round(row.value - previous),
+      changeFromPrevious: previous === null ? null : row.value - previous,
     });
     previous = row.value;
   }
@@ -1285,7 +1340,7 @@ export function compareOverTime(
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/measurements.test.ts`
-Expected: PASS — 6 tests.
+Expected: PASS — 8 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1348,13 +1403,13 @@ export * from './measurements';
 - [ ] **Step 4: Run the whole suite and the type check**
 
 Run: `npm test`
-Expected: PASS — 7 test files: vocabulary 23, ids 3, statuses 4, record-rules 8, transitions 19, measurements 6, index 1 (64 tests).
+Expected: PASS — 7 test files: vocabulary 23, ids 3, statuses 4, record-rules 9, transitions 20, measurements 8, index 1 (68 tests).
 Run: `npm run typecheck`
 Expected: no output, exit code 0.
 
 - [ ] **Step 5: Update plan metadata and roadmap**
 
-In this file set `Status: Completed`, `Implemented by: <first>..<last commit>`, `Verified: <date> — npm test (64 passed), npm run typecheck clean`. In `docs/plans/2026-10-02-v1-roadmap.md` set Plan 1 status to `Completed`.
+In this file set `Status: Completed`, `Implemented by: <first>..<last commit>`, `Verified: <date> — npm test (68 passed), npm run typecheck clean`. In `docs/plans/2026-10-02-v1-roadmap.md` set Plan 1 status to `Completed`.
 
 - [ ] **Step 6: Commit**
 
