@@ -22,3 +22,6 @@ _AI/DESIGN_NOTEBOOK.md
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Isolated implementation worktrees
+.worktrees/
