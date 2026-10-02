@@ -1526,7 +1526,7 @@ git commit -m "feat(server): Fastify app with Origin/JSON/session rules and owne
 - Modify: `src/domain/index.ts`
 - Test: `tests/domain/lists.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/lists.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/lists.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -1573,12 +1573,12 @@ describe('managed-list input schemas', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/lists.test.ts`
 Expected: FAIL — the new exports (`hasAName`, `tagKey`, schemas) do not exist yet.
 
-- [ ] **Step 3: Create `src/domain/lists.ts`**
+- [x] **Step 3: Create `src/domain/lists.ts`**
 
 Note: Zod 4 applies a `.default()` even inside an optional field, so these schemas use **no defaults** — a PATCH must never fill in values that were not sent. The server applies defaults when it creates a row.
 
@@ -1671,7 +1671,7 @@ export type LocationPatchInput = z.output<typeof LocationPatch>;
 export type LocationCopyInput = z.output<typeof LocationCopy>;
 ```
 
-- [ ] **Step 4: Export it from `src/domain/index.ts`**
+- [x] **Step 4: Export it from `src/domain/index.ts`**
 
 Add this line at the end of `src/domain/index.ts`:
 
@@ -1679,11 +1679,11 @@ Add this line at the end of `src/domain/index.ts`:
 export * from './lists';
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/domain` → PASS (8 files: Plan 1's 7 + `lists.test.ts` with 5 tests). Then `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/domain/lists.ts src/domain/index.ts tests/domain/lists.test.ts
