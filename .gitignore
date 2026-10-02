@@ -1,0 +1,24 @@
+# Dependencies and builds
+node_modules/
+dist/
+build/
+coverage/
+
+# Local data (databases, uploaded files, backups)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment and secrets
+.env
+.env.*
+
+# Private design notebook (DOCS-STANDARD §5)
+_AI/DESIGN_NOTEBOOK.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
