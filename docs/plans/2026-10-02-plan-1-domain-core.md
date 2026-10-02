@@ -1,11 +1,11 @@
 # Plan 1 — Domain Core Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Approved
+> **Status:** Completed
 > **Retention:** Active until executed; historical afterwards.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §4.2 (IDs), §5–§6 (required fields, disposition and decision rules), §5.7 (measurement rules and comparisons), §7 (value lists), §8 (status rules).
-> **Implemented by:** Not implemented
-> **Verified:** Not verified
+> **Implemented by:** `804a372..95e1bf4` (Tasks 1–6); final public exports and verification are in this completion commit (`feat(domain): public exports; complete Plan 1`).
+> **Verified:** 2026-10-03 (Australia/Sydney) — `npm test` (68 passed across 7 files), `npm run typecheck` clean.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -13,7 +13,7 @@
 
 **Architecture:** `src/domain` is pure TypeScript with no I/O, shared later by the Fastify server and the React app. The 17 value lists are extracted once from design §7 by a script into `vocabulary.data.ts` (the design stays the single source while it is the implementation baseline); typed helpers live in `vocab.ts`. Rules are plain functions returning error codes, so the server can enforce them and the UI can explain them.
 
-**Tech Stack:** Node.js ≥ 22, TypeScript 5 (strict, ESM, `moduleResolution: bundler`), Vitest 3. No runtime dependencies yet.
+**Tech Stack:** Node.js ≥ 22.12.0, TypeScript 5 (strict, ESM, `moduleResolution: bundler`), Vitest 3. No runtime dependencies yet.
 
 ---
 
@@ -45,7 +45,7 @@
 - Create: `src/domain/vocab.ts`
 - Test: `tests/domain/vocabulary.test.ts`
 
-- [ ] **Step 1: Create `package.json`**
+- [x] **Step 1: Create `package.json`**
 
 ```json
 {
@@ -55,7 +55,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "test": "vitest run",
@@ -66,12 +66,12 @@
 }
 ```
 
-- [ ] **Step 2: Install development dependencies**
+- [x] **Step 2: Install development dependencies**
 
 Run: `npm install -D typescript@5 vitest@3 @types/node@22`
 Expected: `added N packages`; `package-lock.json` created.
 
-- [ ] **Step 3: Create `tsconfig.json`**
+- [x] **Step 3: Create `tsconfig.json`**
 
 ```json
 {
@@ -94,7 +94,7 @@ Expected: `added N packages`; `package-lock.json` created.
 }
 ```
 
-- [ ] **Step 4: Create `vitest.config.ts`**
+- [x] **Step 4: Create `vitest.config.ts`**
 
 ```ts
 import { defineConfig } from 'vitest/config';
@@ -106,7 +106,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 5: Write the failing test `tests/domain/vocabulary.test.ts`**
+- [x] **Step 5: Write the failing test `tests/domain/vocabulary.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -192,12 +192,12 @@ describe('vocabulary (design §7)', () => {
 });
 ```
 
-- [ ] **Step 6: Run the test to verify it fails**
+- [x] **Step 6: Run the test to verify it fails**
 
 Run: `npx vitest run tests/domain/vocabulary.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/domain/vocab"`.
 
-- [ ] **Step 7: Create `scripts/extract-vocabulary.mjs`**
+- [x] **Step 7: Create `scripts/extract-vocabulary.mjs`**
 
 ```js
 // Extracts the value lists of design §7 into src/domain/vocabulary.data.ts.
@@ -278,7 +278,7 @@ for (const [key, values] of Object.entries(lists)) console.log(`${key}: ${values
 console.log(`Wrote ${OUTPUT}`);
 ```
 
-- [ ] **Step 8: Run the extraction**
+- [x] **Step 8: Run the extraction**
 
 Run: `npm run vocabulary:extract`
 Expected output (17 lines, then the file):
@@ -306,7 +306,7 @@ Wrote src/domain/vocabulary.data.ts
 
 Open `src/domain/vocabulary.data.ts` and spot-check: `"code": "in_progress"` has `"el": "Σε εξέλιξη"`; the `repair` definition reads `… recorded in Decided by / Decided on.` (no underscores).
 
-- [ ] **Step 9: Create `src/domain/vocab.ts`**
+- [x] **Step 9: Create `src/domain/vocab.ts`**
 
 ```ts
 import { VOCABULARY } from './vocabulary.data';
@@ -374,14 +374,14 @@ export function definitionOf(key: ListKey, code: string, lang: Lang): string {
 }
 ```
 
-- [ ] **Step 10: Run the tests and the type check**
+- [x] **Step 10: Run the tests and the type check**
 
 Run: `npx vitest run tests/domain/vocabulary.test.ts`
 Expected: PASS — 23 tests (6 named tests + 17 parameterised counts).
 Run: `npm run typecheck`
 Expected: no output, exit code 0.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add package.json package-lock.json tsconfig.json vitest.config.ts scripts/extract-vocabulary.mjs src/domain/vocabulary.data.ts src/domain/vocab.ts tests/domain/vocabulary.test.ts
@@ -395,7 +395,7 @@ git commit -m "feat(domain): scaffold and bilingual value lists generated from d
 - Create: `src/domain/ids.ts`
 - Test: `tests/domain/ids.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/ids.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/ids.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -419,12 +419,12 @@ describe('formatHumanId (design §4.2)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/ids.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/domain/ids"`.
 
-- [ ] **Step 3: Create `src/domain/ids.ts`**
+- [x] **Step 3: Create `src/domain/ids.ts`**
 
 ```ts
 import type { Subtype } from './vocab';
@@ -444,12 +444,12 @@ export function formatHumanId(subtype: Subtype, sequence: number): string {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/ids.test.ts`
 Expected: PASS — 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domain/ids.ts tests/domain/ids.test.ts
@@ -463,7 +463,7 @@ git commit -m "feat(domain): human record IDs"
 - Create: `src/domain/statuses.ts`
 - Test: `tests/domain/statuses.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/statuses.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/statuses.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -502,12 +502,12 @@ describe('status sets (design §7.2, §8)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/statuses.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/domain/statuses"`.
 
-- [ ] **Step 3: Create `src/domain/statuses.ts`**
+- [x] **Step 3: Create `src/domain/statuses.ts`**
 
 ```ts
 import { codesOf, type Status, type Subtype } from './vocab';
@@ -532,12 +532,12 @@ export function isNonTerminal(status: Status): boolean {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/statuses.test.ts`
 Expected: PASS — 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domain/statuses.ts tests/domain/statuses.test.ts
@@ -552,7 +552,7 @@ git commit -m "feat(domain): status sets per subtype"
 - Create: `tests/domain/helpers.ts`
 - Test: `tests/domain/record-rules.test.ts`
 
-- [ ] **Step 1: Create the test fixture `tests/domain/helpers.ts`**
+- [x] **Step 1: Create the test fixture `tests/domain/helpers.ts`**
 
 ```ts
 import type { RecordState } from '../../src/domain/record-rules';
@@ -574,7 +574,7 @@ export function makeRecord(overrides: Partial<RecordState> = {}): RecordState {
 }
 ```
 
-- [ ] **Step 1b: Write the failing test `tests/domain/record-rules.test.ts`**
+- [x] **Step 1b: Write the failing test `tests/domain/record-rules.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -643,12 +643,12 @@ describe('validateSave (design §6.1, §8.2)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/record-rules.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/domain/record-rules"`.
 
-- [ ] **Step 3: Create `src/domain/record-rules.ts`**
+- [x] **Step 3: Create `src/domain/record-rules.ts`**
 
 ```ts
 import { isActive } from './statuses';
@@ -720,12 +720,12 @@ export function validateSave(record: RecordState): RuleError[] {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/record-rules.test.ts`
 Expected: PASS — 9 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domain/record-rules.ts tests/domain/helpers.ts tests/domain/record-rules.test.ts
@@ -739,7 +739,7 @@ git commit -m "feat(domain): required fields and save validation"
 - Modify: `src/domain/record-rules.ts` (append transition rules)
 - Test: `tests/domain/transitions.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/transitions.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/transitions.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -913,12 +913,12 @@ describe('checkTransition (design §5.10, §6.1, §7.3, §7.4, §8)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/transitions.test.ts`
 Expected: FAIL — `allowedTargets is not a function` (or `does not provide an export named 'allowedTargets'`).
 
-- [ ] **Step 3: Replace `src/domain/record-rules.ts` with the complete file below** (Task 4 content plus the transition rules)
+- [x] **Step 3: Replace `src/domain/record-rules.ts` with the complete file below** (Task 4 content plus the transition rules)
 
 ```ts
 import { isActive, isNonTerminal, statusesFor } from './statuses';
@@ -1104,12 +1104,12 @@ export function checkTransition(record: RecordState, input: TransitionInput): Tr
 }
 ```
 
-- [ ] **Step 4: Run the transition and record-rule tests**
+- [x] **Step 4: Run the transition and record-rule tests**
 
 Run: `npx vitest run tests/domain/transitions.test.ts tests/domain/record-rules.test.ts`
 Expected: PASS — 20 transition tests and 9 record-rule tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domain/record-rules.ts tests/domain/transitions.test.ts
@@ -1123,7 +1123,7 @@ git commit -m "feat(domain): status transition rules"
 - Create: `src/domain/measurements.ts`
 - Test: `tests/domain/measurements.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/measurements.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/measurements.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -1237,12 +1237,12 @@ describe('comparison views (design §5.7)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/measurements.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/domain/measurements"`.
 
-- [ ] **Step 3: Create `src/domain/measurements.ts`**
+- [x] **Step 3: Create `src/domain/measurements.ts`**
 
 ```ts
 import type { MeasurementPhase, Unit } from './vocab';
@@ -1337,12 +1337,12 @@ export function compareOverTime(
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/domain/measurements.test.ts`
 Expected: PASS — 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domain/measurements.ts tests/domain/measurements.test.ts
@@ -1357,7 +1357,7 @@ git commit -m "feat(domain): measurement rules and comparison views"
 - Test: `tests/domain/index.test.ts`
 - Modify: `docs/plans/2026-10-02-plan-1-domain-core.md` (metadata), `docs/plans/2026-10-02-v1-roadmap.md` (status)
 
-- [ ] **Step 1: Write the failing test `tests/domain/index.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/index.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -1385,12 +1385,12 @@ describe('domain public exports', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/index.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/domain"`.
 
-- [ ] **Step 3: Create `src/domain/index.ts`**
+- [x] **Step 3: Create `src/domain/index.ts`**
 
 ```ts
 export * from './vocab';
@@ -1400,20 +1400,28 @@ export * from './record-rules';
 export * from './measurements';
 ```
 
-- [ ] **Step 4: Run the whole suite and the type check**
+- [x] **Step 4: Run the whole suite and the type check**
 
 Run: `npm test`
 Expected: PASS — 7 test files: vocabulary 23, ids 3, statuses 4, record-rules 9, transitions 20, measurements 8, index 1 (68 tests).
 Run: `npm run typecheck`
 Expected: no output, exit code 0.
 
-- [ ] **Step 5: Update plan metadata and roadmap**
+- [x] **Step 5: Update plan metadata and roadmap**
 
 In this file set `Status: Completed`, `Implemented by: <first>..<last commit>`, `Verified: <date> — npm test (68 passed), npm run typecheck clean`. In `docs/plans/2026-10-02-v1-roadmap.md` set Plan 1 status to `Completed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/domain/index.ts tests/domain/index.test.ts docs/plans/2026-10-02-plan-1-domain-core.md docs/plans/2026-10-02-v1-roadmap.md
 git commit -m "feat(domain): public exports; complete Plan 1"
 ```
+
+## Completion evidence
+
+The final suite passed all 68 tests across seven files. TypeScript reported no errors. The public-export smoke test first failed because `src/domain/index.ts` was absent, then passed after the barrel module was added.
+
+The declared Node minimum was raised from 22 to 22.12.0 in the package manifest, lockfile root and this plan to match the locked Vite tooling. This is a small implementation deviation from the original scaffold.
+
+Vitest 3 is retained for this Node-only domain slice. The Task 1 audit reported two moderate entries for [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9). The affected mocker dev-server endpoint is not used by this configuration. Upgrade to a maintained patched Vitest version before enabling the affected browser/dev-server mocker integration. Audit output has not been suppressed.
