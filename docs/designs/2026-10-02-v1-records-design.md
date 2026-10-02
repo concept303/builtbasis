@@ -325,7 +325,7 @@ A note is required with `replaced` (the replacing record's ID) and `other`.
 |---|---|---|---|---|
 | `rework` | Rework | Επανεκτέλεση | Modify the existing work until it matches what was agreed. | Τροποποίηση της υφιστάμενης εργασίας ώστε να συμφωνεί με τα συμφωνημένα. |
 | `replace` | Replace | Αντικατάσταση | Remove and build again. | Αφαίρεση και εκ νέου κατασκευή. |
-| `repair` | Repair | Επισκευή | Make it acceptable without fully matching what was agreed. Needs the architect's approval. | Αποκατάσταση σε αποδεκτό επίπεδο χωρίς πλήρη συμφωνία με τα συμφωνημένα. Απαιτεί έγκριση του αρχιτέκτονα. |
+| `repair` | Repair | Επισκευή | Make it acceptable without fully matching what was agreed. Requires approval from the authorised decision-maker, recorded in _Decided by_ / _Decided on_. | Αποκατάσταση σε αποδεκτό επίπεδο χωρίς πλήρη συμφωνία με τα συμφωνημένα. Απαιτεί έγκριση από τον αρμόδιο, με καταγραφή του ονόματος και της ημερομηνίας απόφασης. |
 | `accept_as_is` | Accept as is | Αποδοχή ως έχει | Leave it; the deviation is accepted by whoever has the authority. | Παραμένει ως έχει· η απόκλιση γίνεται αποδεκτή από τον αρμόδιο. |
 
 ### 7.8 Route (Διαδικασία) — Detail Clarification
@@ -570,15 +570,23 @@ All database access is confined to `src/server` data-access modules, so a later 
 **Owner login**
 
 - Username + password; password hashed with Node's built-in `scrypt`; login rate-limited; HTTPS only.
-- The owner account is **created and its password reset by a server-side command** (no sign-up or reset screen).
+- The owner account is **created and its password reset by a server-side command** (no sign-up or reset screen). **A password reset deletes all sessions.**
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, **host-only** (no `Domain` attribute, so it is never sent to `ktimanet.com` or other subdomains).
-- Sessions are stored on the server, expire **30 days after login** (absolute), and are deleted on logout.
-- **Forged-request protection:** every state-changing request requires a valid session **and** an `Origin` header equal to the configured public base URL (`https://builtbasis.ktimanet.com` in production) **and** a JSON body. `SameSite` alone is not relied on, because `ktimanet.com` (WordPress) counts as the same site.
-- **Reads never change state.** GET requests never create, change or delete anything, including share links.
+- The session identifier is a random token; the server stores only its **SHA-256 hash**, so a database or backup never contains a usable session. Sessions expire **30 days after login** (absolute) and are deleted on logout.
+- **Forged-request protection** (`SameSite` alone is not relied on, because `ktimanet.com` (WordPress) counts as the same site). Every request below must carry an `Origin` header equal to the configured public base URL (`https://builtbasis.ktimanet.com` in production):
+  - **Login:** valid credentials, matching `Origin`, JSON body.
+  - **Owner data changes:** valid session, matching `Origin`, JSON body.
+  - **File uploads:** valid session, matching `Origin`, multipart form body.
+- **Reads:** GET requests never modify records, evidence or access permissions (including share links). The only exception: a successful, authorised share-page read updates that link's view count and last-viewed time.
 
 **Share links**
 
-- One record per link. Token = 32 random bytes, URL-safe. The **token is stored**, so the owner can copy and resend a link at any time and the QR code can reuse it. (Hashing it would protect nothing: anyone able to read the database can already read every record.)
+- One record per link. Token = 32 random bytes, URL-safe. Each token is stored in two forms:
+  - a **SHA-256 hash**, used to validate incoming links;
+  - an **encrypted copy** (AES-256-GCM, a fresh nonce for every encryption, nonce and authentication tag stored with the ciphertext), so the owner can copy and resend a link at any time and the QR code can reuse it.
+- The **share-link encryption key** is dedicated to this purpose and kept in the server configuration — **outside the database, the repository and the backups**. Deployment preserves it. If it is lost or replaced, all existing links are revoked and new ones issued.
+- Raw tokens appear only in owner-authorised link management and in the chosen PDF QR code. They are **never written to activity entries or logs**.
+- Database backups therefore contain neither usable share links nor usable sessions. They still contain the record data itself and must be protected accordingly.
 - Each link: label (whom it is for), created at, optional expiry, revoked at, last viewed at and view count. Revoked or expired links, and links to a Draft record, show "not available". Share pages are marked `noindex`.
 - **Private content (§2) is excluded by the server**, not merely hidden in the browser.
 - A share token grants access to its record's page and that record's files (§11.4), nothing else. _Must be done before / Requires first_ entries on a shared page show only the other record's ID and title, omit Draft records, and grant no access to them.
@@ -589,14 +597,17 @@ All database access is confined to `src/server` data-access modules, so a later 
 - Directory layout on the server:
   - **Application folder** — replaced on every deployment.
   - **Data folder** (separate path, outside the application folder) — `builtbasis.db`, `files/`, `backups/`. **Never touched by deployment.** Its path is given by an environment variable.
-- Configuration via environment variables (data path, session secret, public base URL, Node environment).
+- Configuration via environment variables (data path, public base URL, share-link encryption key, Node environment). Configuration is kept outside the application and data folders and is preserved across deployments; the encryption key is never stored in the database, repository or backups.
 - **Deployment:** build locally → upload the application folder over SSH (rsync) → install production dependencies on the server (`npm ci --omit=dev`) → restart the application → migrations run on start after a pre-migration backup.
 
 ### 11.7 Backups
 
 - **On the server (nightly, cron):** consistent database copy using SQLite's own backup mechanism (`VACUUM INTO`), never a plain copy of the live file. The copy is written under a **temporary name**, checked with `PRAGMA integrity_check`, and only then renamed to its final name, so an interrupted or damaged backup never looks complete. Rotation: 14 daily + 8 weekly copies in `backups/`.
-- **Off the server (nightly):** a Windows scheduled task on the owner's PC pulls over SSH to the X: drive, **files first, then the latest completed database backup** — so every copied database already has its files. Files are content-addressed, immutable and never deleted (§11.3), so only new files are copied.
-- **Restore requirements** (the operator guide, written at delivery, must satisfy them): stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; afterwards, log in again and review share links (a restored database can bring back links revoked after the backup was taken).
+- **Off the server (nightly):** a Windows scheduled task on the owner's PC pulls over SSH to the X: drive in this order:
+  1. **Select and pin one completed database backup** and copy it.
+  2. **Copy the files.** Files are content-addressed, immutable and never deleted (§11.3), so every file the pinned backup references still exists on the server; only new files are copied.
+  3. **Verify** that every file referenced by the pinned backup is present locally; only then mark that off-site copy complete.
+- **Restore requirements** (the operator guide, written at delivery, must satisfy them): stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; **before access resumes, delete all sessions and revoke all share links** (a restored database can bring back links revoked after the backup was taken); then issue new links where needed.
 - **One restore drill** from an off-site copy is performed before v1 is declared delivered.
 
 ### 11.8 PDF
@@ -638,11 +649,11 @@ Notes and the activity log are not printed.
 - **Domain (Vitest):** status transitions and their conditions (§8); required fields per status, including Draft/Cancelled/Superseded exceptions; disposition and decision conditions; measurement comparison, label matching, uniqueness, set order and differences (§5.7); ID formatting; **every fixed-code list in §7 (including verification outcome) has an EN label, EL label, EN definition and EL definition for every value** (completeness test over all fixed-code lists, not a hand-picked subset).
 - **API (Vitest + Fastify `inject`, temporary SQLite file):**
   - CRUD for records and managed lists; tag rename/merge/delete across records, including the two-tag collision rejection; location filter includes descendants and counts once; must-be-done-before cycle rejection.
-  - **Security:** writes without a session are rejected; writes with a wrong or missing `Origin` are rejected; GET requests change nothing; invalid direct API writes (rule violations) are rejected by the server.
+  - **Security:** writes without a session are rejected; login, data changes and uploads with a wrong or missing `Origin` are rejected; GET requests change no records, evidence or access (only the share-page view count and last-viewed time); invalid direct API writes (rule violations) are rejected by the server; a password reset ends all sessions; session identifiers and share tokens are never stored in plain text, and raw share tokens never appear in activity entries or logs.
   - **Sharing:** private fields absent from share responses; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
 - **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content.
-- **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7).
+- **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7), including session deletion and share-link revocation.
 
 ## 14. Out of scope for v1
 
