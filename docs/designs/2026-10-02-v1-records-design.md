@@ -217,13 +217,15 @@ Recorded on exactly two transitions (§8.1): **Ready for verification → Closed
 
 ### 5.11 Log (Ημερολόγιο)
 
-A manual, dated record of what happened, entered by the user — e.g. "2026-05-01 · Architect sent plans", "2026-05-02 · Contractor confirmed receipt of plans". Any number of entries per record, shown newest first.
+A manual, dated record of what happened, entered by the user — e.g. "2026-05-01 · Architect sent plans", "2026-05-02 · Contractor confirmed receipt of plans". Any number of entries per record, shown newest first (by event date & time, then by logged-at).
 
 | Field | Greek | Type | Rules |
 |---|---|---|---|
-| Date & time | Ημερομηνία & ώρα | date-time | Required. When it happened. Defaults to now; editable. |
+| Event date & time | Ημερομηνία & ώρα γεγονότος | date-time | Required. When it happened. Defaults to now; editable. Shown in the UI. |
 | Entry | Καταχώριση | long text | Required. |
 | Logged by | Καταχώρισε | user | Automatic: the logged-in user. |
+| Logged at | Χρόνος καταχώρισης | timestamp | Automatic: when the entry was created. **Always stored, never editable, not shown in the UI.** |
+| Last edited at | Τελευταία επεξεργασία | timestamp | Automatic: when the entry was last changed; empty if never edited. Stored, not shown in the UI. |
 | Attachments | Συνημμένα | zero or more files | Optional. Stored as record attachments linked to this entry (§5.9). |
 | Private | Ιδιωτικό | checkbox | **P** when ticked: the entry and its attachments never appear in share links or PDFs. |
 
