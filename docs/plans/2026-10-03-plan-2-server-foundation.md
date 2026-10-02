@@ -31,6 +31,15 @@
 
 Task 10 verified local startup, health, request guards and SIGINT shutdown. Task 11 verified the real local seed: 19 people, 34 trades, 13 zone types, 25 tags and 93 locations; a repeat import refused with exit 1. No owner password was supplied. Production deployment remains Plan 6 work.
 
+Final whole-branch review found no Critical or Important issues and judged the branch ready to merge. The controller independently confirmed 155 passing tests in 18 files, a clean typecheck and a CRLF-aware branch diff check. The branch remains unmerged.
+
+**Nonblocking follow-ups from final review:**
+
+- Before scheduled backups in Plan 6, make backup handle closing and temporary-file cleanup exception-safe. Add failure tests for backup verification and migration rollback.
+- Optional test improvements cover exact configuration paths, blank tag names and final sigma through the API, and retired descendants and Greek names in location copies.
+- Polish owner CLI cancellation so Ctrl+C at the password prompt exits without an uncaught `Cancelled` stack. Raw mode is already restored.
+- Fix the CSV parser's dropped final single empty quoted field before reusing it beyond the known import sources. The specified multi-column inputs are unaffected.
+
 The Task 1 audit reported four moderate development-dependency vulnerabilities across the Vitest/mocker and ExcelJS/uuid chains. They remain retained after review. The affected browser tooling is unused by these Node-only tests; ExcelJS uses uuid v4 without an output buffer, outside the affected v3/v5/v6 buffer paths. Reassess browser tooling in Plan 5. No dependency remediation is claimed.
 
 **Decisions and deviations** (design §9.3 and §11.6 reconciled in Task 12):
