@@ -609,11 +609,14 @@ All database access is confined to `src/server` data-access modules, so a later 
 ### 11.6 Hosting
 
 - Hetzner Webhosting L, addon domain **`builtbasis.ktimanet.com`**, Node.js enabled for that domain only. `ktimanet.com` and its WordPress installation are untouched.
+- **Served through Cloudflare** (DNS for ktimanet.com is on Cloudflare): the `builtbasis` records are proxied, SSL/TLS mode Full (strict); the edge uses Cloudflare's Universal certificate and Hetzner serves the Cloudflare Origin Certificate for `*.ktimanet.com`. The server must therefore take the visitor IP from `CF-Connecting-IP`, trusting it only from Cloudflare (login rate limiting, logs).
+- **How the app listens:** `server.listen()` without arguments; Hetzner supplies a Unix socket and starts the app on demand (trial, §11.9). Locally a `PORT` is used.
+- **Dependencies:** the server has no C++ compiler, and npm runs install scripts only for packages listed in `allowScripts`. Use only dependencies that ship prebuilt binaries or need no build step (better-sqlite3 13 does).
 - Directory layout on the server:
   - **Application folder** — replaced on every deployment.
   - **Data folder** (separate path, outside the application folder) — `builtbasis.db`, `files/`, `backups/`. **Never touched by deployment.** Its path is given by an environment variable.
 - Configuration via environment variables (data path, public base URL, share-link encryption key, Node environment). Configuration is kept outside the application and data folders and is preserved across deployments; the encryption key is never stored in the database, repository or backups.
-- **Deployment:** build locally → upload the application folder over SSH (rsync) → install production dependencies on the server (`npm ci --omit=dev`) → restart the application → migrations run on start after a pre-migration backup.
+- **Deployment:** build locally → upload the application folder over SSH (rsync, available on the server) → install production dependencies on the server (`npm ci --omit=dev`) → **restart by stopping the running Node process**; the platform starts the new version on the next request (≈ 1.3 s cold start) → migrations run on start after a pre-migration backup.
 
 ### 11.7 Backups
 
@@ -627,8 +630,7 @@ All database access is confined to `src/server` data-access modules, so a later 
 
 ### 11.8 PDF
 
-- Preferred: Playwright/Chromium on Webhosting L renders the A3 print view to PDF.
-- If Chromium cannot run there: the owner prints the A3 print view to PDF from the desktop browser (the print view has an A3-landscape print layout). No other mechanism is built. Revisit when hosting moves to a VPS.
+- **v1: the owner prints the A3 print view to PDF from the desktop browser** (the print view has an A3-landscape print layout). The trial showed Chromium cannot run on Webhosting L (missing system libraries, no root), so no server-side PDF is built. Revisit when hosting moves to a VPS.
 
 ### 11.9 Test deployment (before implementation is committed)
 
@@ -641,6 +643,8 @@ A half-day trial on Webhosting L must confirm:
 5. The maximum memory limit for the Node process.
 6. Whether Playwright/Chromium runs (§11.8).
 7. Whether cron can run `node` (backups).
+
+**Trial completed 2026-10-03 — result: GO** (checks 1, 2, 3, 4, 7 pass; 6 fails → browser print; memory limit 384 MB). Evidence: `spikes/webhosting-l/README.md`.
 
 **Sequencing:** server implementation (roadmap Plan 2 onward) starts only after a go result. Exception: Plan 1 — pure domain code with no hosting dependency — may be implemented before the trial.
 
@@ -709,7 +713,7 @@ These do not change the design; they are settled during planning or the test dep
 
 1. **Importing existing records** (the tracker spreadsheet rows; the 2026-09-14 measurement workbook): whether and how, given that records are entered manually otherwise. Seed lists (§15) are in scope.
 2. **HEIC photos from iPhones:** confirm whether the browser upload delivers JPEG; otherwise convert in the browser.
-3. **Restart mechanism and memory limit** on Webhosting L (§11.9).
-4. **PDF path** — Playwright on the server or browser print (§11.8).
+3. ~~Restart mechanism and memory limit~~ — **resolved by the trial:** restart = stop the Node process (restarts on the next request); memory limit 384 MB, app ≈ 78 MB (§11.6, §11.9).
+4. ~~PDF path~~ — **resolved by the trial:** browser print (§11.8).
 5. **Presentation of definitions** — inline help, tap or hover (§3).
 6. **Screen layouts** — wireframes before building the record page and list.

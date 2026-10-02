@@ -1,11 +1,13 @@
 # Plan 0 — Webhosting L Trial Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Approved
-> **Retention:** Active until the trial is completed and its results are recorded; historical afterwards.
+> **Status:** Completed
+> **Retention:** Historical — do not execute. Remaining action: Task 8 Step 5 (server clean-up) during Plan 6 go-live preparation.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §11.9 (test deployment), informing §11.6 and §11.8.
-> **Implemented by:** In progress — Task 1 `f3ccc78`; Task 5 Step 1 done (listen mechanism)
-> **Verified:** Not verified
+> **Implemented by:** Branch `feat/plan-0-webhosting-trial`: `f3ccc78` (spike), `801b2f5` (listen like Hetzner), `7afbd3c`..`5bc1376` (trial log), plus the results commit
+> **Verified:** 2026-10-03 on Webhosting L — GO: checks 1, 2, 3, 4, 7 pass; 6 fails (browser-print fallback); memory limit 384 MB. Evidence: `spikes/webhosting-l/README.md`.
+> **Checklist note:** checkboxes are preserved history; the trial log in the spike README is the record of what was done.
+> **Deviations:** HTTPS via Cloudflare proxy + existing Cloudflare Origin Certificate instead of Let's Encrypt (Task 2); SSH key added through konsoleH (Public SSH Keys) and IPv4 forced; better-sqlite3 install script approved via npm `allowScripts`; cron created at hosting-account level with Freetext `* * * * *` and a 705 wrapper script.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 2–7 need the owner's Hetzner konsoleH access and SSH; an agent prepares commands and records results, the owner performs console actions.
 

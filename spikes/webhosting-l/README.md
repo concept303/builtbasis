@@ -11,17 +11,19 @@ curl http://127.0.0.1:3000/health
 BUILTBASIS_DATA_DIR=./data node backup-check.mjs
 ```
 
-## Results (fill in during Plan 0)
+## Results (Plan 0, 2026-10-03)
+
+**Verdict: GO.** All required checks (1, 2, 3, 4, 7) pass. Check 6 fails, so the design's PDF fallback (browser print, §11.8) applies. Check 5 is informational.
 
 | # | Check (design §11.9) | Result | Evidence |
 |---|---|---|---|
-| 1 | Node active on builtbasis.ktimanet.com; ktimanet.com WordPress unaffected | | |
-| 2 | SQLite works on the server (driver from /health: better-sqlite3, or fallback node:sqlite) | | |
-| 3 | Data folder on local disk (filesystem type) | | |
-| 4 | Restart mechanism after deployment | | |
-| 5 | Maximum memory limit for the Node process | | |
-| 6 | Playwright/Chromium runs | | |
-| 7 | Cron can run `node` (backup check) | | |
+| 1 | Node active on builtbasis.ktimanet.com; ktimanet.com WordPress unaffected | **Pass** | `GET https://builtbasis.ktimanet.com/health` → 200 `{"ok":true,"node":"v24.21.0","driver":"better-sqlite3",…,"rssMb":77}`; `https://www.ktimanet.com/` → 200 at the same time |
+| 2 | SQLite works on the server (driver from /health: better-sqlite3, or fallback node:sqlite) | **Pass — better-sqlite3** | Prebuilt `linux-x64` binary loads, SQLite 3.53.4; `node:sqlite` also works (3.53.4). Plan 2 keeps `better-sqlite3`. |
+| 3 | Data folder on local disk (filesystem type) | **Pass** | `/usr/home/ktimana/builtbasis-data` on `/dev/mapper/vg-usr`, ext4 (local LVM), not a network filesystem |
+| 4 | Restart mechanism after deployment | **Pass** | Stopping the process (`kill <pid>`) is enough: the platform starts the app on the next request with the new code (`restartCheck` appeared, `hits` continued 1→2, cold start ≈ 1.3 s). No konsoleH action needed. |
+| 5 | Maximum memory limit for the Node process | **384 MB** (shown in konsoleH; owner to confirm whether a higher value is accepted) | App RSS ≈ 77–78 MB |
+| 6 | Playwright/Chromium runs | **Fail** | `error while loading shared libraries: libatk-bridge-2.0.so.0`; also missing `libgbm.so.1`, `libxkbcommon.so.0`, `libatspi.so.0`. No root, so they cannot be installed. Chromium download removed. |
+| 7 | Cron can run `node` (backup check) | **Pass** | konsoleH cron (hosting account level, Freetext `* * * * *`, direct call of `backup-cron.sh`, mode 705) → `backup ok (better-sqlite3): …/spike-2026-10-02T17-10-01-989Z.db`, no `.tmp` left |
 
 ## Trial log
 
@@ -33,6 +35,10 @@ BUILTBASIS_DATA_DIR=./data node backup-check.mjs
 - **2026-10-03 — Task 4 (check 3): pass.** `~/builtbasis-data` → `/usr/home/ktimana/builtbasis-data` on `/dev/mapper/vg-usr`, **ext4**, local LVM volume (not a network filesystem). Mount options include `nobarrier` and user quotas — crash durability relies on Hetzner's hardware; mitigated by the designed nightly and off-site backups.
 - **Plan 2 notes:** commit an `allowScripts` entry for any dependency with install scripts; avoid dependencies that need compiling (no compiler on the server). Behind Cloudflare, rate limiting and logging must use the visitor IP from `CF-Connecting-IP` (Fastify `trustProxy` restricted to Cloudflare ranges).
 
-**Listen mechanism used by Hetzner:** Documented (docs.hetzner.com, konsoleH → Node.js, Hello World example): the app calls `server.listen()` **without arguments** and the platform routes requests; no port, host or socket is specified. `server.mjs` therefore listens without arguments when `PORT` is unset (verified locally 2026-10-02: OS-assigned port, `/health` OK). To confirm on the server in Task 5 Step 3.
-**Node binary path for cron:** pending (Task 7)
-**Go / no-go:** pending (Task 8)
+- **2026-10-03 — Task 5 (checks 1, 4, 5).** konsoleH → builtbasis.ktimanet.com → Node.js Configuration: script `server.mjs`, working directory `builtbasis-spike/`, log `builtbasis-spike/log.txt`, memory 384 MB, version 24, env `BUILTBASIS_DATA_DIR=/usr/home/ktimana/builtbasis-data`. The app runs as `/usr/local/nodejs/24/bin/node server.mjs`, is started on demand at the first request, and logs `platform listener: "/hosnodejssocket"`. Restart test: `kill 2354` → next request served by PID 5008 with the changed code.
+- **2026-10-03 — Task 6 (check 6): fail.** `npm install --no-save playwright@1` + `npx playwright install chromium` (headless shell 153, 114 MB download) → launch fails on missing system libraries (see table). Cache (658 MB) and Playwright removed afterwards.
+- **2026-10-03 — Task 7 (check 7): pass.** konsoleH offers the Cron Job Manager only at hosting-account level (`e7hi.your-vhost.de`); interval presets start at hourly, Freetext accepts `* * * * *`. Script `/usr/home/ktimana/builtbasis-spike/backup-cron.sh` (mode 705, absolute paths, calls `/usr/local/nodejs/24/bin/node`) also verified beforehand with an empty environment (`env -i`). The test cron job is deleted after the check.
+
+**Listen mechanism used by Hetzner:** confirmed — the app calls `server.listen()` **without arguments**; the platform supplies a Unix socket (`/hosnodejssocket`) and routes requests to it. Listening on a fixed port is not used.
+**Node binary path for cron:** `/usr/local/nodejs/24/bin/node` (the binary konsoleH runs; `/usr/bin/node` is a small wrapper).
+**Go / no-go:** **GO** (2026-10-03).
