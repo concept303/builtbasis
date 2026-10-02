@@ -881,7 +881,7 @@ git commit -m "feat(server): scrypt passwords, hashed sessions and the owner acc
 - Create: `src/server/auth/login-limiter.ts`, `src/server/http/client-ip.ts`
 - Test: `tests/server/login-limiter.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/server/login-limiter.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/login-limiter.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -924,12 +924,12 @@ describe('login limiter (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/login-limiter.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/auth/login-limiter"`.
 
-- [ ] **Step 3: Create `src/server/auth/login-limiter.ts`**
+- [x] **Step 3: Create `src/server/auth/login-limiter.ts`**
 
 ```ts
 export interface LoginLimits {
@@ -975,7 +975,7 @@ export class LoginLimiter {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/http/client-ip.ts`**
+- [x] **Step 4: Create `src/server/http/client-ip.ts`**
 
 ```ts
 import type { FastifyRequest } from 'fastify';
@@ -994,11 +994,11 @@ export function clientIp(request: FastifyRequest, config: Pick<AppConfig, 'behin
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/login-limiter.test.ts` → PASS (4 tests). Then `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/auth/login-limiter.ts src/server/http/client-ip.ts tests/server/login-limiter.test.ts
