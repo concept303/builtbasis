@@ -2431,7 +2431,7 @@ git commit -m "feat(server): tags API with rename, merge and delete rules"
 
 The API returns the tree as a **flat list** ordered by `sortOrder`, then `id`; the browser builds the tree from `parentId`. A new node without `sortOrder` goes last among its siblings.
 
-- [ ] **Step 1: Write the failing test `tests/server/locations-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/locations-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2569,12 +2569,12 @@ describe('location tree (design §9.4)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/locations-api.test.ts`
 Expected: FAIL — `expected 404 to be 201` (no location routes yet).
 
-- [ ] **Step 3: Create `src/server/lists/locations.ts`**
+- [x] **Step 3: Create `src/server/lists/locations.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2803,15 +2803,15 @@ export function registerLocationRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Register the routes in `src/server/app.ts`**
+- [x] **Step 4: Register the routes in `src/server/app.ts`**
 
 Add `import { registerLocationRoutes } from './lists/locations';` below the other `./lists/...` imports, and `registerLocationRoutes(app, db);` after `registerTagRoutes(app, db);`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/locations-api.test.ts` → PASS (7 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/lists/locations.ts src/server/app.ts tests/server/locations-api.test.ts
