@@ -1,7 +1,7 @@
 # BuiltBasis v1 — Records Design
 
 > **Document type:** Design document
-> **Status:** Approved (2026-10-02, project owner)
+> **Status:** Approved (2026-10-02, project owner). Revised 2026-10-02 after independent design review (sharing, required fields, verification, security, backups, files, measurements, severity, Greek labels).
 > **Scope:** BuiltBasis v1 — records (Quality Issue, Detail Clarification, Task), their fields, value lists, rules, screens, sharing, PDF, hosting and operations.
 > **Retention:** Implementation baseline for the v1 specification and implementation plan. Becomes historical after v1 delivery and reconciliation (DOCS-STANDARD §2).
 > **Governed by:** `docs/VISION.md` (intent), `docs/adr/0001-v1-stack-and-hosting.md` (stack).
@@ -79,7 +79,9 @@ All other references to other records (the requirement a nonconformance breaks, 
 
 ## 5. Shared fields (all subtypes)
 
-Field privacy: **P** = private (owner only). All other fields appear in share links and PDFs unless stated.
+Field privacy: **P** = private (owner only). Shared record pages show every non-private field. The A3 print view / PDF shows exactly the fields listed in §12.
+
+**Required fields** marked "required in active statuses" must be filled in every status except Draft, Cancelled and Superseded, which may be incomplete. The server enforces this on every save (§8.2).
 
 ### 5.1 Core
 
@@ -87,7 +89,7 @@ Field privacy: **P** = private (owner only). All other fields appear in share li
 |---|---|---|---|
 | Subtype | Υποκατηγορία | code (§7.1) | Required. Cannot change after creation. |
 | ID | Κωδικός | `QI-0001` etc. | Generated (§4.2). |
-| Title | Τίτλος | text, ≤ 200 chars | Required (except in Draft). |
+| Title | Τίτλος | text, ≤ 200 chars | Required in active statuses. |
 | Description | Περιγραφή | long text | Optional. Describes the matter and, where relevant, the exact physical item (e.g. "left side of the west balcony door frame"). |
 | Status | Κατάσταση | code (§7.2) | Required. Rules in §8. |
 | Status reason | Αιτιολογία κατάστασης | code (§7.3 / §7.4) + note | Required when status is On hold or Cancelled. |
@@ -98,7 +100,7 @@ Field privacy: **P** = private (owner only). All other fields appear in share li
 
 | Field | Greek | Type | Rules |
 |---|---|---|---|
-| Ball in court | Ποιος έχει την μπάλα | one entry from the people list (§9.1) | Optional. **Who must act next.** Set manually by the owner. Every change is logged with its date (§5.12), so the time someone has held the ball is visible. |
+| Ball in court | Επόμενη ενέργεια από | one entry from the people list (§9.1) | Optional. **Who must act next.** Set manually by the owner. Every change is logged with its date (§5.12), so the time someone has held the ball is visible. |
 | Responsible | Υπεύθυνος | one entry from the people list | Optional. The company or person responsible for doing the work. |
 | Trades | Ειδικότητες | one or more from the trades list (§9.2) | Optional. Several allowed: a record can need a combination of trades. |
 
@@ -119,7 +121,7 @@ Field privacy: **P** = private (owner only). All other fields appear in share li
 | Field | Greek | Type | Rules |
 |---|---|---|---|
 | Outside contract scope | Εκτός σύμβασης | checkbox | **P.** Ticked when the work is outside the existing contract (extra work or change). |
-| Estimated cost (€) | Εκτιμώμενο κόστος (€) | number, 2 decimals | **P.** Shown and editable only when _Outside contract scope_ is ticked. Totals available in lists. |
+| Estimated cost (€) | Εκτιμώμενο κόστος (€) | number, 2 decimals | **P.** Shown and editable only when _Outside contract scope_ is ticked. Unticking keeps the stored value but hides it and excludes it from totals; re-ticking shows it again. List totals sum non-empty estimates of records currently marked _Outside contract scope_ only. |
 
 ### 5.5 Location
 
@@ -142,9 +144,9 @@ Shown for Quality Issues and Detail Clarifications; not shown for Tasks.
 |---|---|---|---|
 | Options considered | Εξεταζόμενες λύσεις | list of options: short label + description | Optional. Any number. Proposals (including cheaper alternatives) are kept even when rejected. |
 | Chosen option | Επιλεγμένη λύση | one of the options | Optional. |
-| Decided by | Αποφάσισε | one entry from the people list | Optional. |
-| Decided on | Ημερομηνία απόφασης | date | Optional. |
-| Instruction text | Κείμενο εντολής | long text | Optional. **Stored exactly as issued** (original language, original wording). Never rewritten by translation. |
+| Decided by | Αποφάσισε | one entry from the people list | Optional; **required** for a QI whose disposition is _Repair_ or _Accept as is_ (§6.1). May be the owner. |
+| Decided on | Ημερομηνία απόφασης | date | Optional; **required** under the same condition as _Decided by_. |
+| Instruction text | Κείμενο εντολής | long text | Optional. **Stored exactly as issued** (original language, original wording). Never rewritten by translation. Editable; every change is logged with the previous and the new text, author and time (§5.12). Record and PDF show the current text. |
 
 ### 5.7 Measurements
 
@@ -171,12 +173,17 @@ A record can hold any number of **measurement sets**; each set holds any number 
 
 **Label suggestions.** When typing _Item_ and _Quantity_, the field suggests labels already used in the same record, so the same thing is labelled identically across sets.
 
+**Rules:**
+
+- **Matching:** labels match when equal after trimming, collapsing internal whitespace and ignoring letter case. Rows with different units are never compared.
+- **Uniqueness:** within one measurement set, the normalised _Item + Quantity + Unit_ must be unique (a duplicate row is rejected).
+- **Set order:** by measurement date, then by creation order (internal set ID).
+- **Differences:** later value minus earlier value; between items, each item is compared with the first item in display order.
+
 **Comparison views** (generated automatically; no configuration):
 
 1. **Between items** — within one measurement set, for one _Quantity_ (and one unit), all items side by side as bars with their values and the differences between them. Example: _Stone thickness_ — Left 18 · Right 15.3 · Top 20.
-2. **Before vs after** — the same _Item + Quantity_ (and unit) across measurement sets, ordered by date, with the change between consecutive sets.
-
-Matching rule: labels match when equal after trimming, collapsing internal whitespace and ignoring letter case. Rows with different units are never compared.
+2. **Before vs after** — the same _Item + Quantity_ (and unit) across measurement sets, in set order, with the change between consecutive sets.
 
 ### 5.8 Photos
 
@@ -187,22 +194,22 @@ Matching rule: labels match when equal after trimming, collapsing internal white
 | Caption | Λεζάντα | text | Optional. |
 | Date taken | Ημερομηνία λήψης | date-time | Read automatically from the photo's metadata when present; editable. |
 
-The record shows photos grouped by phase. The original file is always kept unchanged (§11.4).
+The record shows photos grouped by phase. The original file is always kept unchanged; storage and access rules in §11.4.
 
 ### 5.9 Attachments
 
-Documents and drawings (PDF, images, office documents): file + title (optional) + upload date. Any number per record.
+Documents and drawings (PDF, images, office documents): file + title (optional) + original filename + upload date. Any number per record. Storage and access rules in §11.4.
 
 ### 5.10 Verification
 
-Recorded whenever a record **leaves Ready for verification** (§8). A record can have several verification entries over time (e.g. one failed, then one passed).
+Recorded on exactly two transitions (§8.1): **Ready for verification → Closed** (outcome _passed_) and **Ready for verification → In progress** (outcome _failed_). No other transition creates a verification entry (e.g. a DC superseded while Ready for verification creates none). A record can have several verification entries over time (e.g. one failed, then one passed).
 
 | Field | Greek | Type | Rules |
 |---|---|---|---|
 | Checked by | Ελέγχθηκε από | one entry from the people list | Required. |
 | Date | Ημερομηνία | date | Required. |
 | Method | Μέθοδος | code (§7.16) | Required. |
-| Outcome | Αποτέλεσμα | passed / failed | Set by the transition: → Closed = passed; → In progress = failed. Not chosen separately. |
+| Outcome | Αποτέλεσμα | code (§7.17) | Set by the transition: → Closed = _passed_; → In progress = _failed_. Not chosen separately. |
 | Note | Σημείωση | text | Optional. |
 
 ### 5.11 Notes
@@ -211,7 +218,7 @@ A record has a list of notes (text, author, timestamp). Each note can be marked 
 
 ### 5.12 Activity log
 
-Automatic, append-only, per record. Logs: creation; every status change (with reason where required); changes to ball in court, responsible, severity, priority, due date, disposition, chosen option; verification entries; share links created or revoked. Each entry: what changed, from → to, who, when. Activity entries about private fields are visible only to the owner.
+Automatic, append-only, per record. Logs: creation; every status change (with reason where required); changes to ball in court, responsible, severity, priority, due date, disposition, chosen option, decided by/on; every change to the instruction text (previous and new text); verification entries; share links created or revoked. Each entry: what changed, from → to, who, when. Activity entries about private fields are visible only to the owner.
 
 ## 6. Subtype-specific fields
 
@@ -219,16 +226,16 @@ Automatic, append-only, per record. Logs: creation; every status change (with re
 
 | Field | Greek | Type | Rules |
 |---|---|---|---|
-| Type of problem | Είδος προβλήματος | one or more codes (§7.5) | Required (except in Draft). Several can apply at once (e.g. Defect + Nonconformance). When **Nonconformance** is ticked, the broken requirement should be written in _Reference_. |
+| Type of problem | Είδος προβλήματος | one or more codes (§7.5) | Required in active statuses. Several can apply at once (e.g. Defect + Nonconformance). When **Nonconformance** is ticked, the broken requirement should be written in _Reference_. |
 | Stage | Στάδιο | code (§7.6) | Optional. When in the project the problem was found. |
-| Disposition | Διάθεση | code (§7.7) | Empty until decided. **Required before the status can become Issued.** **Accept as is** allows closing without corrective work (§8). |
+| Disposition | Τρόπος αντιμετώπισης | code (§7.7) | Empty until decided. **Required before the status can become Issued or In progress, and for closing without verification.** _Repair_ and _Accept as is_ also require _Decided by_ and _Decided on_ (§5.6). _Accept as is_ allows closing without corrective work (§8.1). |
 | Correction | Διόρθωση | long text | Optional. The work that fixes the problem. |
 
 ### 6.2 Detail Clarification
 
 | Field | Greek | Type | Rules |
 |---|---|---|---|
-| Question | Ερώτημα | long text | Required (except in Draft). What needs defining or agreeing, and where. |
+| Question | Ερώτημα | long text | Required in active statuses. What needs defining or agreeing, and where. |
 | Route | Διαδικασία | code (§7.8) | Optional. How the clarification is handled. |
 | Issued by | Εκδόθηκε από | one entry from the people list | Optional. Who issued the instruction (architect, engineer, owner…). |
 
@@ -261,7 +268,7 @@ Every value: code, English label, Greek label, English definition, Greek definit
 | `in_progress` | In progress | Σε εξέλιξη | The work has started. | Η εργασία έχει ξεκινήσει. |
 | `ready_for_verification` | Ready for verification | Προς έλεγχο | Reported as done; waiting for someone to check it. | Δηλώθηκε ως ολοκληρωμένο· αναμένεται έλεγχος. |
 | `on_hold` | On hold | Σε αναμονή | Paused by a decision or by circumstances. A reason is required. | Σε παύση λόγω απόφασης ή συνθηκών. Απαιτείται αιτιολογία. |
-| `closed` | Closed | Κλειστό | Finished: checked and accepted, or accepted as is. | Ολοκληρώθηκε: ελέγχθηκε και έγινε αποδεκτό, ή έγινε αποδεκτό ως έχει. |
+| `closed` | Closed | Κλειστό | Finished; nothing more to do. | Ολοκληρώθηκε· δεν απαιτείται άλλη ενέργεια. |
 | `cancelled` | Cancelled | Ακυρώθηκε | Will not be pursued. A reason is required. | Δεν θα προχωρήσει. Απαιτείται αιτιολογία. |
 | `superseded` | Superseded | Αντικαταστάθηκε | Replaced by a later clarification and kept as history. Detail Clarification only. | Αντικαταστάθηκε από μεταγενέστερη διευκρίνιση και διατηρείται ως ιστορικό. Μόνο για τεχνικές διευκρινίσεις. |
 
@@ -312,7 +319,7 @@ A note is required with `replaced` (the replacing record's ID) and `other`.
 | `handover` | Handover | Παράδοση | Found at the formal handover inspection (punch / snag list). | Εντοπίστηκε στην επίσημη αυτοψία παράδοσης (λίστα παρατηρήσεων). |
 | `warranty` | Warranty | Περίοδος εγγύησης | Found after handover, during the defects liability period. | Εντοπίστηκε μετά την παράδοση, εντός της περιόδου εγγύησης. |
 
-### 7.7 Disposition (Διάθεση) — Quality Issue
+### 7.7 Disposition (Τρόπος αντιμετώπισης) — Quality Issue
 
 | Code | EN | EL | Definition (EN) | Ορισμός (EL) |
 |---|---|---|---|---|
@@ -335,9 +342,11 @@ A note is required with `replaced` (the replacing record's ID) and `other`.
 
 | Code | EN | EL | Definition (EN) | Ορισμός (EL) |
 |---|---|---|---|---|
-| `critical` | Critical | Κρίσιμο | Affects safety, structure or waterproofing, or blocks other work or handover. | Επηρεάζει την ασφάλεια, τον φέροντα οργανισμό ή τη στεγάνωση, ή εμποδίζει άλλες εργασίες ή την παράδοση. |
-| `major` | Major | Σημαντικό | Affects function or visible appearance, or will cost more to fix if delayed. | Επηρεάζει τη λειτουργία ή την εμφανή όψη, ή η καθυστέρηση θα αυξήσει το κόστος αποκατάστασης. |
-| `minor` | Minor | Μικρό | Cosmetic or minor. Can wait for the final close-out round. | Αισθητικό ή μικρής σημασίας. Μπορεί να περιμένει τον τελικό γύρο αποκατάστασης. |
+| `critical` | Critical | Κρίσιμο | Serious safety risk, structural failure or major water ingress. | Σοβαρός κίνδυνος για την ασφάλεια, αστοχία του φέροντος οργανισμού ή εκτεταμένη εισροή νερού. |
+| `major` | Major | Σημαντικό | Material impairment of function, durability or appearance. | Ουσιώδης υποβάθμιση της λειτουργίας, της ανθεκτικότητας ή της εμφάνισης. |
+| `minor` | Minor | Μικρό | Local cosmetic imperfection, with no material effect on function or safety. | Τοπική αισθητική ατέλεια, χωρίς ουσιώδεις επιπτώσεις στη λειτουργία ή την ασφάλεια. |
+
+Severity describes consequences only. Urgency belongs to _Priority_ (§7.10) and dependencies to _Must be done before_ (§4.3).
 
 ### 7.10 Priority (Προτεραιότητα) — empty means none
 
@@ -408,6 +417,15 @@ A note is required with `replaced` (the replacing record's ID) and `other`.
 | `document` | Document | Έγγραφο | Checked against a certificate, declaration or report. | Έλεγχος μέσω πιστοποιητικού, δήλωσης ή έκθεσης. |
 | `test` | Test | Δοκιμή | Checked by a functional test (e.g. water, pressure, electrical). | Έλεγχος με δοκιμή λειτουργίας (π.χ. στεγανότητας, πίεσης, ηλεκτρολογική). |
 
+### 7.17 Verification outcome (Αποτέλεσμα ελέγχου)
+
+Set by the transition (§5.10), never chosen directly.
+
+| Code | EN | EL | Definition (EN) | Ορισμός (EL) |
+|---|---|---|---|---|
+| `passed` | Passed | Επιτυχής | The check confirmed the result is acceptable. | Ο έλεγχος επιβεβαίωσε ότι το αποτέλεσμα είναι αποδεκτό. |
+| `failed` | Failed | Ανεπιτυχής | The check found that further work is required. | Ο έλεγχος έδειξε ότι απαιτούνται πρόσθετες εργασίες. |
+
 ## 8. Status rules
 
 ### 8.1 Allowed transitions
@@ -415,7 +433,7 @@ A note is required with `replaced` (the replacing record's ID) and `other`.
 | From | To | Conditions |
 |---|---|---|
 | Draft | Open | Required fields complete (Title; _Type of problem_ for QI; _Question_ for DC). |
-| Draft | Cancelled | Reason required. |
+| Draft | Cancelled | Reason required. Required fields may remain incomplete. |
 | Open | Awaiting decision · Issued · In progress · On hold · Cancelled | Issued or In progress (QI): disposition required. |
 | Open | Closed | **QI only, with disposition _Accept as is_.** **Task** (done without further tracking). |
 | Awaiting decision | Issued · On hold · Cancelled | Issued (QI): disposition required. |
@@ -428,7 +446,7 @@ A note is required with `replaced` (the replacing record's ID) and `other`.
 | Ready for verification | In progress | A verification entry is recorded (outcome _failed_). |
 | On hold | (status before the hold) | Resume returns the record to the status it had when put on hold. |
 | Closed | Open | Reopen; a note is required. |
-| any non-terminal (DC) | Superseded | **DC only.** A note naming the replacing record is required. |
+| any non-terminal (DC) | Superseded | **DC only.** A note naming the replacing record is required. No verification entry is created. Required fields may remain incomplete. |
 | Cancelled, Superseded | — | Terminal. |
 
 Non-terminal = every status except Closed, Cancelled, Superseded.
@@ -439,6 +457,9 @@ Non-terminal = every status except Closed, Cancelled, Superseded.
 - **On hold** and **Cancelled** require a reason (§7.3, §7.4).
 - Every transition is logged (§5.12) with the reason or verification where applicable.
 - The status the record had before _On hold_ is stored so _Resume_ can restore it.
+- **Required fields** apply to every save in active statuses (all except Draft, Cancelled, Superseded).
+- **The server enforces every rule** in §5–§8 (required fields, allowed transitions, disposition and decision conditions, measurement uniqueness), using the shared domain schemas. The browser's checks are a convenience only; a direct API call cannot bypass them.
+- **A status change is one transaction:** the new status, its reason, any verification entry and the activity entries are written together or not at all.
 
 ## 9. Managed lists (per project)
 
@@ -454,11 +475,13 @@ Fields: **code**, **name EN**, **name EL**, **definition EN**, **definition EL**
 
 ### 9.3 Tags (Ετικέτες)
 
-Fields: **name EL**, **name EN**. Operations:
+Fields: **name EL**, **name EN**. At least one name is required. Names are **unique within each language** after trimming and ignoring letter case.
+
+Operations:
 
 - **Add** — from the tag management screen, or by typing a new tag on a record (the box suggests existing tags first).
 - **Rename** — applies to every record carrying the tag.
-- **Merge** — renaming a tag to the name of an existing tag merges the two (after confirmation).
+- **Merge** — if a rename collides with exactly one existing tag (in either language), the owner is offered a merge into that existing tag, which keeps its own names. If the new names collide with two different tags, the rename is rejected.
 - **Delete** — removes the tag from every record (after confirmation showing how many records are affected).
 
 A tag owns nothing: no shared documents, status or responsibility. Filtering by tag gives the list of records and counts of open vs closed.
@@ -488,7 +511,7 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
    - Filters: subtype, status, location (tree; includes descendants), zone type, trade, tag, ball in court, responsible, severity, priority, stage, type of problem, safety implications, outside contract scope (owner only), "must be done before / requires first", due date range, text search (title, description, ID).
    - Sort: ID, due date, priority, severity, updated.
    - Columns/cards: ID, title, subtype, status, ball in court, due date, priority, severity, completion bar, safety badge.
-   - Totals: count; sum of estimated cost for the filtered set (owner only).
+   - Totals: count; sum of estimated cost for the filtered set, counting only records currently marked _Outside contract scope_ (owner only).
 3. **New record** — quick capture: subtype, title, optional photo(s) and location; saved as **Draft**; completed later.
 4. **Record page** — header (ID, title, subtype, status with allowed actions, ball in court, due date, severity, priority, completion bar, safety badge) and sections/tabs:
    - **Overview** — description, location paths, responsible, trades, tags, reference, must be done before / requires first, private commercial fields (owner only).
@@ -500,10 +523,10 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
    - **Verification** — entries.
    - **Notes** — with private marker.
    - **Activity.**
-   - **Share & print** — create/revoke share links; open the A3 print/PDF view.
+   - **Share & print** — create, copy and revoke share links; open the A3 print/PDF view.
 5. **Status change dialog** — shows only allowed transitions (§8.1) and asks for what each requires (reason, verification, disposition).
 6. **Lists management** — people, trades, tags, location tree (with copy branch), zone types.
-7. **Shared record view** (no login) — read-only record page without private content, language switch, "not available" for revoked/expired/draft.
+7. **Shared record view** (no login) — read-only record page without private content, language switch, "not available" for revoked/expired/draft. _Must be done before / Requires first_ entries show only the other record's ID and title, omit Draft records, and are not links (§11.5).
 8. **A3 print view** (§12).
 
 ## 11. Architecture and operations
@@ -531,19 +554,34 @@ All database access is confined to `src/server` data-access modules, so a later 
 - **Managed lists** (people, trades, tags, location nodes, zone types) live in tables.
 - **Multi-value references to managed lists** (trades, tags, locations, must-be-done-before) use join tables. **Multi-value fixed codes** (type of problem) are stored as a validated list of codes on the record.
 - Migrations run at application start, after an automatic backup of the database file.
+- **Stored files are never deleted in v1.** Removing a photo or attachment from a record removes the record's reference, not the file. Every database backup therefore always has its files.
 
 ### 11.4 Files
 
-- Files are stored in the data folder, named by their **SHA-256 content hash**; the database holds metadata (original name, type, size, uploaded by/at).
+- **Stored file (blob):** the bytes, stored once in the data folder and identified by their **SHA-256 content hash**, with size and content type.
+- **Occurrence:** each photo or attachment on a record is its own row, holding the record, the blob reference, the original filename, title/caption and uploaded by/at. The same file uploaded to two records gives two occurrences sharing one blob.
+- **Photos** reference three blobs: original, display copy and thumbnail. The browser produces the display copy and thumbnail at upload, so the server needs no image-processing module.
 - **Originals are never modified or overwritten.** Corrections add new files.
-- For photos, the browser also produces a display copy and a thumbnail at upload, so the server needs no image-processing module.
+- **Access:** files are served only through an authorised application route. A request needs the owner's session, or a currently valid share token for a record that has an occurrence of that file. This applies to originals, display copies and thumbnails. Knowing a content hash grants no access.
 - Limits: photos up to 25 MB, attachments up to 50 MB. Accepted: images (JPEG, PNG, HEIC), PDF, common office documents.
 
 ### 11.5 Authentication and sharing
 
-- **Owner login:** username + password; password hashed with Node's built-in `scrypt`; session cookie (`HttpOnly`, `Secure`, `SameSite=Lax`); login rate-limited; HTTPS only.
-- **Share links:** one record per link. Token = 32 random bytes (URL-safe); only its SHA-256 hash is stored. Each link: label (whom it is for), created at, optional expiry, revoked at, last viewed at and view count. Revoked/expired links show "not available". Share pages are marked `noindex`.
-- Private content (§2) is excluded by the server, not merely hidden in the browser.
+**Owner login**
+
+- Username + password; password hashed with Node's built-in `scrypt`; login rate-limited; HTTPS only.
+- The owner account is **created and its password reset by a server-side command** (no sign-up or reset screen).
+- Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, **host-only** (no `Domain` attribute, so it is never sent to `ktimanet.com` or other subdomains).
+- Sessions are stored on the server, expire **30 days after login** (absolute), and are deleted on logout.
+- **Forged-request protection:** every state-changing request requires a valid session **and** an `Origin` header equal to the configured public base URL (`https://builtbasis.ktimanet.com` in production) **and** a JSON body. `SameSite` alone is not relied on, because `ktimanet.com` (WordPress) counts as the same site.
+- **Reads never change state.** GET requests never create, change or delete anything, including share links.
+
+**Share links**
+
+- One record per link. Token = 32 random bytes, URL-safe. The **token is stored**, so the owner can copy and resend a link at any time and the QR code can reuse it. (Hashing it would protect nothing: anyone able to read the database can already read every record.)
+- Each link: label (whom it is for), created at, optional expiry, revoked at, last viewed at and view count. Revoked or expired links, and links to a Draft record, show "not available". Share pages are marked `noindex`.
+- **Private content (§2) is excluded by the server**, not merely hidden in the browser.
+- A share token grants access to its record's page and that record's files (§11.4), nothing else. _Must be done before / Requires first_ entries on a shared page show only the other record's ID and title, omit Draft records, and grant no access to them.
 
 ### 11.6 Hosting
 
@@ -556,9 +594,10 @@ All database access is confined to `src/server` data-access modules, so a later 
 
 ### 11.7 Backups
 
-- **On the server (nightly, cron):** consistent database copy using SQLite's own backup mechanism (`VACUUM INTO`), never a plain copy of the live file; rotation: 14 daily + 8 weekly copies in `backups/`.
-- **Off the server (nightly):** a Windows scheduled task on the owner's PC pulls the latest database backup and any new files over SSH to the X: drive. Files are content-addressed and immutable, so only new files are copied.
-- **Restore:** documented as an operator guide when v1 is delivered.
+- **On the server (nightly, cron):** consistent database copy using SQLite's own backup mechanism (`VACUUM INTO`), never a plain copy of the live file. The copy is written under a **temporary name**, checked with `PRAGMA integrity_check`, and only then renamed to its final name, so an interrupted or damaged backup never looks complete. Rotation: 14 daily + 8 weekly copies in `backups/`.
+- **Off the server (nightly):** a Windows scheduled task on the owner's PC pulls over SSH to the X: drive, **files first, then the latest completed database backup** — so every copied database already has its files. Files are content-addressed, immutable and never deleted (§11.3), so only new files are copied.
+- **Restore requirements** (the operator guide, written at delivery, must satisfy them): stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; afterwards, log in again and review share links (a restored database can bring back links revoked after the backup was taken).
+- **One restore drill** from an off-site copy is performed before v1 is declared delivered.
 
 ### 11.8 PDF
 
@@ -571,7 +610,7 @@ A half-day trial on Webhosting L must confirm:
 
 1. Node.js activates on `builtbasis.ktimanet.com` while `ktimanet.com` (WordPress) keeps working.
 2. `npm ci` installs `better-sqlite3` on the server. Fallback: Node's built-in `node:sqlite`.
-3. **Filesystem type of the data folder.** If it is a network filesystem, SQLite's WAL mode is not used; the default rollback journal is.
+3. **The data folder is on local disk, not a network filesystem.** SQLite is reliable only where file locking and durability are reliable; switching WAL off does not make network storage safe. If the data folder cannot be placed on local disk, **production does not go live on Webhosting L** and the owner decides on alternative hosting (e.g. a Hetzner Cloud server).
 4. How the application is restarted after deployment (konsoleH).
 5. The maximum memory limit for the Node process.
 6. Whether Playwright/Chromium runs (§11.8).
@@ -579,24 +618,31 @@ A half-day trial on Webhosting L must confirm:
 
 ## 12. A3 print view and PDF
 
-One A3-landscape page per record (continuing to further pages if needed), in the chosen language, **without private content**:
+One A3-landscape page per record (continuing to further pages if needed), in the chosen language, **without private content**. It shows exactly these fields:
 
 - Header: ID, title, subtype, status, severity, priority, due date, ball in court, responsible.
-- Location paths; trades; tags.
-- Description (QI) or question (DC).
+- Location paths; trades; tags; reference.
+- Description (QI, Task); question (DC).
 - Classification (subtype fields).
-- Decision: chosen option, decided by/on; instruction text as issued.
-- Measurements: latest set(s) as a table, plus the comparison views.
+- Decision: chosen option, decided by/on; current instruction text.
+- Measurements: for each phase present, the latest set (by set order, §5.7) as a table, plus the comparison views.
 - Photos: up to 4 _Before_ and 4 _After_ (most recent first).
 - Verification entries.
-- **QR code** to the record's share link (created on first print if none exists; uses an active, non-expired link).
+- **QR code** to an existing active, non-expired share link of the record, chosen by the owner. If the record has none, the print view offers a button to create one first (an explicit action, §11.5).
 - Footer: generated date-time, record last-updated date-time.
+
+Notes and the activity log are not printed.
 
 ## 13. Tests
 
-- **Domain (Vitest):** status transitions and their conditions (§8); required fields per status; measurement comparison and label matching (§5.7); ID formatting; **every fixed value has an EN label, EL label, EN definition and EL definition** (completeness test).
-- **API (Vitest + Fastify `inject`, temporary SQLite file):** CRUD for records and managed lists; private fields absent from share responses; share link revoke/expiry; tag rename/merge/delete across records; location filter includes descendants and counts once; must-be-done-before cycle rejection.
-- **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view.
+- **Domain (Vitest):** status transitions and their conditions (§8); required fields per status, including Draft/Cancelled/Superseded exceptions; disposition and decision conditions; measurement comparison, label matching, uniqueness, set order and differences (§5.7); ID formatting; **every fixed-code list in §7 (including verification outcome) has an EN label, EL label, EN definition and EL definition for every value** (completeness test over all fixed-code lists, not a hand-picked subset).
+- **API (Vitest + Fastify `inject`, temporary SQLite file):**
+  - CRUD for records and managed lists; tag rename/merge/delete across records, including the two-tag collision rejection; location filter includes descendants and counts once; must-be-done-before cycle rejection.
+  - **Security:** writes without a session are rejected; writes with a wrong or missing `Origin` are rejected; GET requests change nothing; invalid direct API writes (rule violations) are rejected by the server.
+  - **Sharing:** private fields absent from share responses; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
+  - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
+- **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content.
+- **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7).
 
 ## 14. Out of scope for v1
 
@@ -619,14 +665,14 @@ Loaded by a seed script; contact details are loaded into the database only and a
 | List | Source | Notes |
 |---|---|---|
 | People | `X:\CBG\Prj\Internal projects\cbg2401 - Κατασκευή Γεννάδι 822Α\Παρακολούθηση Έργου\Γεννάδι 822Α - Εκκρεμότητες v3-References.csv` (Owner/Initials/Full name/Email/Phone) | Role mapped from the code prefix: `ARCH` → architect; `C-PB` → main contractor; other `C-` → subcontractor; `SUP` → supplier; `O3P` → other. Owner and owner's representatives are set manually. |
-| Trades | `X:\CBG\Prj\Internal projects\cbg2401 - Κατασκευή Γεννάδι 822Α\Project Tracking\Project Fields Lookups.xlsx`, sheet _Trades_ | 34 trades with EN/EL names and definitions, imported verbatim (list below). |
-| Location tree | Same workbook, sheets _Location_ and _Zone_ | Top level: Villa 1, Villa 2, Villa 3, Site (shared infrastructure), Off-site (supplier fabrication). Each villa: levels Basement, Ground, Upper, Roof, External with the spaces of the _Zone_ sheet; built once and copied. "All villas" = tick the three villa nodes or the project root. |
+| Trades | `X:\CBG\Prj\Internal projects\cbg2401 - Κατασκευή Γεννάδι 822Α\Project Tracking\Project Fields Lookups.xlsx`, sheet _Trades_ | 34 trades with EN/EL names and definitions, imported verbatim except LVS, whose Greek name becomes «Ασθενή ρεύματα» (list below). |
+| Location tree | Same workbook, sheets _Location_ and _Zone_ | Top level: Villa 1, Villa 2, Villa 3, Site (shared infrastructure), Off-site (supplier fabrication). Each villa: levels Basement, Ground, Upper, Roof, External with the spaces of the _Zone_ sheet; built once and copied. "All villas" = tick Villa 1, Villa 2 and Villa 3. (Ticking the project root means the whole project, including Site and Off-site.) |
 | Zone types | Derived from the _Zone_ sheet | Living area, Kitchen, Bedroom, Bathroom, Hall, Stairs, Machine / store room, Balcony, Pergola, Terrace, Pool area, Garden, Entrance (EN/EL). |
-| Tags | Thematic groups in the References CSV | 25 groups (below), Greek names as source, English names added. |
+| Tags | Thematic groups in the References CSV | 25 groups (below), Greek names as source except where improved, English names added. |
 
-**Trades** (code · EN · EL): BMS Automation Αυτοματισμοί · CAR Carpentry Ξυλουργικά · CLD Cladding Επένδυση · CON Concrete Σκυροδέτηση · DEM Demolition Κατεδαφίσεις · EAR Earthworks Χωματουργικά · ELE Electrical Ηλεκτρικά · EXS External Structures Εξωτ.Κατασκ. · FEN Fencing Περίφραξη · FIR Fire Πυρασφάλεια · FLR Resilient Flooring Ελαστικά Δάπεδα · FRG Frames-Glazing Κουφώματα · FRM Formwork Καλούπια · GYP Gypsum Γυψοσανίδες · HVC HVAC Κλιματισμός · INS Insulation Θερμομόνωση · LAN Landscaping Φύτευση · LFT Lifts Ανελκυστήρες · LGT Lighting Φωτισμός · LVS Low Voltage Ασθενή · MAS Masonry Τοιχοποιία · MET Metalwork Μεταλλικά · PAI Painting Βαφές · PAV Paving Δάπεδα · PLR Plastering-Rendering Σοβατίσματα · PLU Plumbing Υδραυλικά · POL Pool Πισίνα · REB Rebar Οπλισμοί · ROF Roofing Στέγη · SCR Screeds Τσιμεντοκονίες · SUR Surveying Τοπογραφικά · TIL Tiling Πλακίδια · UTL Utilities Υποδομές · WPR Waterproofing Στεγάνωση.
+**Trades** (code · EN · EL): BMS Automation Αυτοματισμοί · CAR Carpentry Ξυλουργικά · CLD Cladding Επένδυση · CON Concrete Σκυροδέτηση · DEM Demolition Κατεδαφίσεις · EAR Earthworks Χωματουργικά · ELE Electrical Ηλεκτρικά · EXS External Structures Εξωτ.Κατασκ. · FEN Fencing Περίφραξη · FIR Fire Πυρασφάλεια · FLR Resilient Flooring Ελαστικά Δάπεδα · FRG Frames-Glazing Κουφώματα · FRM Formwork Καλούπια · GYP Gypsum Γυψοσανίδες · HVC HVAC Κλιματισμός · INS Insulation Θερμομόνωση · LAN Landscaping Φύτευση · LFT Lifts Ανελκυστήρες · LGT Lighting Φωτισμός · LVS Low Voltage Ασθενή ρεύματα · MAS Masonry Τοιχοποιία · MET Metalwork Μεταλλικά · PAI Painting Βαφές · PAV Paving Δάπεδα · PLR Plastering-Rendering Σοβατίσματα · PLU Plumbing Υδραυλικά · POL Pool Πισίνα · REB Rebar Οπλισμοί · ROF Roofing Στέγη · SCR Screeds Τσιμεντοκονίες · SUR Surveying Τοπογραφικά · TIL Tiling Πλακίδια · UTL Utilities Υποδομές · WPR Waterproofing Στεγάνωση.
 
-**Tags** (EL · EN): Πλακάκια - Μάρμαρα · Tiles - Marble | Φωτιστικά Σώματα · Light fittings | Είδη Υγιεινής · Sanitaryware | Ηλεκτρικές Συσκευές · Electrical appliances | Λοιπός Κινητός Εξοπλισμός · Other movable equipment | Internet - Συναγερμός · Internet - Alarm | Ξυλουργικά - Πάγκοι · Carpentry - Worktops | Υδραυλικά · Plumbing | Ηλεκτρολογικά · Electrical | Κλιματισμός A/C · Air conditioning | Μόνωση - Στεγάνωση · Insulation - Waterproofing | Πέτρα · Stone | Λοιπά Κατασκευαστικά · Other construction | Σκάλα · Stairs | Κουφώματα · Windows and doors | Γυάλινα Στηθαία · Glass balustrades | Πισίνα · Pool | Πέργκολες · Pergolas | Περίφραξη · Fencing | Ντεκ Πισίνας · Pool deck | Landscaping · Landscaping | Λοιπός Εξωτερικός Χώρος · Other external areas | Γκαραζόπορτα · Garage door | Fit Out και Έλεγχοι · Fit-out and checks | Διαχείριση · Management.
+**Tags** (EL · EN): Πλακάκια - Μάρμαρα · Tiles - Marble | Φωτιστικά Σώματα · Light fittings | Είδη Υγιεινής · Sanitaryware | Ηλεκτρικές Συσκευές · Electrical appliances | Λοιπός Κινητός Εξοπλισμός · Other movable equipment | Internet - Συναγερμός · Internet - Alarm | Ξυλουργικά - Πάγκοι · Carpentry - Worktops | Υδραυλικά · Plumbing | Ηλεκτρολογικά · Electrical | Κλιματισμός A/C · Air conditioning | Μόνωση - Στεγάνωση · Insulation - Waterproofing | Πέτρα · Stone | Λοιπά Κατασκευαστικά · Other construction | Σκάλα · Stairs | Κουφώματα · Windows and doors | Γυάλινα Στηθαία · Glass balustrades | Πισίνα · Pool | Πέργκολες · Pergolas | Περίφραξη · Fencing | Ντεκ Πισίνας · Pool deck | Διαμόρφωση περιβάλλοντος χώρου · Landscaping | Λοιπός Εξωτερικός Χώρος · Other external areas | Γκαραζόπορτα · Garage door | Τελικές εργασίες και έλεγχοι · Fit-out and checks | Διαχείριση · Management.
 
 ## 16. Open items for the implementation plan
 
