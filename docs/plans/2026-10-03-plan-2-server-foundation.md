@@ -7,7 +7,8 @@
 > **Depends on:** Plan 0 (GO, 2026-10-03), Plan 1 (merged, `2f5f860`).
 > **Implemented by:** Not implemented
 > **Verified:** Not verified
-> **Plan check:** 2026-10-03 — every file in this plan was materialised into a scratch clone of `main` (`46ed7f0`) with the Task 1 dependencies: `npm run typecheck` clean; `npm test` 18 files, 133 tests passed; local server answered as in Task 10; the real seed produced the Task 11 output, and a second run refused with exit code 1. The clone and its seeded database were deleted.
+> **Plan check:** 2026-10-03 — every file in this plan was materialised into a scratch clone of `main` with the Task 1 dependencies: `npm run typecheck` clean; `npm test` 18 files, 136 tests passed; every `git add` path stages without an ignore error; local server answered as in Task 10; the real seed produced the Task 11 output, and a second run refused with exit code 1. The clone and its seeded database were deleted.
+> **Review:** 2026-10-03, second agent, on `6e259c3` — three findings, all reproduced and fixed: (1) the owner command now enforces the login form's username and password limits before writing anything, with the limits shared between both (Tasks 3, 5, 10); (2) `verifyPassword` accepts only hashes in exactly the stored format, so a malformed or altered hash never verifies (Task 3); (3) `.gitignore` un-ignores `.env.example` (Task 10 Step 5).
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
 
@@ -574,7 +575,7 @@ git commit -m "feat(server): SQLite connection, migrations and verified backups"
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { hashPassword, verifyPassword } from '../../src/server/auth/passwords';
+import { hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from '../../src/server/auth/passwords';
 
 describe('passwords (design §11.5)', () => {
   it('hashes with scrypt and verifies', () => {
@@ -588,9 +589,29 @@ describe('passwords (design §11.5)', () => {
     expect(hashPassword('the same long password')).not.toBe(hashPassword('the same long password'));
   });
 
-  it('requires at least 12 characters and rejects malformed stored hashes', () => {
+  it('accepts 12 to 200 characters, the same limit as the login form', () => {
     expect(() => hashPassword('short')).toThrow(RangeError);
-    expect(verifyPassword('anything at all', 'not-a-hash')).toBe(false);
+    expect(() => hashPassword('x'.repeat(MAX_PASSWORD_LENGTH + 1))).toThrow(RangeError);
+    const longest = 'x'.repeat(MAX_PASSWORD_LENGTH);
+    expect(verifyPassword(longest, hashPassword(longest))).toBe(true);
+  });
+
+  it('never verifies against a malformed or altered stored hash', () => {
+    const password = 'a long enough password';
+    const good = hashPassword(password);
+    const [, , , , salt = '', hash = ''] = good.split('$');
+    for (const stored of [
+      'not-a-hash',
+      `scrypt$16384$8$1$${salt}$`, // no hash
+      `scrypt$16384$8$1$${salt}$!!!!`, // decodes to zero bytes
+      `scrypt$16384$8$1$${salt}$${hash.slice(0, 8)}`, // truncated hash
+      `scrypt$16384$8$1$$${hash}`, // no salt
+      `scrypt$16383$8$1$${salt}$${hash}`, // parameters scrypt rejects
+      `scrypt$1024$8$1$${salt}$${hash}`, // other parameters
+      `${good}$extra`,
+    ]) {
+      expect(verifyPassword(password, stored), stored).toBe(false);
+    }
   });
 });
 ```
@@ -599,8 +620,9 @@ describe('passwords (design §11.5)', () => {
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
+import { MAX_PASSWORD_LENGTH, verifyPassword } from '../../src/server/auth/passwords';
 import { createSession, deleteSession, findSessionUser, SESSION_TTL_MS } from '../../src/server/auth/sessions';
-import { setOwnerPassword } from '../../src/server/auth/users';
+import { findUserByUsername, MAX_USERNAME_LENGTH, setOwnerPassword } from '../../src/server/auth/users';
 import { openDatabase, type Db } from '../../src/server/db/connection';
 import { migrate } from '../../src/server/db/migrate';
 
@@ -657,6 +679,20 @@ describe('sessions and the owner account (design §11.5)', () => {
   it('allows exactly one owner account', () => {
     expect(() => setOwnerPassword(db, 'someone-else', 'yet another long password')).toThrow('one account');
   });
+
+  it('a rejected password reset keeps the previous password and sessions', () => {
+    const session = createSession(db, userId);
+    expect(() => setOwnerPassword(db, 'owner', 'x'.repeat(MAX_PASSWORD_LENGTH + 1))).toThrow(RangeError);
+    expect(() => setOwnerPassword(db, 'owner', 'short')).toThrow(RangeError);
+    expect(findSessionUser(db, session.token)).not.toBeNull();
+    expect(verifyPassword('correct horse battery', findUserByUsername(db, 'owner')?.passwordHash ?? '')).toBe(true);
+  });
+
+  it('refuses a username the login form would not accept', () => {
+    for (const username of ['', 'x'.repeat(MAX_USERNAME_LENGTH + 1)]) {
+      expect(() => setOwnerPassword(db, username, 'a long enough password'), username).toThrow(RangeError);
+    }
+  });
 });
 ```
 
@@ -673,29 +709,41 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 const N = 16384;
 const R = 8;
 const P = 1;
+const SALT_LENGTH = 16;
 const KEY_LENGTH = 64;
 export const MIN_PASSWORD_LENGTH = 12;
+/** Also the login form's limit, so every password the owner command accepts can log in. */
+export const MAX_PASSWORD_LENGTH = 200;
 
 /** scrypt with a random salt, stored as scrypt$N$r$p$salt$hash (base64). */
 export function hashPassword(password: string): string {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new RangeError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+    throw new RangeError(`Password must be ${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters`);
   }
-  const salt = randomBytes(16);
+  const salt = randomBytes(SALT_LENGTH);
   const hash = scryptSync(password, salt, KEY_LENGTH, { N, r: R, p: P });
   return ['scrypt', N, R, P, salt.toString('base64'), hash.toString('base64')].join('$');
 }
 
+/** Canonical base64 of exactly `length` bytes, or null. */
+function decodeExact(text: string | undefined, length: number): Buffer | null {
+  if (text === undefined) return null;
+  const bytes = Buffer.from(text, 'base64');
+  return bytes.length === length && bytes.toString('base64') === text ? bytes : null;
+}
+
+/**
+ * Verifies only hashes in exactly the format hashPassword writes: same parameters, salt and key lengths.
+ * A malformed or altered stored value never verifies. Changing the parameters later therefore needs
+ * a password reset (`npm run owner`).
+ */
 export function verifyPassword(password: string, stored: string): boolean {
-  const [scheme, n, r, p, salt, hash] = stored.split('$');
-  if (scheme !== 'scrypt' || !n || !r || !p || !salt || !hash) return false;
-  const expected = Buffer.from(hash, 'base64');
-  const actual = scryptSync(password, Buffer.from(salt, 'base64'), expected.length, {
-    N: Number(n),
-    r: Number(r),
-    p: Number(p),
-  });
-  return timingSafeEqual(actual, expected);
+  const parts = stored.split('$');
+  if (parts.length !== 6 || parts[0] !== 'scrypt' || parts.slice(1, 4).join('$') !== `${N}$${R}$${P}`) return false;
+  const salt = decodeExact(parts[4], SALT_LENGTH);
+  const expected = decodeExact(parts[5], KEY_LENGTH);
+  if (salt === null || expected === null) return false;
+  return timingSafeEqual(scryptSync(password, salt, KEY_LENGTH, { N, r: R, p: P }), expected);
 }
 ```
 
@@ -761,6 +809,9 @@ import type { Db } from '../db/connection';
 import { hashPassword } from './passwords';
 import { deleteUserSessions } from './sessions';
 
+/** Also the login form's limit, so every account the owner command creates can log in. */
+export const MAX_USERNAME_LENGTH = 100;
+
 export interface StoredUser {
   id: number;
   username: string;
@@ -784,6 +835,10 @@ export function setOwnerPassword(
   password: string,
   now: Date = new Date(),
 ): { userId: number; created: boolean; sessionsRemoved: number } {
+  // Both checks run before anything is written, so a rejected reset changes nothing.
+  if (username.length === 0 || username.length > MAX_USERNAME_LENGTH) {
+    throw new RangeError(`Username must be 1 to ${MAX_USERNAME_LENGTH} characters`);
+  }
   const passwordHash = hashPassword(password);
   const existing = findUserByUsername(db, username);
   if (existing) {
@@ -807,7 +862,7 @@ export function setOwnerPassword(
 
 - [ ] **Step 7: Run to verify they pass**
 
-Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (3 + 6 tests). Then `npm run typecheck`.
+Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (4 + 8 tests). Then `npm run typecheck`.
 
 - [ ] **Step 8: Commit**
 
@@ -1281,16 +1336,20 @@ export function registerHealthRoutes(app: FastifyInstance): void {
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { LoginLimiter } from '../auth/login-limiter';
-import { hashPassword, verifyPassword } from '../auth/passwords';
+import { hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from '../auth/passwords';
 import { createSession, deleteExpiredSessions, deleteSession } from '../auth/sessions';
-import { findUserByUsername } from '../auth/users';
+import { findUserByUsername, MAX_USERNAME_LENGTH } from '../auth/users';
 import type { AppConfig } from '../config';
 import type { Db } from '../db/connection';
 import { HttpError } from '../errors';
 import { clientIp } from '../http/client-ip';
 import { SESSION_COOKIE } from '../http/guards';
 
-const LoginBody = z.strictObject({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) });
+/** The same limits as the owner command, so every account it creates can log in. */
+const LoginBody = z.strictObject({
+  username: z.string().min(1).max(MAX_USERNAME_LENGTH),
+  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+});
 
 export function registerAuthRoutes(
   app: FastifyInstance,
@@ -2759,6 +2818,7 @@ git commit -m "feat(server): location tree API with move, retire, delete and cop
 **Files:**
 
 - Create: `src/server/bootstrap.ts`, `src/server/main.ts`, `scripts/owner.ts`, `.env.example`
+- Modify: `.gitignore`
 
 - [ ] **Step 1: Create `src/server/bootstrap.ts`**
 
@@ -2824,7 +2884,7 @@ if (config.port !== null) {
 
 ```ts
 import { stdin, stdout } from 'node:process';
-import { MIN_PASSWORD_LENGTH } from '../src/server/auth/passwords';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../src/server/auth/passwords';
 import { setOwnerPassword } from '../src/server/auth/users';
 import { loadEnvFile, openMigratedDatabase } from '../src/server/bootstrap';
 import { loadConfig } from '../src/server/config';
@@ -2873,7 +2933,9 @@ if (!stdin.isTTY) {
   process.exit(2);
 }
 
-const password = await readHidden(`New password for "${username}" (at least ${MIN_PASSWORD_LENGTH} characters): `);
+const password = await readHidden(
+  `New password for "${username}" (${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters): `,
+);
 if ((await readHidden('Repeat the password: ')) !== password) {
   console.error('The passwords differ. Nothing was changed.');
   process.exit(1);
@@ -2908,13 +2970,23 @@ PUBLIC_BASE_URL=http://localhost:3000
 # BEHIND_CLOUDFLARE=1
 ```
 
-- [ ] **Step 5: Typecheck and check the owner command refuses piped input**
+- [ ] **Step 5: Let git track `.env.example`**
+
+The existing `.env.*` rule in `.gitignore` also matches `.env.example`. Directly below the line `.env.*`, add:
+
+```text
+!.env.example
+```
+
+Check: `git check-ignore .env.example` prints nothing (exit code 1), and `git check-ignore .env` still prints `.env`.
+
+- [ ] **Step 6: Typecheck and check the owner command refuses piped input**
 
 Run: `npm run typecheck` → no output.
 Run: `npm run owner -- owner < /dev/null` (PowerShell: `$null | npm run owner -- owner`)
 Expected: `Run this command in an interactive terminal: …`, exit code 2, and no database change.
 
-- [ ] **Step 6: Run the server locally**
+- [ ] **Step 7: Run the server locally**
 
 Run: `cp .env.example .env` (PowerShell: `Copy-Item .env.example .env`), then `npm start`.
 Expected log lines include `Server listening at http://127.0.0.1:3000`; `data/builtbasis.db` now exists.
@@ -2932,10 +3004,10 @@ curl -s http://127.0.0.1:3000/api/projects
 
 Stop the server with Ctrl+C. Expected log line: `SIGINT received, closing`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/server/bootstrap.ts src/server/main.ts scripts/owner.ts .env.example
+git add .gitignore src/server/bootstrap.ts src/server/main.ts scripts/owner.ts .env.example
 git commit -m "feat(server): entry point, owner account command and local settings"
 ```
 
@@ -3560,7 +3632,7 @@ git commit -m "feat(server): seed import for Gennadi 822A"
 - [ ] **Step 1: Run the full suite and the type check**
 
 Run: `npm test`
-Expected: `Test Files  18 passed (18)` and `Tests  133 passed (133)` (Plan 1: 69; Plan 2: config 3, db 4, passwords 3, sessions 6, login limiter 4, auth API 12, domain lists 5, lists API 8, tags 6, locations 7, seed 6).
+Expected: `Test Files  18 passed (18)` and `Tests  136 passed (136)` (Plan 1: 69; Plan 2: config 3, db 4, passwords 4, sessions 8, login limiter 4, auth API 12, domain lists 5, lists API 8, tags 6, locations 7, seed 6).
 Run: `npm run typecheck` → no output.
 
 - [ ] **Step 2: Update design §9.3 (tag matching, Decision 2)**
