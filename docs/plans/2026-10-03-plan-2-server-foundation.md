@@ -3031,7 +3031,7 @@ Source layouts (checked 2026-10-03):
 
 **Contact details never enter the repository** (design §15): the tests use made-up names and `example.com` addresses; the real files are read only when the seed command runs.
 
-- [ ] **Step 1: Write the failing test `tests/server/seed.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/seed.test.ts`**
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -3169,12 +3169,12 @@ describe('seedGennadi (design §15)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/seed.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/seed/csv"`.
 
-- [ ] **Step 3: Create `src/server/seed/csv.ts`**
+- [x] **Step 3: Create `src/server/seed/csv.ts`**
 
 ```ts
 /** Parses RFC 4180 CSV: quoted fields, doubled quotes, CRLF or LF line ends, an optional byte-order mark. */
@@ -3212,7 +3212,7 @@ export function parseCsv(text: string): string[][] {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/seed/gennadi-data.ts`**
+- [x] **Step 4: Create `src/server/seed/gennadi-data.ts`**
 
 ```ts
 /**
@@ -3354,7 +3354,7 @@ export const TRADE_OVERRIDES: Readonly<Record<string, { nameEl?: string }>> = {
 };
 ```
 
-- [ ] **Step 5: Create `src/server/seed/gennadi.ts`**
+- [x] **Step 5: Create `src/server/seed/gennadi.ts`**
 
 ```ts
 import type { PersonRole } from '../../domain';
@@ -3542,11 +3542,11 @@ export function seedGennadi(
 }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run tests/server/seed.test.ts` → PASS (6 tests). Then `npm run typecheck`.
 
-- [ ] **Step 7: Create `scripts/seed-gennadi.ts`**
+- [x] **Step 7: Create `scripts/seed-gennadi.ts`**
 
 ```ts
 import { readFileSync } from 'node:fs';
@@ -3603,7 +3603,7 @@ try {
 }
 ```
 
-- [ ] **Step 8: Seed the local development database from the real files**
+- [x] **Step 8: Seed the local development database from the real files**
 
 The local database lives in the git-ignored `data/` folder; contact details stay out of the repository. Run (one line):
 
@@ -3620,7 +3620,7 @@ Set the role by hand (owner / owner's representative) for: KAN, KAN2, MAN, RG, G
 
 Running it a second time must print `Project cbg2401 already exists; the seed runs only once` and exit with code 1. Then run `git status --short` and confirm nothing under `data/` or `.env` is listed.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/server/seed scripts/seed-gennadi.ts tests/server/seed.test.ts
