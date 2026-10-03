@@ -1,7 +1,8 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 import type { PhotoPhase } from './vocab';
 
-export const FILE_LIMITS = { 'photo-original': 25_000_000, 'photo-display': 5_000_000, 'photo-thumbnail': 500_000, attachment: 50_000_000 } as const;
+export const UPLOAD_REQUEST_LIMIT = 100_000_000;
+export const FILE_LIMITS = { 'photo-original': UPLOAD_REQUEST_LIMIT, 'photo-display': 5_000_000, 'photo-thumbnail': 500_000, attachment: UPLOAD_REQUEST_LIMIT } as const;
 export type FilePurpose = keyof typeof FILE_LIMITS;
 const text = z.string().max(2_000).nullable().transform(value => value === null || value.trim() === '' ? null : value);
 export const FileTimestamp = z.iso.datetime({ offset: true }).transform(value => new Date(value).toISOString());
@@ -24,3 +25,4 @@ export interface AttachmentOut {
   id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
   logEntry: { id: number; eventAt: string; text: string; private: boolean } | null;
 }
+

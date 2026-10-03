@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+﻿import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -201,7 +201,7 @@ it('rejects an oversized attachment by actual streamed bytes without a Content-L
   const payload = Readable.from((function* () {
     yield Buffer.from('--limit\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--limit\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\nContent-Type: application/pdf\r\n\r\n');
     yield PDF;
-    let remaining = 50_000_001 - PDF.length;
+    let remaining = 100_000_001 - PDF.length;
     const chunk = Buffer.alloc(64 * 1024);
     while (remaining > 0) {
       const n = Math.min(remaining, chunk.length);
@@ -215,3 +215,4 @@ it('rejects an oversized attachment by actual streamed bytes without a Content-L
   expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
   expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
 });
+
