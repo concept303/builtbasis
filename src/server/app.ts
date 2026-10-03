@@ -12,6 +12,7 @@ import { registerTradeRoutes } from './lists/trades';
 import { registerZoneTypeRoutes } from './lists/zone-types';
 import { registerTagRoutes } from './lists/tags';
 import { registerLocationRoutes } from './lists/locations';
+import { registerRecordRoutes } from './records/routes';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 
@@ -58,5 +59,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerZoneTypeRoutes(app, db);
   registerTagRoutes(app, db);
   registerLocationRoutes(app, db);
+  registerRecordRoutes(app, db);
   return app;
 }

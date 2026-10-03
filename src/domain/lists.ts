@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { normalizeLabel } from './measurements';
+import { foldText } from './text';
 import { isCode, type CodeOf, type ListKey } from './vocab';
 
 /** Managed lists have an English and a Greek name; either may be empty, not both (design §3, §9). */
@@ -13,7 +13,7 @@ export function hasAName(names: { nameEn: string; nameEl: string }): boolean {
  * Returns null for an empty name.
  */
 export function tagKey(name: string): string | null {
-  const key = normalizeLabel(name).normalize('NFD').replace(/\p{M}/gu, '').replace(/ς/g, 'σ');
+  const key = foldText(name);
   return key === '' ? null : key;
 }
 

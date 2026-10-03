@@ -1,17 +1,37 @@
 # Plan 3 — Records API Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Written — awaiting review
-> **Retention:** Active until executed; historical afterwards.
+> **Status:** Completed
+> **Retention:** Historical — do not execute.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §4 (record model, human IDs, must be done before), §5 (shared fields, decision, measurements, verification, Log, activity), §6 (subtype fields), §8 (status rules), §9.3–§9.4 (tag and location operations that involve records), §10.2 (list filters, sorting, totals) — data and API only.
 > **Not in this plan:** photos, attachments, files and share links (Plan 4); screens (Plan 5); print view and PDF (Plan 6).
 > **Depends on:** Plan 2 (server foundation), merged to `main` at `48c50ef` (18 test files, 155 tests). Task 0 checks the starting point.
-> **Implemented by:** Not implemented
-> **Verified:** Not verified
+> **Implemented by:** `09c7e4d`..`6cd5713` (inclusive; Tasks 1–10). Task 0 was a read-only preflight; Task 11 records this closeout.
+> **Verified:** 2026-10-03 — `npm test`: 29 files, 237 tests passed; `npm run typecheck`: exit 0, no diagnostics.
+> **Merged to main:** 2026-10-03, through branch tip `13e6ccc`.
+> **Checklist note:** Checkboxes are preserved execution history, not active instructions. Any unchecked boxes do not represent outstanding implementation work.
 > **Plan check:** 2026-10-03 — checked against the merged Plan 2 on `main` (`48c50ef`, 155 tests). Every step of this plan was replayed in order in a fresh clone of `main`: each "verify it fails" step failed as stated, each "verify it passes" step passed, `npm run typecheck` was clean after every task, and every commit staged its files with nothing left over. Final `npm test`: 29 files, 229 tests passed. The clones were deleted.
 > **Review:** 2026-10-03, second agent, on `a88af6f` — five findings, all reproduced and fixed: (1) the choice history kept only option ids, which SQLite could reuse after a delete — option ids are now never reused, and each choice entry keeps the option's label and description (Tasks 2, 3, 5); (2) a zone-type filter also matched differently typed nodes inside a typed node — it now matches only nodes carrying the type (Task 8); (3) tag merge and delete changed records without marking them updated — they now do, in the same transaction (Task 9); (4) the starting-point and final counts used Plan 2's planned 136 tests instead of the merged 155 (Tasks 0, 11); (5) the sort-by-update test could depend on timing — every record now gets its own update time (Task 8).
 >
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
+> **Historical execution instruction:** Workers used superpowers:subagent-driven-development or superpowers:executing-plans with checkbox tracking. Do not execute this completed plan.
+
+## Completion record — 2026-10-03
+
+The records API is implemented and merged to `main` on 2026-10-03. Verification passed with 237 tests across 29 files and a clean typecheck. The first sandboxed test attempt stopped before tests ran with `spawn EPERM`; the same command passed with subprocess permission.
+
+The original expectation was 229 tests: 155 from Plans 1–2 and 74 from Plan 3. Implementation added eight regression tests: four in Task 3, two in Task 6 and two in Task 9. The actual Plan 3 total is 82: records 10, records-db 3, records-api 16, record-links 6, transitions-api 10, options-api 6, measurements-api 7, log-api 5, records-list 10, lists-with-records 7 and records-reads 2.
+
+Task 3 refined `checkSelection` to verify project ownership for every submitted ID, including retained selections. Only newly selected entries must be active. This preserves valid retired selections and rejects externally corrupted prior associations. The historical helper snippet below has been synchronized with that implementation. No material deviation from the approved design was identified. Decisions 2 and 12 are now recorded in design §14.
+
+No maintained specification exists yet. The maintained v1 specification and Architecture reconciliation remain Plan 6 work under the roadmap. The v1 design remains the implementation baseline and has not been marked Historical.
+
+Final review found no blockers or production defects. Three test improvements were applied: the verifier test now names only the inactive case it exercises; the tag-rename test checks the successful response, returned name and unchanged record update metadata; and the GET write-counter test checks all four setup responses before measuring writes.
+
+The optional measurement API cases for a foreign measurer and retaining a retired measurer on PATCH remain deferred. Review confirmed the actual endpoints use the shared reference helper correctly. The optional second-project list/totals case also remains deferred because both SQL queries use the reviewed project-scoped predicate. Neither suggestion represents required work.
+
+The controller independently verified 237 tests across 29 files and a clean typecheck at `d754f38`. After the cleanup, `npm test` again passed all 237 tests across 29 files and `npm run typecheck` exited 0 without diagnostics. The affected files passed all 19 tests within that run: transitions-api 10, lists-with-records 7 and records-reads 2. No test cases or production changes were added.
+
+Execution retained the README install workaround, `npm ci --ignore-scripts` followed by `npm rebuild esbuild`, because ordinary installation attempted an unnecessary native SQLite rebuild. No dependency changes were made. Harmless blank-line differences in replacement examples were resolved by matching the actual code statements without depending on whitespace.
 
 **Goal:** The owner can create, read, update and list records of all three subtypes through the API, with every rule of design §4–§8 enforced by the server: required fields, subtype fields, status transitions with reasons and verification, decision options, measurements, Log, activity, must-be-done-before links, and the list's filters, search, sorting and totals.
 
@@ -92,12 +112,12 @@ The `details.errors` of `rule_violation` and `transition_rejected` are Plan 1's 
 
 This plan edits Plan 2's code. Check first that the code you start from is the merged Plan 2 that this plan was checked against.
 
-- [ ] **Step 1: Confirm Plan 2 is merged and green**
+- [x] **Step 1: Confirm Plan 2 is merged and green**
 
 Run: `git log --oneline -15` — the Plan 2 commits (`feat(server): …`, `docs: record Plan 2 completion …`) are on the branch you start from.
 Run: `npm test` → `Test Files  18 passed (18)` and `Tests  155 passed (155)`. Run: `npm run typecheck` → no output.
 
-- [ ] **Step 2: Confirm the text this plan replaces exists**
+- [x] **Step 2: Confirm the text this plan replaces exists**
 
 Run:
 
@@ -119,7 +139,7 @@ If any result differs, or Step 1 fails: **stop and report**. The code differs fr
 - Modify: `src/domain/lists.ts` (`tagKey` uses `foldText`), `src/domain/index.ts`
 - Test: `tests/domain/records.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/records.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/records.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -237,12 +257,12 @@ describe('text folding', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/records.test.ts`
 Expected: FAIL — all 10 tests fail with `TypeError: Cannot read properties of undefined (reading 'parse')`: the new exports do not exist yet.
 
-- [ ] **Step 3: Create `src/domain/text.ts`**
+- [x] **Step 3: Create `src/domain/text.ts`**
 
 ```ts
 import { normalizeLabel } from './measurements';
@@ -256,7 +276,7 @@ export function foldText(text: string): string {
 }
 ```
 
-- [ ] **Step 4: Create `src/domain/records.ts`**
+- [x] **Step 4: Create `src/domain/records.ts`**
 
 Note: as in Plan 2, the schemas have **no defaults**, so a save never fills in fields that were not sent.
 
@@ -422,7 +442,7 @@ export type LogEntryInput = z.output<typeof LogEntryBody>;
 export type LogEntryPatchInput = z.output<typeof LogEntryPatch>;
 ```
 
-- [ ] **Step 5: Modify `src/domain/lists.ts`**
+- [x] **Step 5: Modify `src/domain/lists.ts`**
 
 `tagKey` keeps its behaviour and now uses the shared folding. Replace:
 
@@ -448,7 +468,7 @@ with:
   const key = foldText(name);
 ```
 
-- [ ] **Step 6: Modify `src/domain/index.ts`**
+- [x] **Step 6: Modify `src/domain/index.ts`**
 
 Replace:
 
@@ -464,11 +484,11 @@ export * from './text';
 export * from './records';
 ```
 
-- [ ] **Step 7: Run to verify it passes**
+- [x] **Step 7: Run to verify it passes**
 
 Run: `npx vitest run tests/domain` → PASS (9 files, 84 tests: Plans 1–2 plus `records.test.ts` with 10). Then `npm run typecheck` → no output.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/domain/text.ts src/domain/records.ts src/domain/lists.ts src/domain/index.ts tests/domain/records.test.ts
@@ -486,7 +506,7 @@ git commit -m "feat(domain): record input schemas, subtype fields and shared tex
 
 Money is stored as whole cents (`estimated_cost_cents`) so that sums are exact. Problem types are a JSON list of codes on the record (design §11.3). Join tables hold trades, tags, locations and must-be-done-before links.
 
-- [ ] **Step 1: Write the failing test `tests/server/records-db.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/records-db.test.ts`**
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -542,12 +562,12 @@ describe('record tables (migration 0002)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/records-db.test.ts`
 Expected: FAIL — all 3 tests fail: the record tables do not exist (`no such table: records`) and SQL has no `bb_fold` (`no such function: bb_fold`).
 
-- [ ] **Step 3: Create `src/server/db/migration-0002-records.ts`**
+- [x] **Step 3: Create `src/server/db/migration-0002-records.ts`**
 
 ```ts
 import type { Migration } from './migrations';
@@ -713,7 +733,7 @@ export const MIGRATION_0002_RECORDS: Migration = {
 };
 ```
 
-- [ ] **Step 4: Modify `src/server/db/migrations.ts`**
+- [x] **Step 4: Modify `src/server/db/migrations.ts`**
 
 Add the import as the first line of the file:
 
@@ -748,7 +768,7 @@ with:
 
 (The import is type-only in the other direction, so there is no circular import at run time.)
 
-- [ ] **Step 5: Replace `src/server/db/connection.ts`**
+- [x] **Step 5: Replace `src/server/db/connection.ts`**
 
 ```ts
 import Database from 'better-sqlite3';
@@ -772,11 +792,11 @@ export function openDatabase(path: string): Db {
 }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run tests/server/records-db.test.ts` → PASS (3). Then `npm test` → all pass (Plan 2's database test now applies both migrations), and `npm run typecheck`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/server/db/migration-0002-records.ts src/server/db/migrations.ts src/server/db/connection.ts tests/server/records-db.test.ts
@@ -802,7 +822,7 @@ How a save works (`applyPatch` in `records.ts`), all inside one transaction:
 
 Any failure throws, and the transaction rolls everything back.
 
-- [ ] **Step 1: Create the test helpers `tests/server/record-fixture.ts`**
+- [x] **Step 1: Create the test helpers `tests/server/record-fixture.ts`**
 
 ```ts
 import type { RecordDetail } from '../../src/server/records/records';
@@ -903,7 +923,7 @@ export function forceStatus(f: Fixture, id: number, status: string): void {
 }
 ```
 
-- [ ] **Step 2: Write the failing test `tests/server/records-api.test.ts`**
+- [x] **Step 2: Write the failing test `tests/server/records-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1108,7 +1128,7 @@ describe('activity log (design §5.12)', () => {
 });
 ```
 
-- [ ] **Step 3: Write the failing test `tests/server/record-links.test.ts`**
+- [x] **Step 3: Write the failing test `tests/server/record-links.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1196,12 +1216,12 @@ describe('must be done before (design §4.3)', () => {
 });
 ```
 
-- [ ] **Step 4: Run to verify they fail**
+- [x] **Step 4: Run to verify they fail**
 
 Run: `npx vitest run tests/server/records-api.test.ts tests/server/record-links.test.ts`
 Expected: FAIL — all 18 tests fail with `create failed: 404 {"error":"not_found"}`: there are no records routes yet.
 
-- [ ] **Step 5: Create `src/server/http/user.ts`**
+- [x] **Step 5: Create `src/server/http/user.ts`**
 
 ```ts
 import type { FastifyRequest } from 'fastify';
@@ -1214,7 +1234,7 @@ export function requireUserId(request: FastifyRequest): number {
 }
 ```
 
-- [ ] **Step 6: Create `src/server/records/store.ts`**
+- [x] **Step 6: Create `src/server/records/store.ts`**
 
 ```ts
 import type {
@@ -1349,7 +1369,7 @@ export function touchRecord(db: Db, recordId: number, userId: number, at: string
 }
 ```
 
-- [ ] **Step 7: Create `src/server/records/activity.ts`**
+- [x] **Step 7: Create `src/server/records/activity.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1441,7 +1461,7 @@ export function registerActivityRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 8: Create `src/server/records/references.ts`**
+- [x] **Step 8: Create `src/server/records/references.ts`**
 
 ```ts
 import type { Db } from '../db/connection';
@@ -1466,13 +1486,13 @@ export function checkSelection(
   current: readonly number[] = [],
 ): void {
   const added = ids.filter((id) => !current.includes(id));
-  if (added.length === 0) return;
+  if (ids.length === 0) return;
   const active = HAS_ACTIVE[table] ? 'active' : '1 AS active';
   const rows = db
-    .prepare(`SELECT id, ${active} FROM ${table} WHERE project_id = ? AND id IN (${added.map(() => '?').join(', ')})`)
-    .all(projectId, ...added) as { id: number; active: number }[];
+    .prepare(`SELECT id, ${active} FROM ${table} WHERE project_id = ? AND id IN (${ids.map(() => '?').join(', ')})`)
+    .all(projectId, ...ids) as { id: number; active: number }[];
   const activeById = new Map(rows.map((row) => [row.id, row.active]));
-  const missing = added.filter((id) => !activeById.has(id));
+  const missing = ids.filter((id) => !activeById.has(id));
   if (missing.length > 0) throw new HttpError(400, 'invalid_reference', { field, ids: missing });
   const inactive = added.filter((id) => activeById.get(id) !== 1);
   if (inactive.length > 0) throw new HttpError(400, 'inactive_selection', { field, ids: inactive });
@@ -1498,7 +1518,7 @@ export function checkOption(db: Db, recordId: number, optionId: number | null | 
 }
 ```
 
-- [ ] **Step 9: Create `src/server/records/links.ts`**
+- [x] **Step 9: Create `src/server/records/links.ts`**
 
 ```ts
 import type { Status } from '../../domain';
@@ -1591,7 +1611,7 @@ export function replaceMustBeDoneBefore(db: Db, projectId: number, recordId: num
 }
 ```
 
-- [ ] **Step 10: Create `src/server/records/records.ts`**
+- [x] **Step 10: Create `src/server/records/records.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1896,7 +1916,7 @@ export function registerRecordCoreRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 11: Create `src/server/records/routes.ts`**
+- [x] **Step 11: Create `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1911,7 +1931,7 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 12: Modify `src/server/app.ts`**
+- [x] **Step 12: Modify `src/server/app.ts`**
 
 Replace:
 
@@ -1939,11 +1959,11 @@ with:
   registerRecordRoutes(app, db);
 ```
 
-- [ ] **Step 13: Run to verify they pass**
+- [x] **Step 13: Run to verify they pass**
 
 Run: `npx vitest run tests/server/records-api.test.ts tests/server/record-links.test.ts` → PASS (12 + 6 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 14: Commit**
+- [x] **Step 14: Commit**
 
 ```bash
 git add src/server/http/user.ts src/server/records src/server/app.ts tests/server/record-fixture.ts tests/server/records-api.test.ts tests/server/record-links.test.ts
@@ -1960,7 +1980,7 @@ git commit -m "feat(server): create, read and save records with references, link
 
 Plan 1's `checkTransition` decides whether a change is allowed and what it needs. This task writes the result: the status, the status before a hold, the reason, the verification entry and the activity entry, in one transaction (design §8.2). The atomicity test makes the last write fail on purpose, using a temporary SQLite trigger.
 
-- [ ] **Step 1: Write the failing test `tests/server/transitions-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/transitions-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2132,12 +2152,12 @@ describe('status changes (design §8)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/transitions-api.test.ts`
 Expected: FAIL — all 10 tests fail with `404` from `POST …/transitions`, which does not exist yet.
 
-- [ ] **Step 3: Create `src/server/records/transitions.ts`**
+- [x] **Step 3: Create `src/server/records/transitions.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2269,7 +2289,7 @@ export function registerTransitionRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2286,11 +2306,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/transitions-api.test.ts` → PASS (10 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/transitions.ts src/server/records/routes.ts tests/server/transitions-api.test.ts
@@ -2307,7 +2327,7 @@ git commit -m "feat(server): atomic status changes with reasons, verification an
 
 The chosen option is a record field (`chosenOptionId`, saved through `PATCH /records/:id` and logged in the activity log). This task adds the options themselves.
 
-- [ ] **Step 1: Write the failing test `tests/server/options-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/options-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2411,12 +2431,12 @@ describe('options considered (design §5.6)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/options-api.test.ts`
 Expected: FAIL — all 6 tests fail with `404` (there are no option routes yet) or, for the choice test, `200` where `400` is expected (no option of another record can be checked yet).
 
-- [ ] **Step 3: Replace `src/server/http/params.ts`**
+- [x] **Step 3: Replace `src/server/http/params.ts`**
 
 `ProjectParams` and `ItemParams` keep their shape; `RecordItemParams` is new.
 
@@ -2431,7 +2451,7 @@ export const ItemParams = z.object({ projectId: positiveId, id: positiveId });
 export const RecordItemParams = z.object({ projectId: positiveId, id: positiveId, itemId: positiveId });
 ```
 
-- [ ] **Step 4: Create `src/server/records/options.ts`**
+- [x] **Step 4: Create `src/server/records/options.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2563,7 +2583,7 @@ export function registerOptionRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Replace `src/server/records/routes.ts`**
+- [x] **Step 5: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2582,11 +2602,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run tests/server/options-api.test.ts` → PASS (6 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/server/http/params.ts src/server/records/options.ts src/server/records/routes.ts tests/server/options-api.test.ts
@@ -2603,7 +2623,7 @@ git commit -m "feat(server): decision options with protection of the chosen opti
 
 The test also feeds the API's output to Plan 1's comparison functions, to prove the browser can build both comparison views from it (Decision 10).
 
-- [ ] **Step 1: Write the failing test `tests/server/measurements-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/measurements-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2714,12 +2734,12 @@ describe('measurements (design §5.7)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/measurements-api.test.ts`
 Expected: FAIL — all 5 tests fail with `404`: there are no measurement routes yet.
 
-- [ ] **Step 3: Create `src/server/records/measurements.ts`**
+- [x] **Step 3: Create `src/server/records/measurements.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2891,7 +2911,7 @@ export function registerMeasurementRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2912,11 +2932,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/measurements-api.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/measurements.ts src/server/records/routes.ts tests/server/measurements-api.test.ts
@@ -2933,7 +2953,7 @@ git commit -m "feat(server): measurement sets with unique normalised rows"
 
 Attachments on Log entries arrive with files in Plan 4.
 
-- [ ] **Step 1: Write the failing test `tests/server/log-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/log-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3017,12 +3037,12 @@ describe('Log (design §5.11)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/log-api.test.ts`
 Expected: FAIL — all 5 tests fail with `404`: there are no Log routes yet.
 
-- [ ] **Step 3: Create `src/server/records/log.ts`**
+- [x] **Step 3: Create `src/server/records/log.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -3161,7 +3181,7 @@ export function registerLogRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -3184,11 +3204,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/log-api.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/log.ts src/server/records/routes.ts tests/server/log-api.test.ts
@@ -3218,7 +3238,7 @@ Query parameters of `GET /records` (all optional; several values of one filter a
 | `sort` | `id` (default), `due`, `priority`, `severity`, `updated` |
 | `dir` | `asc` or `desc`; default `asc`, except `updated` (`desc`). Empty values sort last either way. |
 
-- [ ] **Step 1: Write the failing test `tests/server/records-list.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/records-list.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3369,12 +3389,12 @@ describe('record list order and totals (design §10.2)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/records-list.test.ts`
 Expected: FAIL — all 10 tests fail with `list failed: 404 {"error":"not_found"}`: `GET /records` does not exist yet.
 
-- [ ] **Step 3: Create `src/server/records/list.ts`**
+- [x] **Step 3: Create `src/server/records/list.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -3602,7 +3622,7 @@ export function registerRecordListRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -3627,11 +3647,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/records-list.test.ts` → PASS (10 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/list.ts src/server/records/routes.ts tests/server/records-list.test.ts
@@ -3647,7 +3667,7 @@ git commit -m "feat(server): record list with filters, accent-insensitive search
 
 This completes the Plan 2 hand-over items: a tag merge moves record links, a tag delete reports its usage first, and a location that records use cannot be deleted (the owner retires it instead). A merge or delete also marks each record whose tags change as updated (Decision 13), so the record moves up when the list is sorted by update time.
 
-- [ ] **Step 1: Write the failing test `tests/server/lists-with-records.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/lists-with-records.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3723,12 +3743,12 @@ describe('locations on records (design §9.4)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/lists-with-records.test.ts`
 Expected: FAIL — 4 tests fail and 1 passes. The merge leaves the record without tags (`expected [] to deeply equal [ 1 ]`), `/usage` answers `404`, the merged and deleted records keep their old update time, and deleting a used location hits the database's foreign-key check (`500` where `409` is expected). The rename test already passes: a rename never touched records; it guards that behaviour.
 
-- [ ] **Step 3: Modify `src/server/lists/tags.ts`**
+- [x] **Step 3: Modify `src/server/lists/tags.ts`**
 
 Replace:
 
@@ -3855,7 +3875,7 @@ with:
   });
 ```
 
-- [ ] **Step 4: Modify `src/server/lists/locations.ts`**
+- [x] **Step 4: Modify `src/server/lists/locations.ts`**
 
 Replace:
 
@@ -3894,11 +3914,11 @@ export function deleteLocation(db: Db, projectId: number, id: number): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/lists-with-records.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/lists/tags.ts src/server/lists/locations.ts tests/server/lists-with-records.test.ts
@@ -3913,7 +3933,7 @@ git commit -m "feat(server): tag merge, usage and delete across records; locatio
 
 A guard test over everything built in Tasks 3–9 (design §11.5): no GET request changes the database, and the records routes follow Plan 2's session and `Origin` rules. It uses SQLite's `total_changes()`, which counts every row written on the connection. It should pass at once; if it fails, a GET handler writes and must be fixed.
 
-- [ ] **Step 1: Write the test `tests/server/records-reads.test.ts`**
+- [x] **Step 1: Write the test `tests/server/records-reads.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3971,11 +3991,11 @@ describe('records and the request rules (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `npx vitest run tests/server/records-reads.test.ts` → PASS (2 tests).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/server/records-reads.test.ts
@@ -3989,13 +4009,13 @@ git commit -m "test(server): GET requests on records never write; records routes
 - Modify: `docs/designs/2026-10-02-v1-records-design.md` (§14)
 - Modify: `docs/plans/2026-10-03-plan-3-records-api.md` (metadata), `docs/plans/2026-10-02-v1-roadmap.md` (Plan 3 status)
 
-- [ ] **Step 1: Run the full suite and the type check**
+- [x] **Step 1: Run the full suite and the type check**
 
 Run: `npm test`
 Expected: `Test Files  29 passed (29)` and `Tests  229 passed (229)` (Plans 1–2: 155; Plan 3: 74 — records 10, records-db 3, records-api 12, record-links 6, transitions-api 10, options-api 6, measurements-api 5, log-api 5, records-list 10, lists-with-records 5, records-reads 2).
 Run: `npm run typecheck` → no output.
 
-- [ ] **Step 2: Update design §14 (Decisions 2 and 12)**
+- [x] **Step 2: Update design §14 (Decisions 2 and 12)**
 
 Replace:
 
@@ -4011,15 +4031,15 @@ with:
 - Edit-conflict detection: when the same record is saved from two devices, the last save wins.
 ```
 
-- [ ] **Step 3: Update this plan's metadata**
+- [x] **Step 3: Update this plan's metadata**
 
 Set `> **Status:** Completed`, `> **Retention:** Historical — do not execute.`, `> **Implemented by:**` the Plan 3 commit range (first..last hash), and `> **Verified:**` with the date and the two results of Step 1.
 
-- [ ] **Step 4: Update the roadmap**
+- [x] **Step 4: Update the roadmap**
 
 In `docs/plans/2026-10-02-v1-roadmap.md`, change the Plan 3 row's status from `Written` to `Completed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/designs/2026-10-02-v1-records-design.md docs/plans/2026-10-03-plan-3-records-api.md docs/plans/2026-10-02-v1-roadmap.md
