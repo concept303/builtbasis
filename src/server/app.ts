@@ -18,7 +18,7 @@ import { registerFileRoutes } from './files/routes';
 import { requireShareKey } from './sharing/crypto';
 import { reconcileShareKey } from './sharing/links';
 import { registerSharingRoutes } from './sharing/routes';
-import { safeLogger } from './http/logging';
+import { safeErrorDiagnostic, safeLogger } from './http/logging';
 import { registerAccessRoutes } from './access/routes';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
@@ -43,6 +43,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof HttpError) {
+      if (error.statusCode >= 500) {
+        const cause: unknown = Object.getOwnPropertyDescriptor(error, 'cause')?.value;
+        request.log.error({ event: 'internal_error', ...safeErrorDiagnostic(cause ?? error) });
+      }
       return reply
         .status(error.statusCode)
         .send(error.details === undefined ? { error: error.code } : { error: error.code, details: error.details });
@@ -57,7 +61,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
       return reply.status(statusCode).send({ error: 'bad_request' });
     }
-    request.log.error({ event: 'internal_error' });
+    request.log.error({ event: 'internal_error', ...safeErrorDiagnostic(error) });
     return reply.status(500).send({ error: 'internal_error' });
   });
   app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));

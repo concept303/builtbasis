@@ -4,8 +4,9 @@ export class HttpError extends Error {
     readonly statusCode: number,
     readonly code: string,
     readonly details?: unknown,
+    options?: ErrorOptions,
   ) {
-    super(code);
+    super(code, options);
     this.name = 'HttpError';
   }
 }

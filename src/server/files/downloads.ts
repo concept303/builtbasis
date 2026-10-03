@@ -49,7 +49,7 @@ export async function sendFile(request: FastifyRequest, reply: FastifyReply, fil
     info = await stat(path);
   } catch (error) {
     if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) throw new HttpError(404, 'file_not_found');
-    throw new HttpError(500, 'file_unavailable');
+    throw new HttpError(500, 'file_unavailable', undefined, { cause: error });
   }
   if (!info.isFile() || info.size !== target.size) throw new HttpError(500, 'file_unavailable');
   let range: { start: number; end: number } | undefined;
