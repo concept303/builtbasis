@@ -33,4 +33,3 @@ export function readHidden(prompt: string): Promise<string> {
     stdin.on('data', onData);
   });
 }
-
