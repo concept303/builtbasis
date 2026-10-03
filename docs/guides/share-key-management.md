@@ -1,8 +1,9 @@
 # Share-link key management and API handoff
 
 > **Document type:** Operational guide
-> **Status:** Draft — approved Plan 4 scope; operational procedure awaits implementation and closeout.
-> **Authority:** The approved v1 design and reconciled Plan 4 decisions define scope. This guide describes the planned API and operational contract; scratch replay is not production implementation.
+> **Status:** Active for the implemented Plan 4 backend on `feat/plan-4-files-sharing`; not yet merged or deployed.
+> **Authority:** The approved v1 design defines scope. This guide documents the implemented key/account procedures and API contract, with browser and deployment work explicitly assigned to Plans 5–6.
+> **Verified:** 2026-10-03 — implementation suite passed 423 tests across 53 files; TypeScript passed. Implementation range: `a442939..55da13a`.
 
 The application stores encrypted copies of share tokens so the owner can resend a link. The dedicated encryption key belongs in private server configuration. Losing or replacing it requires revoking existing links and issuing replacements.
 
@@ -101,7 +102,7 @@ Only a successful public record GET updates view count and last-viewed time. HEA
 
 PDF generation reuses an owner-selected existing share URL and never creates a link on GET. Its QR code may contain that selected URL. Private content remains excluded from PDF as required by the design.
 
-The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and documentation closeout. Plan 4 and this guide remain Draft until execution and closeout. Approved scope and scratch verification do not mark a release implemented.
+The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented and verified on its feature branch. This does not establish browser delivery, merge or production deployment. No maintained specification exists to update at this stage; the approved design remains the requirements baseline until Plan 6 consolidates it.
 
 ## Verification evidence
 

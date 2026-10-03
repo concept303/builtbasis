@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–3 are implemented and merged to `main`. Plan 4 covers files, sharing and named contributor access. Its scope is approved; its revised implementation plan remains pending execution and closeout. Scratch implementation and replay evidence do not change that status. Plan 5 supplies the browser screens and viewers.
+**Status:** Plans 0–3 are implemented and merged to `main`. Plan 4, including Tasks 17–19, is implemented on `feat/plan-4-files-sharing` and is not yet merged or deployed. Implementation verification passed 423 tests across 53 files and the TypeScript check. Plan 5 supplies the browser screens and viewers.
 
 ## Local dependency installation
 
@@ -15,7 +15,7 @@ npm rebuild esbuild
 
 On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrectly attempted a SQLite source build despite the package declaring `gypfile: false`. Reassess install scripts when dependencies change. Use each completed plan's verification record for current test counts.
 
-## Planned access and evidence contract
+## Access and evidence contract
 
 There is one owner and separately named contributor accounts. The owner grants access per record. Upload and Add Log are independent permissions. Contributors cannot edit record fields or either Notes field. Public Notes are visible to readers. Private Notes, commercial fields, private Log entries and their attachments remain owner-only. Both Notes fields are edited by the owner. Public share links remain read-only.
 
@@ -34,13 +34,13 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
 | [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
-| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Planned key/account operations, access rules and Plan 5/6 handoff |
+| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Key/account operations, access rules and Plan 5/6 handoff |
 | [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
 | [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research |
 
 Documentation follows `X:\1976KN\Dev\Code\DOCS-STANDARD.md` (v1.4).
 
-## Planned share-key setup
+## Share-key setup
 
 Plan 4 requires `SHARE_LINK_KEY`, a dedicated random 32-byte key encoded as 64 hexadecimal characters. Store it in private server configuration outside the repository, data directory and backups. Preserve it across deployments. Offline owner, contributor, seed and share-revocation commands permit an absent key.
 

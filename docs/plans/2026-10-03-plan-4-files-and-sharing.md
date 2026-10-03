@@ -1,15 +1,15 @@
 # Plan 4 — Files and Sharing Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Draft
-> **Retention:** Current planning document. Review before execution.
+> **Status:** Completed
+> **Retention:** Historical execution record. Do not execute again.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §2, §5.8–5.12, §11.3–11.5 and the relevant API tests in §13.
 > **Depends on:** Plan 3, merged to `main` at `8324b2e`. Baseline: 237 tests across 29 files; TypeScript passes.
-> **Implemented by:** Not implemented.
-> **Verified:** Product implementation not verified or merged. The proposed code is checked separately by the scratch replay recorded below.
+> **Implemented by:** `a442939..55da13a` on `feat/plan-4-files-sharing`; Tasks 1–19 committed separately.
+> **Verified:** 2026-10-03 — implementation passed 423 tests across 53 files, `npm run typecheck`, and `git diff a442939..HEAD --check`. See implementation evidence below; planning replay is separate.
 > **Planning check:** 2026-10-03 — complete code and tests replayed from this document in a separate disposable checkout. See the replay evidence for commands, results and limits.
-> **Merged to main:** Implementation not merged.
-> **Checklist note:** Unchecked steps are future implementation work.
+> **Merged to main:** Not merged. Implementation remains on `feat/plan-4-files-sharing`; not deployed.
+> **Checklist note:** Tasks 1–19 are complete. Their original checkboxes and code snapshots are preserved as historical execution instructions, not outstanding work.
 > **For agentic workers:** Use `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Preserve the owner's selected method and Astra Medium model preference. Follow the checkboxes task by task.
 
 **Goal:** The owner can manage evidence and sharing, grant named users per-record upload and Add Log permissions, and maintain separate Public/Private Notes. Authorised readers can fetch broad attachment formats for the approved viewing/playback and download capabilities without receiving private content.
@@ -17379,10 +17379,28 @@ git commit -m "fix: recognize long SVG prologs while streaming uploads"
 
 ## Implementation closeout
 
-- [ ] Run the entire suite and TypeScript check after the final task. Record actual implementation commits and counts. Run `git diff --check`.
-- [ ] Review the implementation against the approved design and the security cases in this plan. Complete the Plan 5/6 handoffs in the key guide.
-- [ ] Update this plan, the roadmap and the key guide status only when implementation is complete. Record implementation verification and merge state separately from this planning replay. Preserve the approved design as active until Plan 6 consolidates the maintained specification and Architecture.
-- [ ] Commit those lifecycle updates with the completed implementation. The scratch checkpoints in this document are provenance, not a substitute for implementation commits.
+- [x] Run the entire suite and TypeScript check after the final task. Record actual implementation commits and counts. Run `git diff --check`.
+- [x] Review the implementation against the approved design and the security cases in this plan. Complete the Plan 5/6 handoffs in the key guide.
+- [x] Update this plan, the roadmap and the key guide status only when implementation is complete. Record implementation verification and merge state separately from this planning replay. Preserve the approved design as active until Plan 6 consolidates the maintained specification and Architecture.
+- [x] Commit those lifecycle updates with the completed implementation. The scratch checkpoints in this document are provenance, not a substitute for implementation commits.
+
+### Implementation evidence — 2026-10-03
+
+Executed Tasks 1–19 in a fresh worktree from `a442939`, on `feat/plan-4-files-sharing`. Task commits run from `42c457f` through `66dc8ce`. The dependency baseline guards passed before Tasks 1 and 3. Each runtime task's new tests failed before its implementation and passed afterwards; documentation/verification tasks retained their explicitly expected initial green result. Every task passed its focused verification and TypeScript check.
+
+The final implementation matched all 77 final file snapshots from 156 hash-verified plan blocks. The required range diff check then identified one extra blank line at the end of `scripts/hidden-input.ts`; commit `55da13a` removed that whitespace only. There were no behavioral or scope deviations. Lifecycle documentation was reconciled separately after implementation.
+
+- Baseline: 237 tests across 29 files passed; TypeScript passed.
+- After Task 8: 319 tests across 40 files passed, including the original authentication suite.
+- After Task 19: `npm test -- --reporter=dot` passed **423 tests across 53 files**; `npm run typecheck` passed.
+- Tasks 17–19 reproduced the specified stale-login, revoked-upload and SVG-preamble failures before passing their 30-, 45- and 45-test focused checks respectively.
+- `git diff a442939..HEAD --check` passed after the whitespace correction.
+
+A fresh Astra Medium review of `a442939..55da13a` found no actionable Critical, Important or minor defects. The reviewer independently passed 50 tests across seven files covering login/upload races, SVG streaming, occurrence privacy, shared projections, key reconciliation and real HTTP upload limits/disconnects. This review establishes the backend closeout; it does not replace the later browser or production checks.
+
+The completed backend includes the Plan 5/6 handoffs in [the operational guide](../guides/share-key-management.md). No maintained specification exists yet; the approved design stays active until Plan 6 consolidates the specification and Architecture. Browser viewers, hosting capacity values, production checks and the restore drill remain assigned to their existing later plans. No real project database, credentials or production files were used.
+
+Merge state is separate from implementation verification: this branch has not been merged to main or deployed. The scratch replay section below records earlier planning evidence and is retained unchanged.
 
 ## Preflight and execution checks
 
