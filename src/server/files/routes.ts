@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { AttachmentPatch, PhotoPatch, PhotoVariantParam } from '../../domain';
 import type { AppConfig } from '../config';
 import type { Db } from '../db/connection';
+import { requireCurrentSession } from '../auth/sessions';
+import { SESSION_COOKIE } from '../http/guards';
 import { ItemParams, RecordItemParams } from '../http/params';
 import { requireUserId } from '../http/user';
 import { requireRecord } from '../records/store';
@@ -39,8 +41,11 @@ export function registerFileRoutes(app: FastifyInstance, db: Db, config: AppConf
     app.post(url, { config: { multipart: true } }, async (request, reply) => {
       const { projectId, id } = ItemParams.parse(request.params);
       requireRecord(db, projectId, id);
-      const result = await withUpload(request, config.filesDir, kind, capacity, envelope =>
-        saveUpload(db, projectId, id, requireUserId(request), kind, envelope));
+      const userId = requireUserId(request);
+      const result = await withUpload(request, config.filesDir, kind, capacity, envelope => db.transaction(() => {
+        requireCurrentSession(db, request.cookies[SESSION_COOKIE], userId, true);
+        return saveUpload(db, projectId, id, userId, kind, envelope);
+      }).immediate());
       return reply.status(201).send(result);
     });
     app.get(url, async request => {

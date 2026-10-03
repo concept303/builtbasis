@@ -4,7 +4,7 @@ import type { StorageCapacity, UploadReservation } from './capacity';
 import { discardStaged, publishFile } from './storage';
 import { parseUpload, type UploadEnvelope } from './uploads';
 
-/** Caller checks its owner/grant access before admission and rechecks mutable grants at commit. */
+/** Caller checks access before admission and rechecks session/permissions in its final write transaction. */
 export async function withUpload<T>(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments', capacity: StorageCapacity,
   consume: (envelope: UploadEnvelope) => T | Promise<T>): Promise<T> {
   let slot: UploadReservation;

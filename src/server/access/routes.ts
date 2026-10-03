@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { LogEntryBody, PhotoVariantParam, type AttachmentMeta } from '../../domain';
 import type { AppConfig } from '../config';
-import { findSessionUser } from '../auth/sessions';
+import { requireCurrentSession } from '../auth/sessions';
 import type { Db } from '../db/connection';
 import { HttpError } from '../errors';
 import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
@@ -100,8 +100,7 @@ export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppCo
       const userId = requireUserId(request);
       requireContributorAccess(db, userId, id, 'upload');
       const result = await withUpload(request, config.filesDir, kind, capacity, envelope => db.transaction(() => {
-          const token = request.cookies[SESSION_COOKIE];
-          if (!token || findSessionUser(db, token)?.userId !== userId) throw new HttpError(401, 'unauthenticated');
+          requireCurrentSession(db, request.cookies[SESSION_COOKIE], userId);
           const access = requireContributorAccess(db, userId, id, 'upload');
           const logEntryId = kind === 'attachments' ? (envelope.metadata as AttachmentMeta).logEntryId : null;
           if (logEntryId != null) {
@@ -111,7 +110,7 @@ export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppCo
           }
           const occurrence = saveUpload(db, access.projectId, id, userId, kind, envelope);
           return buildSharedRecord(db, access)[kind].find(item => item.id === occurrence.id);
-      })());
+      }).immediate());
       return reply.status(201).send(result);
     });
   }

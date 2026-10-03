@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
 
 /** Absolute expiry: 30 days after login (design §11.5). */
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -35,6 +36,16 @@ export function findSessionUser(db: Db, token: string, now: Date = new Date()): 
     .get(hashToken(token)) as { userId: number; username: string; expiresAt: string } | undefined;
   if (!row || row.expiresAt <= now.toISOString()) return null;
   return { userId: row.userId, username: row.username };
+}
+
+/** Call inside the final IMMEDIATE write transaction after asynchronous work. */
+export function requireCurrentSession(db: Db, token: string | undefined, expectedUserId: number, ownerOnly = false): SessionUser {
+  const user = token ? findSessionUser(db, token) : null;
+  if (!user || user.userId !== expectedUserId) throw new HttpError(401, 'unauthenticated');
+  if (ownerOnly && db.prepare('SELECT is_owner FROM users WHERE id = ?').pluck().get(user.userId) !== 1) {
+    throw new HttpError(403, 'owner_required');
+  }
+  return user;
 }
 
 export function deleteSession(db: Db, token: string): void {
