@@ -15,3 +15,33 @@ export function multipart(parts: MultipartPart[]) {
   chunks.push(Buffer.from(`--${boundary}--\r\n`));
   return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
 }
+
+export function upload(f: Fixture, recordId: number, kind: 'photos' | 'attachments', parts: MultipartPart[], headers: Record<string, string> = {}) {
+  const form = multipart(parts);
+  return f.ctx.app.inject({
+    method: 'POST',
+    url: `${f.base}/records/${recordId}/${kind}`,
+    headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType, ...headers },
+    payload: form.body,
+  });
+}
+
+export async function addAttachment(f: Fixture, recordId: number, metadata: object = {}, filename = 'plan.pdf', bytes = PDF) {
+  const response = await upload(f, recordId, 'attachments', [
+    { name: 'metadata', data: JSON.stringify(metadata) },
+    { name: 'file', filename, data: bytes },
+  ]);
+  expect(response.statusCode, response.body).toBe(201);
+  return response.json();
+}
+
+export async function addPhoto(f: Fixture, recordId: number, metadata: object = { phase: 'before' }) {
+  const response = await upload(f, recordId, 'photos', [
+    { name: 'metadata', data: JSON.stringify(metadata) },
+    ...['original', 'display', 'thumbnail'].map(name => ({ name, filename: name === 'original' ? 'όψη.jpg' : `${name}.jpg`, data: JPEG })),
+  ]);
+  expect(response.statusCode, response.body).toBe(201);
+  return response.json();
+}
+import { expect } from 'vitest';
+import type { Fixture } from './record-fixture';

@@ -87,7 +87,7 @@ export function updateLogEntry(
   })();
 }
 
-/** Plan 4 adds: delete the entry's attachment occurrences in this same transaction (design §5.11). */
+/** The composite attachment FK cascades occurrence deletion in this transaction; stored blobs remain. */
 export function deleteLogEntry(
   db: Db,
   projectId: number,

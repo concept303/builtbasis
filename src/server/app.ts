@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 import { DEFAULT_LOGIN_LIMITS, LoginLimiter } from './auth/login-limiter';
@@ -13,6 +14,7 @@ import { registerZoneTypeRoutes } from './lists/zone-types';
 import { registerTagRoutes } from './lists/tags';
 import { registerLocationRoutes } from './lists/locations';
 import { registerRecordRoutes } from './records/routes';
+import { registerFileRoutes } from './files/routes';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 
@@ -28,6 +30,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, db } = deps;
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: 1024 * 1024 });
   await app.register(cookie);
+  await app.register(multipart);
   registerGuards(app, config, db);
 
   app.setErrorHandler((error, request, reply) => {
@@ -60,5 +63,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTagRoutes(app, db);
   registerLocationRoutes(app, db);
   registerRecordRoutes(app, db);
+  registerFileRoutes(app, db, config);
   return app;
 }
