@@ -2603,7 +2603,7 @@ git commit -m "feat(server): decision options with protection of the chosen opti
 
 The test also feeds the API's output to Plan 1's comparison functions, to prove the browser can build both comparison views from it (Decision 10).
 
-- [ ] **Step 1: Write the failing test `tests/server/measurements-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/measurements-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2714,12 +2714,12 @@ describe('measurements (design §5.7)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/measurements-api.test.ts`
 Expected: FAIL — all 5 tests fail with `404`: there are no measurement routes yet.
 
-- [ ] **Step 3: Create `src/server/records/measurements.ts`**
+- [x] **Step 3: Create `src/server/records/measurements.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2891,7 +2891,7 @@ export function registerMeasurementRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2912,11 +2912,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/measurements-api.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/measurements.ts src/server/records/routes.ts tests/server/measurements-api.test.ts

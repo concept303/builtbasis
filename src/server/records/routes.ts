@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Db } from '../db/connection';
 import { registerActivityRoutes } from './activity';
+import { registerMeasurementRoutes } from './measurements';
 import { registerOptionRoutes } from './options';
 import { registerRecordCoreRoutes } from './records';
 import { registerTransitionRoutes } from './transitions';
@@ -11,4 +12,5 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
   registerActivityRoutes(app, db);
   registerTransitionRoutes(app, db);
   registerOptionRoutes(app, db);
+  registerMeasurementRoutes(app, db);
 }
