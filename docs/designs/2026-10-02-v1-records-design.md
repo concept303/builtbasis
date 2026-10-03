@@ -602,14 +602,14 @@ All database access is confined to `src/server` data-access modules, so a later 
 
 **Account login**
 
-- Username + password; password hashed with Node's built-in `scrypt`; login rate-limited; HTTPS only.
+- Username + password; password hashed with Node's built-in `scrypt`; login rate-limited; HTTPS only. After password verification, recheck the active account and unchanged verified password hash and insert the session within one short write transaction. Password verification itself holds no write transaction. A concurrent password reset must prevent a session based on the old verification.
 - Accounts are provisioned/reset by server-side commands (no self-registration or email reset service). The owner account is unique; named-user administration cannot replace or disable it. Disabling a named user or resetting their password ends that user’s sessions. Disabled users cannot log in. Enabling an account requires a fresh login and does not restore its old sessions. Per-record grants are owner-controlled and checked on every read/write; login alone grants no owner rights.
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, **host-only** (no `Domain` attribute, so it is never sent to `ktimanet.com` or other subdomains).
 - The session identifier is a random token; the server stores only its **SHA-256 hash**, so a database or backup never contains a usable session. Sessions expire **30 days after login** (absolute) and are deleted on logout.
 - **Forged-request protection** (`SameSite` alone is not relied on, because `ktimanet.com` (WordPress) counts as the same site). Every request below must carry an `Origin` header equal to the configured public base URL (`https://builtbasis.ktimanet.com` in production):
   - **Login:** valid credentials, matching `Origin`, JSON body.
   - **Data changes:** valid session, matching `Origin`, JSON body, and owner authority or the specific contributor grant required by that route.
-  - **File uploads:** valid session, matching `Origin`, multipart form body, and owner authority or the record's Upload grant. Recheck the session and grant before committing the upload.
+  - **File uploads:** valid session, matching `Origin`, multipart form body, and owner authority or the record's Upload grant. Recheck the actual session token and current owner role or contributor grant inside the upload commit transaction. Do not hold that transaction while receiving or publishing files.
 - **Reads:** GET requests never modify records, evidence or access permissions (including share links). The only exception: a successful, authorised share-page read updates that link's view count and last-viewed time.
 
 **Share links**

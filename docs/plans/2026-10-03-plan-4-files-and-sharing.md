@@ -38,7 +38,7 @@ These fill implementation details left open by the design. They are proposals fo
 1. **Share URL:** `${publicOrigin}/share#${token}`. Plan 5 reads the fragment and sends `Authorization: Bearer <token>` to the public API. No tokens in query strings, route parameters, image URLs or redirects. Shared images/downloads use authenticated fetch and browser object URLs. Never open or frame an uploaded-content Blob URL, including in a new tab. Use Blob URLs only in image/video/audio elements or forced-download links; email content is parsed as inert data and rendered as escaped text. Shared PDF viewing must use a data-fed PDF renderer or another reviewed sandboxed route, never unsandboxed Blob navigation; disable document scripting and automatic external resources/actions. Owner and contributor views use authorised server URLs with protective response headers. For bearer-only SVG viewing, decode the source in an image context, draw it to canvas and display a generated PNG; never expose the original SVG Blob URL in the DOM, where the browser could offer Open image in new tab. Revoke temporary source URLs; conversion failure falls back to original download. This keeps the token out of ordinary proxy request URLs. The `/share` page itself arrives in Plan 5; Plan 4 delivers its API.
 2. **Upload unit:** one attachment, or one photo bundle, per request. A photo bundle contains exactly `original`, `display` and `thumbnail`. No batch protocol or replacement of bytes. Metadata can be edited separately.
 3. **Limits:** 100,000,000 bytes for the complete multipart request, including boundaries, metadata and all files. Original photos and attachments are bounded by that envelope. Generated JPEG display/thumbnail copies remain bounded at 5,000,000/500,000 bytes. Metadata JSON is at most 16,384 bytes. Streamed counts enforce the ceiling with or without Content-Length. The browser must account for envelope overhead; a 100 MB original plus metadata does not fit the 100 MB request ceiling.
-4. **Types and capabilities:** the revised explicit extension policy is defined in the attachment task below, using the combined documented vendor-supported formats. Images, PDFs, EML/MSG email, video and audio support upload, viewing/playback and download. Office documents, CAD/BIM and archives support upload/download. Bytes remain immutable; MIME and filenames are screened, not trusted. Format screening is not malware scanning. Email parsing and native media rendering are Plan 5 browser work, backed by Plan 4 authorised original/view APIs and a tested reader handoff. No server transcoder or CAD/Office viewer.
+4. **Types and capabilities:** the revised explicit extension policy is defined in the attachment task below, using the combined documented vendor-supported formats. Images, PDFs, EML/MSG email, video and audio support upload, viewing/playback and download. Office documents, CAD/BIM and archives support upload/download. Bytes remain immutable; MIME and filenames are screened, not trusted. SVG prologs use constant-memory streaming recognition rather than requiring the root within a 512-byte prefix; entity expansion and DTD loading are forbidden. Canonical content types remain filename-independent. Format screening is not malware scanning. Email parsing and native media rendering are Plan 5 browser work, backed by Plan 4 authorised original/view APIs and a tested reader handoff. No server transcoder or CAD/Office viewer.
 5. **Dates:** photo `takenAt` is nullable, accepts an ISO timestamp with an explicit offset and is normalised to UTC. The browser reads metadata in Plan 5. Missing or ambiguous metadata stays null until the owner edits it; the server does not substitute upload time.
 6. **Links:** label is required nonblank text, max 200 characters; optional expiry must be a future ISO timestamp on creation. Links may be created for Draft records, but remain unavailable while Draft. Create a new link to change label/expiry; no link editing or physical link deletion. Revocation is idempotent. The owner can copy a stored link, including an inactive one; the returned state tells the UI whether it is usable.
 7. **Key changes:** a valid 32-byte key is required before the HTTP app starts. Missing/malformed keys stop startup. A changed key revokes all unrevoked links before routes become available. It does not silently re-encrypt links. A stored SHA-256 key fingerprint identifies a change; it is not the key. A server command handles deliberate revocation without needing the lost key.
@@ -47,9 +47,9 @@ These fill implementation details left open by the design. They are proposals fo
 10. **HTTP caching:** shared responses and owner link-management responses use `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and `X-Robots-Tag: noindex, nofollow`. File responses also use `X-Content-Type-Options: nosniff`. No conditional 304 shortcut, CDN caching, or direct static mount of the data directory.
 11. **Actor identities:** login usernames are not published. Named-user evidence and Log entries use separate display names for human attribution; storage retains the real user ID. Owner account administration can set a human display name. This replaces the earlier single-owner assumption that all automatic author fields could be omitted.
 12. **Administrative revocations:** key-change/global revocation emits a safe system reason and affected count, without fabricating an owner actor. Owner-requested revocation still appends per-record activity. The revised design records this operational exception explicitly.
-13. **Accounts and record grants:** one owner retains all existing powers. A named-user grant gives read access to one non-Draft record and two independent booleans, Upload and Add Log. Both false means read-only; deleting the grant removes authenticated access. Login alone authorises no record or project-wide directory. Grant/account changes take effect on every request; uploads recheck permission before committing evidence. Anonymous share links remain independent and read-only.
+13. **Accounts and record grants:** one owner retains all existing powers. A named-user grant gives read access to one non-Draft record and two independent booleans, Upload and Add Log. Both false means read-only; deleting the grant removes authenticated access. Login alone authorises no record or project-wide directory. Grant/account changes take effect on every request; owner and contributor uploads recheck the actual session token plus current role/grant in the final short IMMEDIATE commit transaction. No database write lock is held while receiving or publishing files. Anonymous share links remain independent and read-only.
 14. **Notes:** preserve the existing notes column as Private Notes. Add Public Notes with an empty/null initial value. Only owner record saves may change either; public projections include only Public Notes. Existing A3 Notes exclusions stay unchanged until Plan 6 layout review.
-15. **Account administration:** owner-controlled server commands provision/reset/disable/enable named users. Passwords use the existing limits/hashing and hidden prompts. Reset/disable ends that user's sessions; enabling requires a fresh login. The contributor command cannot replace/reset/disable the owner. The owner manages record grants through protected APIs; Plan 5 adds the controls. There is no self-signup or email-reset service. Plan 6 restore must disable all non-owner accounts and clear grants, followed by deliberate password resets, enable and regrant; deleting sessions alone cannot invalidate restored passwords.
+15. **Account administration:** owner-controlled server commands provision/reset/disable/enable named users. Passwords use the existing limits/hashing and hidden prompts. Reset/disable ends that user's sessions; enabling requires a fresh login. Login verifies the password outside a write transaction, then atomically rechecks identity, active state and the exact verified hash and inserts the session under an IMMEDIATE transaction. The contributor command cannot replace/reset/disable the owner. The owner manages record grants through protected APIs; Plan 5 adds the controls. There is no self-signup or email-reset service. Plan 6 restore must disable all non-owner accounts and clear grants, followed by deliberate password resets, enable and regrant; deleting sessions alone cannot invalidate restored passwords.
 16. **New contributions:** contributors may upload new evidence and/or create public Log entries according to their grants. They cannot edit/delete existing content, change record fields/status, touch either Notes field or access private entries. Upload alone may append a new attachment to an accessible public Log entry on the granted record. Add Log is required to create new entry text; creating a new entry with files requires both grants. Existing text and attachments remain owner-editable only.
 
 17. **Storage admission:** the owner approved a configurable managed-file budget and physical free-space reserve, with no per-user quota and no published-file deletion. HTTP startup requires explicit positive byte values for `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`; offline commands can omit them. Inventory real retained files at startup, including orphan blobs and stale temporary files. Reserve in-flight capacity before staging; a request without Content-Length reserves the full 100 MB envelope. Return controlled `507 storage_capacity` on exhaustion while retaining reads/login. The single HTTP process owns the ledger and upload directory. Choose the file budget below the actual hosting allowance to leave space for the database, backups and other account use. A filesystem free-space probe is not a shared-hosting quota query or a guarantee against external writers.
@@ -14035,7 +14035,7 @@ git commit -m "feat: integrate contributor previews and independent log uploads"
 
 **Deliverable:** Final account, permission, attachment and viewer guidance; preserve the distinction between approved scope, planning replay and future product implementation.
 
-**Reviewed corrections:** the listed file blocks incorporate fixes from `1096350` directly. Execute the corrected blocks below; do not reproduce the earlier defects.
+**Reviewed corrections:** the listed file blocks incorporate fixes from `1096350`, `5e6b347` directly. Execute the corrected blocks below; do not reproduce the earlier defects.
 
 - [ ] **Step 1: Write these complete test and fixture files.**
 
@@ -14107,7 +14107,7 @@ After key loss or replacement, stop the application and run `npm run shares:revo
 
 #### File: `docs/guides/share-key-management.md`
 
-<!-- replay task=14 phase=implementation sha256=5f78af8626d279067669d5e9e9959988ce92f42e40ad850a1130ff6791bb095e -->
+<!-- replay task=14 phase=implementation sha256=ee56cdfa5e8fd057cf567766838676940f7305768b10a4832fcfde3fe875d08f -->
 
 ``````markdown
 # Share-link key management and API handoff
@@ -14171,11 +14171,11 @@ npm run user -- disable contractor
 npm run user -- enable contractor
 ```
 
-Create and reset prompt for a password twice in an interactive terminal. Passwords are never command arguments or piped input. Reset ends that account's sessions. Disable blocks login and ends sessions. Enable requires a fresh login and leaves existing record grants in place. The contributor command cannot change the owner. A reset does not implicitly enable a disabled account.
+Create and reset prompt for a password twice in an interactive terminal. Passwords are never command arguments or piped input. Reset ends that account's sessions. Login verifies the password before acquiring the write lock, then rechecks the active account and unchanged verified hash and inserts the session atomically. A reset that commits first prevents a login based on the old verification. Disable blocks login and ends sessions. Enable requires a fresh login and leaves existing record grants in place. The contributor command cannot change the owner. A reset does not implicitly enable a disabled account.
 
 The owner selects an active contributor and grants access to individual records. A grant with both write permissions false provides read access. `canUpload` permits photos and attachments. `canAddLog` permits new public Log entries. Either permission can be enabled independently. Upload alone also permits a new attachment on an existing public Log entry of the same record. Creating a new entry with files needs both permissions. Contributors cannot add private entries, edit record fields, manage grants or change existing evidence. Draft records remain unavailable.
 
-The owner APIs list contributors and manage `/api/projects/:projectId/records/:id/grants`. Contributor access uses `/api/assigned-records`. Every request checks the current account and grant. An upload checks them again before committing after its bytes arrive. Removing a grant or disabling an account stops subsequent access. Already delivered bytes cannot be recalled. Public share links remain read-only and never grant contributor permissions.
+The owner APIs list contributors and manage `/api/projects/:projectId/records/:id/grants`. Contributor access uses `/api/assigned-records`. Every request checks the current account and grant. Every upload, including the owner's, revalidates the actual session token and current role or grant in the same short IMMEDIATE transaction that commits its occurrence. Receiving and publishing file bytes happen before this transaction. Logout, password reset or expiry during that asynchronous work must prevent the evidence commit. Removing a grant or disabling an account stops subsequent access. Already delivered bytes cannot be recalled. Public share links remain read-only and never grant contributor permissions.
 
 Plan 5 supplies screens to display and select existing CLI-provisioned accounts, manage record grants, show separate Upload and Add Log controls, and follow assigned records. It does not imply an account-creation or password-management API. It must not infer one permission from the other. Current command/API availability and future screens must be labelled accurately during implementation.
 
@@ -14183,7 +14183,7 @@ Plan 5 supplies screens to display and select existing CLI-provisioned accounts,
 
 The browser uploads one attachment or one photo bundle per request. A bundle supplies an original plus JPEG display and thumbnail copies. The entire multipart request body may contain at most **100,000,000 bytes**, including preamble, metadata, part headers, boundaries and epilogue. Original files share this budget with the other parts; do not advertise a 100 MB file plus overhead. Generated display and thumbnail copies remain limited to 5,000,000 and 500,000 bytes. The server counts actual streamed bytes and rejects oversize requests with 413, including chunked bodies.
 
-`ACCEPTED_ATTACHMENT_EXTENSIONS` in `src/domain/files.ts` is the shared 145-extension catalog. Browser pickers reuse it. Storage-only Office, CAD/BIM, archive and specialist formats are screened by suffix and never executed or converted. DWG version signatures do not limit storage admission. Native-view formats receive bounded signature screening before selecting their response MIME. This is not document validation or malware scanning. The `.a` and `.mat` entries are intentionally download-only.
+`ACCEPTED_ATTACHMENT_EXTENSIONS` in `src/domain/files.ts` is the shared 145-extension catalog. Browser pickers reuse it. Storage-only Office, CAD/BIM, archive and specialist formats are screened by suffix and never executed or converted. DWG version signatures do not limit storage admission. Native-view formats receive content-based screening before selecting their response MIME. SVG preambles stream through a constant-memory UTF-8 recognizer, so long comments, declarations and processing instructions are not limited to the initial 512-byte prefix. The recognizer never expands entities or loads a DTD and is not full-document validation. Canonical MIME is independent of the occurrence filename. This is not document validation or malware scanning. The `.a` and `.mat` entries are intentionally download-only.
 
 EXIF extraction, explicit-offset date handling, HEIC decoding and fallback belong to the browser. Missing or ambiguous capture dates stay null. Photo bundles retain immutable original bytes. Server tests do not establish browser image-decoder support.
 
@@ -16225,6 +16225,1158 @@ git add '.env.example' 'src/server/access/routes.ts' 'src/server/app.ts' 'src/se
 git commit -m "feat: enforce storage admission and release interrupted reservations"
 ```
 
+## Task 17: Make login atomic relative to password resets
+
+**Scratch checkpoint:** `9678089`. **Depends on:** Task 16.
+
+**Deliverable:** Verify passwords outside the write lock, then re-read the active account and verified hash and create the session in one short IMMEDIATE transaction. Concurrent administrative reset or disable cannot authorize stale credentials.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/login-race.test.ts`
+
+<!-- replay task=17 phase=test sha256=7d9f3964ba48d85006d188129a3153eefc134f2376a659894cb1cd52f21b4b22 -->
+
+``````ts
+import { afterEach, expect, it, vi } from 'vitest';
+import * as passwords from '../../src/server/auth/passwords';
+import { createContributor, disableContributor, resetContributorPassword } from '../../src/server/auth/contributors';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { openDatabase, type Db } from '../../src/server/db/connection';
+import { makeContext, OWNER, type TestContext } from './helpers';
+
+let ctx: TestContext;
+let concurrent: Db;
+afterEach(async () => {
+  vi.restoreAllMocks();
+  concurrent?.close();
+  await ctx?.close();
+});
+
+it.each(['owner', 'contributor'] as const)('rejects a %s password reset completed after verification but before session creation', async account => {
+  ctx = await makeContext();
+  const username = account === 'owner' ? OWNER.username : 'alex';
+  if (account === 'owner') setOwnerPassword(ctx.db, username, OWNER.password);
+  else createContributor(ctx.db, username, 'Alex', OWNER.password);
+  concurrent = openDatabase(ctx.config.dbPath);
+  const verify = passwords.verifyPassword;
+  vi.spyOn(passwords, 'verifyPassword').mockImplementationOnce((password, hash) => {
+    const verified = verify(password, hash);
+    expect(verified).toBe(true);
+    // A separate connection models the administrative CLI while this handler still
+    // holds the previously read/verified hash. There is no production test hook.
+    if (account === 'owner') setOwnerPassword(concurrent, username, 'replacement owner password');
+    else resetContributorPassword(concurrent, username, 'replacement contributor password');
+    return verified;
+  });
+  const response = await ctx.app.inject({ method: 'POST', url: '/api/auth/login',
+    headers: { origin: ctx.origin }, payload: { username, password: OWNER.password } });
+  expect(response.statusCode).toBe(401);
+  expect(response.json()).toEqual({ error: 'invalid_credentials' });
+  expect(response.headers['set-cookie']).toBeUndefined();
+  expect(ctx.db.prepare('SELECT COUNT(*) FROM sessions').pluck().get()).toBe(0);
+});
+
+it('rejects an account disabled on another connection after password verification', async () => {
+  ctx = await makeContext();
+  createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  concurrent = openDatabase(ctx.config.dbPath);
+  const verify = passwords.verifyPassword;
+  vi.spyOn(passwords, 'verifyPassword').mockImplementationOnce((password, hash) => {
+    const verified = verify(password, hash);
+    disableContributor(concurrent, 'alex');
+    return verified;
+  });
+  const response = await ctx.app.inject({ method: 'POST', url: '/api/auth/login',
+    headers: { origin: ctx.origin }, payload: { username: 'alex', password: OWNER.password } });
+  expect(response.statusCode).toBe(401);
+  expect(response.headers['set-cookie']).toBeUndefined();
+  expect(ctx.db.prepare('SELECT COUNT(*) FROM sessions').pluck().get()).toBe(0);
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/login-race.test.ts tests/server/auth-api.test.ts tests/server/sessions.test.ts`.
+
+Expected: all three new race cases fail because stale verification can still issue a session after a second-connection reset or disable.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/server/routes/auth.ts`
+
+<!-- replay task=17 phase=implementation sha256=bd55f78087befe0b01c3ab3b649c3fccb212d37bc4181ab68c313f4b5cfef692 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import type { LoginLimiter } from '../auth/login-limiter';
+import { hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from '../auth/passwords';
+import { createSession, deleteExpiredSessions, deleteSession } from '../auth/sessions';
+import { findUserByUsername, MAX_USERNAME_LENGTH } from '../auth/users';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { clientIp } from '../http/client-ip';
+import { SESSION_COOKIE } from '../http/guards';
+
+/** The same limits as the owner command, so every account it creates can log in. */
+const LoginBody = z.strictObject({
+  username: z.string().min(1).max(MAX_USERNAME_LENGTH),
+  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+});
+
+export function registerAuthRoutes(
+  app: FastifyInstance,
+  deps: { config: AppConfig; db: Db; limiter: LoginLimiter },
+): void {
+  const { config, db, limiter } = deps;
+  // Verifying unknown users against a dummy hash keeps both failure cases equally slow.
+  const dummyHash = hashPassword('builtbasis-dummy-password');
+
+  app.post('/api/auth/login', async (request, reply) => {
+    const ip = clientIp(request, config);
+    const now = Date.now();
+    if (limiter.isBlocked(ip, now)) throw new HttpError(429, 'too_many_attempts');
+    const body = LoginBody.parse(request.body);
+    const user = findUserByUsername(db, body.username);
+    const passwordOk = verifyPassword(body.password, user?.passwordHash ?? dummyHash);
+    if (user === null || !user.isActive || !passwordOk) {
+      limiter.recordFailure(ip, now);
+      throw new HttpError(401, 'invalid_credentials');
+    }
+    // Password verification is expensive and holds no write lock. Re-read the
+    // verified identity under the short write lock shared with administrative resets.
+    const session = db.transaction(() => {
+      const current = findUserByUsername(db, body.username);
+      if (!current || current.id !== user.id || !current.isActive || current.passwordHash !== user.passwordHash) {
+        limiter.recordFailure(ip, now);
+        throw new HttpError(401, 'invalid_credentials');
+      }
+      deleteExpiredSessions(db);
+      return createSession(db, current.id);
+    }).immediate();
+    limiter.recordSuccess(ip);
+    reply.setCookie(SESSION_COOKIE, session.token, {
+      path: '/',
+      httpOnly: true,
+      secure: config.secureCookies,
+      sameSite: 'lax',
+      expires: session.expiresAt,
+    });
+    return { username: user.username };
+  });
+
+  app.post('/api/auth/logout', { config: { sessionOnly: true } }, async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) deleteSession(db, token);
+    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return { ok: true };
+  });
+
+  app.get('/api/auth/me', { config: { sessionOnly: true } }, async (request) => {
+    if (request.user === null) throw new HttpError(401, 'unauthenticated');
+    const user = findUserByUsername(db, request.user.username)!;
+    return { username: user.username, displayName: user.displayName, isOwner: user.isOwner === 1 };
+  });
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/login-race.test.ts tests/server/auth-api.test.ts tests/server/sessions.test.ts`, then `npm run typecheck`. Expected: 30 tests in three files pass and TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/server/routes/auth.ts' 'tests/server/login-race.test.ts'
+git commit -m "fix: issue sessions atomically against administrative resets"
+```
+
+## Task 18: Revalidate upload sessions under the final write lock
+
+**Scratch checkpoint:** `a47b431`. **Depends on:** Task 17.
+
+**Deliverable:** A shared live-session check protects owner and contributor upload commits. Final role/grant checks and evidence insertion run under IMMEDIATE transactions after all asynchronous file work; revocation leaves no new occurrence, timestamp or activity change.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/upload-session-race.test.ts`
+
+<!-- replay task=18 phase=test sha256=8ef78ec7f9e7a446ca3b4913fb4e1fc610affcc416cae41d3540242ba3475b99 -->
+
+``````ts
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createContributor, resetContributorPassword } from '../../src/server/auth/contributors';
+import { createSession } from '../../src/server/auth/sessions';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { openDatabase, type Db } from '../../src/server/db/connection';
+import * as storage from '../../src/server/files/storage';
+import { JPEG, multipart, PDF } from './file-fixture';
+import { OWNER, send } from './helpers';
+import { forceStatus, makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+let concurrent: Db;
+let id: number;
+beforeEach(async () => {
+  f = await makeFixture();
+  id = (await postRecord(f, { subtype: 'task' })).id;
+  concurrent = openDatabase(f.ctx.config.dbPath);
+  concurrent.pragma('busy_timeout = 0');
+});
+afterEach(async () => {
+  vi.restoreAllMocks();
+  concurrent.close();
+  await f.ctx.close();
+});
+
+function upload(kind: 'photos' | 'attachments', cookie = f.cookie, assigned = false) {
+  const form = multipart([
+    { name: 'metadata', data: JSON.stringify(kind === 'photos' ? { phase: 'before' } : {}) },
+    ...(kind === 'photos' ? ['original', 'display', 'thumbnail'].map(name => ({ name, filename: 'photo.jpg', data: JPEG }))
+      : [{ name: 'file', filename: 'file.pdf', data: PDF }]),
+  ]);
+  return f.ctx.app.inject({ method: 'POST', url: assigned ? `/api/assigned-records/${id}/${kind}` : recordUrl(f, id, `/${kind}`),
+    headers: { cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body });
+}
+
+for (const kind of ['photos', 'attachments'] as const) {
+  it.each(['logout', 'reset', 'expire', 'disable'] as const)(`rejects ${kind} when owner %s occurs during publication without mutating the record`, async action => {
+    const recordBefore = f.ctx.db.prepare('SELECT * FROM records WHERE id = ?').get(id);
+    const activityBefore = f.ctx.db.prepare('SELECT * FROM activity WHERE record_id = ?').all(id);
+    const publish = storage.publishFile;
+    let changed = false;
+    vi.spyOn(storage, 'publishFile').mockImplementation(async (...args) => {
+      await publish(...args);
+      if (changed) return;
+      changed = true;
+      if (action === 'logout') {
+        expect((await send(f.ctx, f.cookie, 'POST', '/api/auth/logout')).statusCode).toBe(200);
+      } else if (action === 'reset') {
+        setOwnerPassword(concurrent, OWNER.username, 'replacement owner password');
+      } else if (action === 'expire') {
+        concurrent.exec("UPDATE sessions SET expires_at = '2000-01-01T00:00:00.000Z'");
+      } else {
+        // The contributor CLI deliberately cannot disable owners. Exercise the
+        // active-account invariant directly through the separate connection.
+        concurrent.exec('UPDATE users SET is_active = 0 WHERE is_owner = 1');
+      }
+    });
+    const response = await upload(kind);
+    expect(response.statusCode, response.body).toBe(401);
+    expect(changed).toBe(true);
+    expect(f.ctx.db.prepare(`SELECT COUNT(*) FROM ${kind}`).pluck().get()).toBe(0);
+    expect(f.ctx.db.prepare('SELECT * FROM records WHERE id = ?').get(id)).toEqual(recordBefore);
+    expect(f.ctx.db.prepare('SELECT * FROM activity WHERE record_id = ?').all(id)).toEqual(activityBefore);
+  });
+
+  it(`retains successful owner ${kind} uploads with a current session`, async () => {
+    const response = await upload(kind);
+    expect(response.statusCode, response.body).toBe(201);
+    expect(f.ctx.db.prepare(`SELECT COUNT(*) FROM ${kind}`).pluck().get()).toBe(1);
+  });
+}
+
+it.each(['owner', 'contributor'] as const)('holds the %s final write lock before reading the live session', async account => {
+  let cookie = f.cookie;
+  const username = account === 'owner' ? OWNER.username : 'alex';
+  if (account === 'contributor') {
+    const userId = createContributor(f.ctx.db, username, 'Alex', OWNER.password);
+    cookie = `bb_session=${createSession(f.ctx.db, userId).token}`;
+    forceStatus(f, id, 'open');
+    f.ctx.db.prepare('INSERT INTO record_grants VALUES (?,?,1,0)').run(id, userId);
+  }
+  let published = false;
+  let attempted = false;
+  let resetError: unknown;
+  const publish = storage.publishFile;
+  vi.spyOn(storage, 'publishFile').mockImplementation(async (...args) => {
+    await publish(...args);
+    published = true;
+  });
+  const prepare = f.ctx.db.prepare.bind(f.ctx.db);
+  vi.spyOn(f.ctx.db, 'prepare').mockImplementation((sql: string) => {
+    if (published && !attempted && sql.includes('FROM sessions s JOIN users u')) {
+      attempted = true;
+      try {
+        if (account === 'owner') setOwnerPassword(concurrent, username, 'replacement owner password');
+        else resetContributorPassword(concurrent, username, 'replacement contributor password');
+      } catch (error) { resetError = error; }
+    }
+    return prepare(sql);
+  });
+  const response = await upload('attachments', cookie, account === 'contributor');
+  expect(response.statusCode, response.body).toBe(201);
+  expect(attempted).toBe(true);
+  expect(resetError).toMatchObject({ code: 'SQLITE_BUSY' });
+  expect(f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get()).toBe(1);
+  // The short lock has ended; the same administrative reset now succeeds.
+  if (account === 'owner') setOwnerPassword(concurrent, username, 'replacement owner password');
+  else resetContributorPassword(concurrent, username, 'replacement contributor password');
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/login-race.test.ts tests/server/upload-session-race.test.ts tests/server/files-api.test.ts tests/server/assigned-records.test.ts tests/server/storage-admission-api.test.ts`.
+
+Expected: ten of twelve new upload-session cases fail before fresh owner authorization and final write-lock protection are added; valid-upload controls remain green.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/server/access/routes.ts`
+
+<!-- replay task=18 phase=implementation sha256=7f004c8b2ab6050fd1da1653f5b73d1ccdf0b03534d48b15f382eb60ac109e66 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { LogEntryBody, PhotoVariantParam, type AttachmentMeta } from '../../domain';
+import type { AppConfig } from '../config';
+import { requireCurrentSession } from '../auth/sessions';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
+import { saveUpload } from '../files/occurrences';
+import { describeAttachment, resolveAttachmentView } from '../files/previews';
+import { withUpload } from '../files/admission';
+import type { StorageCapacity } from '../files/capacity';
+import { ItemParams } from '../http/params';
+import { SESSION_COOKIE } from '../http/guards';
+import { requireUserId } from '../http/user';
+import { recordActivity } from '../records/activity';
+import { addLogEntry } from '../records/log';
+import { requireRecord } from '../records/store';
+import { buildSharedRecord } from '../sharing/projection';
+import { requireContributorAccess } from './grants';
+
+const Id = z.coerce.number().int().positive();
+const AssignedParams = z.object({ id: Id });
+const FileParams = AssignedParams.extend({ itemId: Id });
+const GrantParams = ItemParams.extend({ userId: Id });
+const GrantBody = z.strictObject({ canUpload: z.boolean(), canAddLog: z.boolean() });
+const PublicLogBody = LogEntryBody.omit({ private: true });
+const contributorConfig = { contributor: true, privateResponse: true };
+
+export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppConfig, capacity: StorageCapacity): void {
+  app.get('/api/contributors', { config: { privateResponse: true } }, async () => {
+    const rows = db.prepare(`SELECT id, username, display_name AS displayName, is_active AS active
+      FROM users WHERE is_owner = 0 ORDER BY display_name, id`).all() as { id: number; username: string; displayName: string; active: number }[];
+    return rows.map(row => ({ ...row, active: row.active === 1 }));
+  });
+  const grantsUrl = '/api/projects/:projectId/records/:id/grants';
+  app.get(grantsUrl, { config: { privateResponse: true } }, async request => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    const rows = db.prepare(`SELECT user_id AS userId, can_upload AS canUpload, can_add_log AS canAddLog
+      FROM record_grants WHERE record_id = ? ORDER BY user_id`).all(id) as { userId: number; canUpload: number; canAddLog: number }[];
+    return rows.map(row => ({ ...row, canUpload: row.canUpload === 1, canAddLog: row.canAddLog === 1 }));
+  });
+  app.put(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    const body = GrantBody.parse(request.body);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      if (!db.prepare('SELECT id FROM users WHERE id = ? AND is_owner = 0 AND is_active = 1').get(userId)) {
+        throw new HttpError(404, 'contributor_not_found');
+      }
+      const old = db.prepare('SELECT can_upload, can_add_log FROM record_grants WHERE record_id = ? AND user_id = ?').get(id, userId) as { can_upload: number; can_add_log: number } | undefined;
+      db.prepare(`INSERT INTO record_grants VALUES (?,?,?,?) ON CONFLICT(record_id,user_id)
+        DO UPDATE SET can_upload=excluded.can_upload, can_add_log=excluded.can_add_log`)
+        .run(id, userId, Number(body.canUpload), Number(body.canAddLog));
+      if (!old || old.can_upload !== Number(body.canUpload) || old.can_add_log !== Number(body.canAddLog)) {
+        recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+          action: 'grant_changed', detail: { userId, ...body } });
+      }
+      return { userId, ...body };
+    })();
+  });
+  app.delete(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      const result = db.prepare('DELETE FROM record_grants WHERE record_id = ? AND user_id = ?').run(id, userId);
+      if (result.changes) recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+        action: 'grant_revoked', detail: { userId } });
+      return { ok: true };
+    })();
+  });
+
+  app.get('/api/assigned-records', { config: contributorConfig }, async request => db.prepare(`
+    SELECT r.id, r.human_id AS humanId, r.title FROM record_grants g
+    JOIN records r ON r.id = g.record_id JOIN users u ON u.id = g.user_id
+    WHERE g.user_id = ? AND u.is_active = 1 AND u.is_owner = 0 AND r.status <> 'draft'
+    ORDER BY r.id`).all(requireUserId(request)));
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const access = requireContributorAccess(db, requireUserId(request), id);
+      if (request.method === 'HEAD') return reply.send();
+      return { ...buildSharedRecord(db, access), permissions: { canUpload: access.canUpload, canAddLog: access.canAddLog } };
+    },
+  });
+  app.post('/api/assigned-records/:id/log', { config: contributorConfig }, async (request, reply) => {
+    const { id } = AssignedParams.parse(request.params);
+    const userId = requireUserId(request);
+    const body = PublicLogBody.parse(request.body);
+    const entry = db.transaction(() => {
+      const access = requireContributorAccess(db, userId, id, 'addLog');
+      return addLogEntry(db, access.projectId, id, userId, body);
+    })();
+    return reply.status(201).send({ id: entry.id, eventAt: entry.eventAt, text: entry.text, loggedBy: entry.loggedBy, attachmentIds: [] });
+  });
+  for (const kind of ['photos', 'attachments'] as const) {
+    app.post(`/api/assigned-records/:id/${kind}`, { config: { ...contributorConfig, multipart: true } }, async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const userId = requireUserId(request);
+      requireContributorAccess(db, userId, id, 'upload');
+      const result = await withUpload(request, config.filesDir, kind, capacity, envelope => db.transaction(() => {
+          requireCurrentSession(db, request.cookies[SESSION_COOKIE], userId);
+          const access = requireContributorAccess(db, userId, id, 'upload');
+          const logEntryId = kind === 'attachments' ? (envelope.metadata as AttachmentMeta).logEntryId : null;
+          if (logEntryId != null) {
+            if (!db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ? AND private = 0').get(logEntryId, id)) {
+              throw new HttpError(404, 'log_entry_not_found');
+            }
+          }
+          const occurrence = saveUpload(db, access.projectId, id, userId, kind, envelope);
+          return buildSharedRecord(db, access)[kind].find(item => item.id === occurrence.id);
+      }).immediate());
+      return reply.status(201).send(result);
+    });
+  }
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/photos/:itemId/:variant', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+      await sendFile(request, reply, config.filesDir, resolvePhotoFile(db, id, itemId, variant), variant === 'original' ? 'attachment' : 'inline');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/file', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'shared'), 'attachment');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/preview', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const descriptor = describeAttachment(db, id, itemId, 'shared');
+      if (request.method === 'HEAD') return reply.send();
+      return descriptor;
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/view', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'shared'), 'inline');
+    },
+  });
+}
+``````
+
+#### File: `src/server/auth/sessions.ts`
+
+<!-- replay task=18 phase=implementation sha256=b525e2aeda0460de88babc30fe765f80a6700d36a4d67f7aeeb1448ccd464457 -->
+
+``````ts
+import { createHash, randomBytes } from 'node:crypto';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+
+/** Absolute expiry: 30 days after login (design §11.5). */
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface SessionUser {
+  userId: number;
+  username: string;
+}
+
+/** Only this hash is stored, so a database or backup never contains a usable session. */
+const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
+
+export function createSession(db: Db, userId: number, now: Date = new Date()): { token: string; expiresAt: Date } {
+  const token = randomBytes(32).toString('base64url');
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(
+    hashToken(token),
+    userId,
+    now.toISOString(),
+    expiresAt.toISOString(),
+  );
+  return { token, expiresAt };
+}
+
+/** Read-only: used on every request, including GET, which must never write. */
+export function findSessionUser(db: Db, token: string, now: Date = new Date()): SessionUser | null {
+  const row = db
+    .prepare(
+      `SELECT u.id AS userId, u.username AS username, s.expires_at AS expiresAt
+       FROM sessions s JOIN users u ON u.id = s.user_id
+       WHERE s.token_hash = ? AND u.is_active = 1`,
+    )
+    .get(hashToken(token)) as { userId: number; username: string; expiresAt: string } | undefined;
+  if (!row || row.expiresAt <= now.toISOString()) return null;
+  return { userId: row.userId, username: row.username };
+}
+
+/** Call inside the final IMMEDIATE write transaction after asynchronous work. */
+export function requireCurrentSession(db: Db, token: string | undefined, expectedUserId: number, ownerOnly = false): SessionUser {
+  const user = token ? findSessionUser(db, token) : null;
+  if (!user || user.userId !== expectedUserId) throw new HttpError(401, 'unauthenticated');
+  if (ownerOnly && db.prepare('SELECT is_owner FROM users WHERE id = ?').pluck().get(user.userId) !== 1) {
+    throw new HttpError(403, 'owner_required');
+  }
+  return user;
+}
+
+export function deleteSession(db: Db, token: string): void {
+  db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
+}
+
+export function deleteUserSessions(db: Db, userId: number): number {
+  return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes;
+}
+
+export function deleteExpiredSessions(db: Db, now: Date = new Date()): number {
+  return db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now.toISOString()).changes;
+}
+``````
+
+#### File: `src/server/files/admission.ts`
+
+<!-- replay task=18 phase=implementation sha256=bd35816bca145958b518e9ba9fd4a2eccddb866dc79204b36b1f80f87a49e2d1 -->
+
+``````ts
+import type { FastifyRequest } from 'fastify';
+import { HttpError } from '../errors';
+import type { StorageCapacity, UploadReservation } from './capacity';
+import { discardStaged, publishFile } from './storage';
+import { parseUpload, type UploadEnvelope } from './uploads';
+
+/** Caller checks access before admission and rechecks session/permissions in its final write transaction. */
+export async function withUpload<T>(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments', capacity: StorageCapacity,
+  consume: (envelope: UploadEnvelope) => T | Promise<T>): Promise<T> {
+  let slot: UploadReservation;
+  try { slot = await capacity.reserve(request.headers['content-length']); }
+  catch (error) { request.raw.resume(); throw error; }
+  let envelope: UploadEnvelope | undefined;
+  let cleanupUncertain = false;
+  const cleanupFailed = () => { cleanupUncertain = true; slot.cleanupFailed(); };
+  try {
+    // Admission awaits the disk probe; an abort may precede multipart listeners.
+    if (request.raw.aborted || request.raw.destroyed) throw new HttpError(400, 'invalid_upload');
+    envelope = await parseUpload(request, filesDir, kind, { maxBodyBytes: slot.maxBodyBytes, cleanupFailed });
+    for (const file of Object.values(envelope.files)) await publishFile(filesDir, file, slot.retained);
+    return await consume(envelope);
+  } catch (error) {
+    if (['ENOSPC', 'EDQUOT'].includes((error as NodeJS.ErrnoException).code ?? '')) throw new HttpError(507, 'storage_capacity', undefined, { cause: error });
+    throw error;
+  } finally {
+    try {
+      if (envelope) await Promise.all(Object.values(envelope.files).map(file => discardStaged(file).catch(cleanupFailed)));
+    } finally {
+      slot.release();
+    }
+    if (cleanupUncertain) throw new HttpError(507, 'storage_capacity');
+  }
+}
+``````
+
+#### File: `src/server/files/routes.ts`
+
+<!-- replay task=18 phase=implementation sha256=d497312283040ff0ddced7066684cbd4526499c401ce689ed289f1e0f40fd74a -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { AttachmentPatch, PhotoPatch, PhotoVariantParam } from '../../domain';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { requireCurrentSession } from '../auth/sessions';
+import { SESSION_COOKIE } from '../http/guards';
+import { ItemParams, RecordItemParams } from '../http/params';
+import { requireUserId } from '../http/user';
+import { requireRecord } from '../records/store';
+import { deleteOccurrence, editOccurrence, listAttachments, listPhotos, saveUpload } from './occurrences';
+import { withUpload } from './admission';
+import type { StorageCapacity } from './capacity';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from './downloads';
+import { describeAttachment, resolveAttachmentView } from './previews';
+
+export function registerFileRoutes(app: FastifyInstance, db: Db, config: AppConfig, capacity: StorageCapacity): void {
+  app.get('/api/projects/:projectId/records/:id/attachments/:itemId/preview', { config: { privateResponse: true } }, async request => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    return describeAttachment(db, id, itemId, 'owner');
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/view', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'owner'), 'inline');
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/photos/:itemId/:variant', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+    requireRecord(db, projectId, id);
+    const target = resolvePhotoFile(db, id, itemId, variant);
+    await sendFile(request, reply, config.filesDir, target, variant === 'original' ? 'attachment' : 'inline');
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/file', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'owner'), 'attachment');
+  } });
+  for (const kind of ['photos', 'attachments'] as const) {
+    const url = `/api/projects/:projectId/records/:id/${kind}`;
+    app.post(url, { config: { multipart: true } }, async (request, reply) => {
+      const { projectId, id } = ItemParams.parse(request.params);
+      requireRecord(db, projectId, id);
+      const userId = requireUserId(request);
+      const result = await withUpload(request, config.filesDir, kind, capacity, envelope => db.transaction(() => {
+        requireCurrentSession(db, request.cookies[SESSION_COOKIE], userId, true);
+        return saveUpload(db, projectId, id, userId, kind, envelope);
+      }).immediate());
+      return reply.status(201).send(result);
+    });
+    app.get(url, async request => {
+      const { projectId, id } = ItemParams.parse(request.params);
+      requireRecord(db, projectId, id);
+      return kind === 'photos' ? listPhotos(db, id) : listAttachments(db, id);
+    });
+    app.patch(`${url}/:itemId`, async request => {
+      const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+      const patch = kind === 'photos' ? PhotoPatch.parse(request.body) : AttachmentPatch.parse(request.body);
+      return editOccurrence(db, projectId, id, itemId, requireUserId(request), kind, patch);
+    });
+    app.delete(`${url}/:itemId`, async request => {
+      const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+      deleteOccurrence(db, projectId, id, itemId, requireUserId(request), kind);
+      return { ok: true };
+    });
+  }
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/login-race.test.ts tests/server/upload-session-race.test.ts tests/server/files-api.test.ts tests/server/assigned-records.test.ts tests/server/storage-admission-api.test.ts`, then `npm run typecheck`. Expected: 45 tests in five files pass and TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/server/access/routes.ts' 'src/server/auth/sessions.ts' 'src/server/files/admission.ts' 'src/server/files/routes.ts' 'tests/server/upload-session-race.test.ts'
+git commit -m "fix: revalidate upload sessions under the final write lock"
+```
+
+## Task 19: Recognize long SVG preambles while streaming
+
+**Scratch checkpoint:** `bc846fd`. **Depends on:** Task 18.
+
+**Deliverable:** A bounded-memory UTF-8 prolog recognizer tolerates long declarations, comments and processing instructions across chunk boundaries. It runs independently of filename, preserves canonical MIME and occurrence capabilities, rejects wrong roots/unfinished prologs, and never expands entities or loads a DTD.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/media-preview.test.ts`
+
+<!-- replay task=19 phase=test sha256=fab321a614c2b017e12db8ec0318d0456c65ea10d401b7f8a516867e74b695ec -->
+
+``````ts
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { makeFixture, postRecord, recordUrl, forceStatus, type Fixture } from './record-fixture';
+import { addAttachment, PDF, JPEG, ZIP } from './file-fixture';
+import { send } from './helpers';
+let f: Fixture;
+let id: number;
+let token: string;
+beforeEach(async () => {
+  f = await makeFixture(); id = (await postRecord(f, { subtype: 'task', title: 'Media' })).id;
+  forceStatus(f, id, 'open');
+  const link = await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/share-links'), { label: 'Media reader' });
+  token = link.json().url.split('#')[1];
+});
+afterEach(async () => { await f.ctx.close(); });
+function read(file: number, suffix: string, audience: 'owner' | 'shared' = 'owner', method: 'GET' | 'HEAD' = 'GET', headers: Record<string,string> = {}) {
+  return f.ctx.app.inject({ method, url: audience === 'owner' ? recordUrl(f, id, `/attachments/${file}/${suffix}`) : `/api/shared/attachments/${file}/${suffix}`,
+    headers: { ...(audience === 'owner' ? {cookie:f.cookie} : {authorization:`Bearer ${token}`}), ...headers } });
+}
+it('describes and serves native PDF and image previews without exposing blob paths', async () => {
+  for (const [filename, bytes, kind] of [['a.pdf',PDF,'pdf'],['a.jpg',JPEG,'image']] as const) {
+    const file = await addAttachment(f,id,{},filename,bytes);
+    expect(file.capabilities).toMatchObject({kind,view:'native',download:true});
+    for (const audience of ['owner','shared'] as const) {
+      const descriptor = await read(file.id,'preview',audience);
+      expect(descriptor.statusCode).toBe(200);
+      expect(descriptor.json()).toMatchObject({id:file.id,capabilities:{kind,view:'native',download:true}});
+      expect(descriptor.body).not.toContain('hash');
+      const view = await read(file.id,'view',audience);
+      expect(view.statusCode).toBe(200);
+      expect(view.rawPayload).toEqual(bytes);
+      expect(view.headers['content-disposition']).toMatch(/^inline;/);
+      expect(view.headers['cache-control']).toBe('no-store');
+      expect(view.headers['content-security-policy']).toContain('sandbox');
+    }
+  }
+});
+it('streams single byte ranges, open ranges and suffix ranges for authorized originals and views', async () => {
+  const file = await addAttachment(f,id);
+  for (const audience of ['owner','shared'] as const) {
+    for (const suffix of ['file','view']) {
+      for (const [range,start,end] of [['bytes=1-4',1,4],['bytes=5-',5,PDF.length-1],['bytes=-3',PDF.length-3,PDF.length-1]] as const) {
+        const response = await read(file.id,suffix,audience,'GET',{range});
+        expect(response.statusCode).toBe(206);
+        expect(response.rawPayload).toEqual(PDF.subarray(start,end+1));
+        expect(response.headers['content-range']).toBe(`bytes ${start}-${end}/${PDF.length}`);
+        expect(response.headers['accept-ranges']).toBe('bytes');
+      }
+      const invalid = await read(file.id,suffix,audience,'GET',{range:'bytes=999999-'});
+      expect(invalid.statusCode).toBe(416);
+      expect(invalid.headers['content-range']).toBe(`bytes */${PDF.length}`);
+      expect((await read(file.id,suffix,audience,'HEAD',{range:'bytes=1-4'})).statusCode).toBe(200);
+      expect((await read(file.id,suffix,audience,'GET',{range:'bytes=1-4','if-range':'"old"'})).statusCode).toBe(200);
+    }
+  }
+});
+it('keeps document originals downloadable without offering native previews', async () => {
+  const file = await addAttachment(f,id,{},'a.docx',ZIP);
+  const descriptor = await read(file.id,'preview');
+  expect(descriptor.statusCode).toBe(200);
+  expect(descriptor.json().capabilities).toMatchObject({kind:'document',view:'download',download:true});
+  expect((await read(file.id,'view')).statusCode).toBe(415);
+  expect((await read(file.id,'file')).rawPayload).toEqual(ZIP);
+});
+it('checks current private, deleted, revoked and wrong-record state before every preview or byte range', async () => {
+  const log = (await send(f.ctx,f.cookie,'POST',recordUrl(f,id,'/log'),{text:'Private',private:true})).json();
+  const file = await addAttachment(f,id,{logEntryId:log.id});
+  for (const suffix of ['view','preview']) {
+    expect((await read(file.id,suffix,'shared','GET',{range:'bytes=0-1'})).json()).toEqual({error:'not_available'});
+    expect((await read(file.id,suffix)).statusCode).toBe(200);
+  }
+  await send(f.ctx,f.cookie,'PATCH',recordUrl(f,id,`/log/${log.id}`),{private:false});
+  expect((await read(file.id,'view','shared')).statusCode).toBe(200);
+  const other = await postRecord(f,{subtype:'task'});
+  const elsewhere = await addAttachment(f,other.id);
+  expect((await read(elsewhere.id,'preview','shared')).statusCode).toBe(404);
+  f.ctx.db.exec("UPDATE share_links SET revoked_at='2026-01-01'");
+  expect((await read(file.id,'view','shared')).statusCode).toBe(404);
+  await send(f.ctx,f.cookie,'DELETE',recordUrl(f,id,`/attachments/${file.id}`));
+  expect((await read(file.id,'preview')).statusCode).toBe(404);
+});
+it('preserves occurrence viewer policy when identical bytes were first uploaded under a download-only suffix', async () => {
+  const generic = await addAttachment(f,id,{},'evidence.txt',PDF);
+  const pdf = await addAttachment(f,id,{},'evidence.pdf',PDF);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+  expect((await read(generic.id,'preview')).json().capabilities.view).toBe('download');
+  expect((await read(generic.id,'view')).statusCode).toBe(415);
+  expect((await read(pdf.id,'view')).headers['content-type']).toBe('application/pdf');
+});
+it('offers a browser email reader descriptor and retains original bytes without server parsing', async () => {
+  const eml = Buffer.from('From: writer@example.test\r\nSubject: Site notes\r\n\r\nHello');
+  const file = await addAttachment(f,id,{},'notes.eml',eml);
+  for (const audience of ['owner','shared'] as const) {
+    expect((await read(file.id,'preview',audience)).json().capabilities).toMatchObject({kind:'email',view:'email',reader:'eml',download:true});
+    expect((await read(file.id,'file',audience)).rawPayload).toEqual(eml);
+    expect((await read(file.id,'view',audience)).statusCode).toBe(415);
+  }
+});
+it('serves media with an occurrence-specific player MIME and protects SVG document navigation', async () => {
+  const mp4 = Buffer.concat([Buffer.from([0,0,0,24]),Buffer.from('ftypisom'),Buffer.alloc(12),Buffer.from('synthetic media')]);
+  const video = await addAttachment(f,id,{},'clip.mp4',mp4);
+  const audio = await addAttachment(f,id,{},'clip.m4a',mp4);
+  expect((await read(video.id,'preview')).json().capabilities).toMatchObject({kind:'video',view:'native',mediaType:'video/mp4'});
+  expect((await read(audio.id,'view')).headers['content-type']).toBe('audio/mp4');
+  expect((await read(video.id,'view','shared','GET',{range:'bytes=8-11'})).rawPayload).toEqual(Buffer.from('isom'));
+  const svg = Buffer.from('<!--' + 'export comment '.repeat(500) + '--><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><image href="https://external.invalid/tracker"/></svg>');
+  const generic = await addAttachment(f,id,{},'vector.txt',svg);
+  const image = await addAttachment(f,id,{},'vector.svg',svg);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs WHERE content_type = ?').pluck().get('image/svg+xml')).toBe(1);
+  expect((await read(generic.id,'preview')).json().capabilities.view).toBe('download');
+  expect((await read(image.id,'preview')).json().capabilities).toMatchObject({kind:'image',view:'native'});
+  expect((await read(generic.id,'view')).statusCode).toBe(415);
+  const view = await read(image.id,'view','shared');
+  expect(view.headers['content-type']).toBe('image/svg+xml');
+  expect(view.headers['content-security-policy']).toContain("default-src 'none'");
+  expect(view.headers['content-security-policy']).toContain('sandbox');
+  expect(view.headers['x-content-type-options']).toBe('nosniff');
+});
+it('rejects invalid and multi ranges without returning file bytes, and clamps a valid long end', async () => {
+  const file = await addAttachment(f,id);
+  for (const range of ['bytes=-0','bytes=2-1','bytes=0-1,3-4','bytes=999999999999999999999-','nonsense']) {
+    const response = await read(file.id,'view','shared','GET',{range});
+    expect(response.statusCode).toBe(416);
+    expect(response.headers['content-range']).toBe(`bytes */${PDF.length}`);
+    expect(response.rawPayload).not.toEqual(PDF);
+  }
+  expect((await read(file.id,'view','owner','GET',{range:'bytes=0-999999'})).rawPayload).toEqual(PDF);
+});
+``````
+
+#### File: `tests/server/svg-stream.test.ts`
+
+<!-- replay task=19 phase=test sha256=377b4c684aec43d90795eb85cb0deac503a6a160241be3daefa625b64dcbbd60 -->
+
+``````ts
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { stageFile } from '../../src/server/files/storage';
+
+let dir: string;
+beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'bb-svg-')); });
+afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+const prolog = '\uFEFF<?xml version="1.0"' + ' '.repeat(2048) + '?>\n<!--' + 'drawing export '.repeat(300) + '-->\n<?tool exported?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "https://example.invalid/svg.dtd" [<!-- bracket [ and quote " and > stay inside comment --><?tool ] [ " ?><!ENTITY label "a > [ b">]>\n';
+const svg = Buffer.from(prolog + '<svg xmlns="http://www.w3.org/2000/svg"/>');
+it.each([1, 7, 511, 4096])('recognizes SVG beyond the signature prefix with %i-byte chunks and filename-independent MIME', async width => {
+  const chunks = () => Array.from({ length: Math.ceil(svg.length / width) }, (_, i) => svg.subarray(i * width, (i + 1) * width));
+  const generic = await stageFile(dir, Readable.from(chunks()), 'drawing.txt', 'attachment');
+  const image = await stageFile(dir, Readable.from(chunks()), 'drawing.svg', 'attachment');
+  expect(generic.contentType).toBe('image/svg+xml');
+  expect(image.contentType).toBe(generic.contentType);
+  expect(image.hash).toBe(generic.hash);
+});
+it.each([
+  '<!--' + 'x'.repeat(4096) + '--><html><svg/></html>',
+  '<!-- incomplete <svg/>', '<?xml version="1.0" <svg/>',
+  '<!-- bad -- comment --><svg/>', '<!DOCTYPE html><svg/>',
+  '<!DOCTYPE svg [<!ENTITY x "open>]><svg/>', '<svgish/>', '<SVG/>', '<svg/no>',
+  'not XML <svg/>', '<!garbage><svg/>',
+])('rejects wrong roots and malformed or unfinished SVG prologs (case %#)', async text => {
+  const bytes = Buffer.from(text);
+  await expect(stageFile(dir, Readable.from(Array.from(bytes, b => Buffer.from([b]))), 'drawing.svg', 'attachment'))
+    .rejects.toMatchObject({ statusCode: 415 });
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/svg-stream.test.ts tests/server/media-formats.test.ts tests/server/media-preview.test.ts`.
+
+Expected: eight cases fail before streaming recognition, covering legitimate long preambles and malformed declarations that the old prefix regex mishandled.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/server/files/formats.ts`
+
+<!-- replay task=19 phase=implementation sha256=1717552624850b45cfec2f483d48c05c86e26bb1ca320f2edb174cf172577972 -->
+
+``````ts
+import { extname } from 'node:path';
+import { ACCEPTED_ATTACHMENT_EXTENSIONS, type AttachmentCapabilities, type FilePurpose } from '../../domain';
+import { HttpError } from '../errors';
+import { hasSvgRoot } from './svg-prefix';
+
+/** Named positive vendor formats plus retained v1 formats. Storage acceptance is not document validation. */
+export const ATTACHMENT_EXTENSIONS = new Set(ACCEPTED_ATTACHMENT_EXTENSIONS);
+const extension = (filename: string) => extname(filename).slice(1).toLowerCase();
+const begins = (bytes: Buffer, hex: string) => bytes.subarray(0, hex.length / 2).equals(Buffer.from(hex, 'hex'));
+const native: Record<string, [AttachmentCapabilities['kind'], string, string]> = {};
+function formats(extensions: string, kind: AttachmentCapabilities['kind'], mediaType: string, canonical = mediaType): void {
+  for (const ext of extensions.split(' ')) native[ext] = [kind, mediaType, canonical];
+}
+formats('jpg jpeg jpe jfif','image','image/jpeg');
+formats('png','image','image/png');
+formats('heic heif','image','image/heic');
+formats('gif','image','image/gif');
+formats('bmp','image','image/bmp');
+formats('ico','image','image/x-icon');
+formats('webp','image','image/webp');
+formats('tif tiff','image','image/tiff');
+formats('svg','image','image/svg+xml');
+formats('pdf','pdf','application/pdf');
+formats('mp4','video','video/mp4','application/mp4');
+formats('mov','video','video/quicktime','application/mp4');
+formats('m4a','audio','audio/mp4','application/mp4');
+formats('webm','video','video/webm','application/x-ebml');
+formats('mkv','video','video/x-matroska','application/x-ebml');
+formats('avi','video','video/x-msvideo');
+formats('flv','video','video/x-flv');
+formats('mpeg','video','video/mpeg');
+formats('mp3','audio','audio/mpeg');
+formats('wav','audio','audio/wav');
+formats('ogg','audio','audio/ogg','application/ogg');
+
+function canonicalType(bytes: Buffer, svg: boolean): string {
+  if (begins(bytes,'ffd8ff')) return 'image/jpeg';
+  if (begins(bytes,'89504e470d0a1a0a')) return 'image/png';
+  if (/^GIF8[79]a/.test(bytes.toString('ascii',0,6))) return 'image/gif';
+  if (bytes.toString('ascii',0,2) === 'BM') return 'image/bmp';
+  if (begins(bytes,'00000100')) return 'image/x-icon';
+  if (begins(bytes,'49492a00') || begins(bytes,'4d4d002a')) return 'image/tiff';
+  if (bytes.toString('ascii',0,4) === 'RIFF') {
+    const subtype = bytes.toString('ascii',8,12);
+    if (subtype === 'WEBP') return 'image/webp';
+    if (subtype === 'WAVE') return 'audio/wav';
+    if (subtype === 'AVI ') return 'video/x-msvideo';
+  }
+  if (bytes.length >= 16 && bytes.toString('ascii',4,8) === 'ftyp') {
+    const size = bytes.readUInt32BE(0);
+    if (size >= 16 && size <= bytes.length && size % 4 === 0) {
+      const brands = [bytes.toString('ascii',8,12)];
+      for (let at=16; at<size; at+=4) brands.push(bytes.toString('ascii',at,at+4));
+      if (brands.some(brand => ['heic','heix','hevc','hevx'].includes(brand))) return 'image/heic';
+      return 'application/mp4';
+    }
+  }
+  if (begins(bytes,'1a45dfa3')) return 'application/x-ebml';
+  if (bytes.toString('ascii',0,3) === 'FLV') return 'video/x-flv';
+  if (begins(bytes,'000001ba') || begins(bytes,'000001b3')) return 'video/mpeg';
+  if (bytes.toString('ascii',0,3) === 'ID3' || (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0)) return 'audio/mpeg';
+  if (bytes.toString('ascii',0,4) === 'OggS') return 'application/ogg';
+  const text = bytes.toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  if (text.startsWith('%PDF-')) return 'application/pdf';
+  if (svg) return 'image/svg+xml';
+  if (text.startsWith('{\\rtf')) return 'application/rtf';
+  if (begins(bytes,'d0cf11e0a1b11ae1')) return 'application/x-cfb';
+  if (begins(bytes,'504b0304') || begins(bytes,'504b0506') || begins(bytes,'504b0708')) return 'application/zip';
+  return 'application/octet-stream';
+}
+
+/** Content-derived storage MIME stays identical when the same bytes have different allowed names. */
+export function detectFormat(bytes: Buffer, filename: string, purpose: FilePurpose, svg = hasSvgRoot(bytes)): string {
+  const ext = extension(filename);
+  const mime = canonicalType(bytes, svg);
+  if (purpose === 'attachment') {
+    if (!ATTACHMENT_EXTENSIONS.has(ext)) throw new HttpError(415,'unsupported_file_type');
+    const expected = native[ext]?.[2];
+    if (expected && expected !== mime) throw new HttpError(415,'unsupported_file_type');
+  } else {
+    const allowed = purpose === 'photo-original' ? ['image/jpeg','image/png','image/heic'] : ['image/jpeg'];
+    if (!allowed.includes(mime) || native[ext]?.[2] !== mime) throw new HttpError(415,'unsupported_file_type');
+  }
+  return mime;
+}
+
+/** A viewer is an attempt, not a codec guarantee. Every viewer must retain an original-download fallback. */
+export function attachmentCapabilities(filename: string, contentType: string): AttachmentCapabilities {
+  const ext = extension(filename);
+  if (ext === 'eml' || ext === 'msg') return {kind:'email',view:'email',reader:ext,download:true};
+  const entry = native[ext];
+  if (entry && entry[2] === contentType) return {kind:entry[0],view:'native',mediaType:entry[1],download:true};
+  return {kind:'document',view:'download',download:true};
+}
+``````
+
+#### File: `src/server/files/storage.ts`
+
+<!-- replay task=19 phase=implementation sha256=3e6049d6adb5c4537ae66f96d30ab1075fa89989dd9c6e89bb7fade187a3d4f3 -->
+
+``````ts
+import { createHash, randomBytes } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { link, mkdir, open, stat, unlink, type FileHandle } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import type { Readable } from 'node:stream';
+import { FILE_LIMITS, Filename, type FilePurpose } from '../../domain';
+import { HttpError } from '../errors';
+import { detectFormat } from './formats';
+import { SvgPrefix } from './svg-prefix';
+
+export interface StagedFile { path: string; hash: string; size: number; contentType: string }
+export function blobPath(filesDir: string, hash: string): string {
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('invalid_blob_hash');
+  return join(filesDir, hash.slice(0, 2), hash);
+}
+export async function discardStaged(staged: Pick<StagedFile, 'path'>): Promise<void> {
+  try { await unlink(staged.path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+}
+export async function stageFile(filesDir: string, source: Readable, filename: string, purpose: FilePurpose, onCleanupFailure?: () => void): Promise<StagedFile> {
+  let file: FileHandle | undefined;
+  let path: string | undefined;
+  try {
+    const name = Filename.parse(filename);
+    const tempDir = join(filesDir, '.tmp');
+    await mkdir(tempDir, { recursive: true });
+    const candidate = join(tempDir, randomBytes(24).toString('hex'));
+    file = await open(candidate, 'wx', 0o600);
+    path = candidate;
+    const hash = createHash('sha256');
+    let size = 0;
+    let prefix = Buffer.alloc(0);
+    const svg = new SvgPrefix();
+    for await (const chunk of source) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += bytes.length;
+      if (size > FILE_LIMITS[purpose]) throw new HttpError(413, 'upload_too_large');
+      if (prefix.length < 512) prefix = Buffer.concat([prefix, bytes.subarray(0, 512 - prefix.length)]);
+      svg.write(bytes);
+      hash.update(bytes);
+      for (let offset = 0; offset < bytes.length;) {
+        const result = await file.write(bytes, offset, bytes.length - offset);
+        if (result.bytesWritten === 0) throw new Error('file_write_incomplete');
+        offset += result.bytesWritten;
+      }
+    }
+    if ((source as Readable & { truncated?: boolean }).truncated) throw new HttpError(413, 'upload_too_large');
+    if (size === 0) throw new HttpError(415, 'unsupported_file_type');
+    const contentType = detectFormat(prefix, name, purpose, svg.isSvg);
+    await file.sync();
+    await file.close();
+    file = undefined;
+    return { path, hash: hash.digest('hex'), size, contentType };
+  } catch (error) {
+    source.destroy();
+    // Try both cleanup operations even if close itself fails; retain the original error.
+    if (file) await file.close().catch(() => onCleanupFailure?.());
+    if (path) await discardStaged({ path }).catch(() => onCleanupFailure?.());
+    throw error;
+  }
+}
+export async function publishFile(filesDir: string, staged: StagedFile, onRetained?: (file: StagedFile) => void): Promise<void> {
+  const destination = blobPath(filesDir, staged.hash);
+  const dir = dirname(destination);
+  await mkdir(dir, { recursive: true });
+  try { await link(staged.path, destination); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    if ((await stat(destination)).size !== staged.size) throw new Error('blob_collision');
+    const hash = createHash('sha256');
+    for await (const chunk of createReadStream(destination)) hash.update(chunk);
+    if (hash.digest('hex') !== staged.hash) throw new Error('blob_collision');
+  }
+  // Charge retained bytes before sync or cleanup can fail. Database rollback never removes this blob.
+  onRetained?.(staged);
+  if (process.platform !== 'win32') {
+    // Persist newly created directory entries as well as the published file entry.
+    for (const path of [dirname(filesDir), filesDir, dir]) {
+      const handle = await open(path, 'r');
+      try { await handle.sync(); } finally { await handle.close(); }
+    }
+  }
+  await discardStaged(staged);
+}
+``````
+
+#### File: `src/server/files/svg-prefix.ts`
+
+<!-- replay task=19 phase=implementation sha256=a86f5accd3a6fd1ba80124f1bcacc893cf2e33e35f2091cb1a3d618227b4b058 -->
+
+``````ts
+/** UTF-8 XML prolog recognition only, not document validation. Constant memory;
+ * no decoding of entities, DTD loading, or buffering of comments/declarations.
+ * Once the first root is identified, the rest of the file is not inspected.
+ */
+export class SvgPrefix {
+  private state = 'start';
+  private token = '';
+  private quote = 0;
+  private depth = 0;
+  private declared = false;
+  private returnState = 'space';
+  private result: boolean | undefined;
+
+  get isSvg(): boolean { return this.result === true; }
+
+  write(bytes: Uint8Array): void {
+    for (const byte of bytes) {
+      if (this.result !== undefined) break;
+      this.consume(byte);
+    }
+  }
+
+  private consume(b: number): void {
+    const c = String.fromCharCode(b);
+    const whitespace = b === 32 || b === 9 || b === 10 || b === 13;
+    const fail = () => { this.result = false; };
+    switch (this.state) {
+      case 'start':
+        this.state = b === 0xef ? 'bom2' : 'space';
+        if (b !== 0xef) this.consume(b);
+        break;
+      case 'bom2': if (b === 0xbb) this.state = 'bom3'; else fail(); break;
+      case 'bom3': if (b === 0xbf) this.state = 'space'; else fail(); break;
+      case 'space': if (b === 60) this.state = 'open'; else if (!whitespace) fail(); break;
+      case 'open':
+        this.token = '';
+        this.returnState = 'space';
+        if (b === 33) this.state = 'bang';
+        else if (b === 63) this.state = 'piTarget';
+        else { this.state = 'root'; this.consume(b); }
+        break;
+      case 'bang':
+        this.token += c;
+        if (this.token === '--') this.state = 'comment';
+        else if (this.token === 'DOCTYPE' && !this.declared) { this.state = 'doctypeSpace'; this.declared = true; }
+        else if (!'--'.startsWith(this.token) && !'DOCTYPE'.startsWith(this.token)) fail();
+        else if (this.token.length >= 7) fail();
+        break;
+      case 'comment': if (b === 45) this.state = 'commentDash'; break;
+      case 'commentDash': this.state = b === 45 ? 'commentEnd' : 'comment'; break;
+      case 'commentEnd': if (b === 62) this.state = this.returnState; else fail(); break;
+      case 'piTarget':
+        if (/[A-Za-z_:]/.test(c)) this.state = 'piName'; else fail();
+        break;
+      case 'piName':
+        if (whitespace) this.state = 'pi';
+        else if (b === 63) this.state = 'piEnd';
+        else if (!/[A-Za-z0-9_.:-]/.test(c)) fail();
+        break;
+      case 'pi': if (b === 63) this.state = 'piEnd'; break;
+      case 'piEnd': this.state = b === 62 ? this.returnState : b === 63 ? 'piEnd' : 'pi'; break;
+      case 'doctypeSpace':
+        if (whitespace) { this.token = ''; this.state = 'doctypeName'; } else fail();
+        break;
+      case 'doctypeName':
+        if (whitespace && !this.token) break;
+        if (whitespace || b === 91 || b === 62) {
+          if (this.token !== 'svg') { fail(); break; }
+          this.state = 'doctype'; this.consume(b);
+        } else { this.token += c; if (!'svg'.startsWith(this.token)) fail(); }
+        break;
+      case 'doctype':
+        if (this.quote) { if (b === this.quote) this.quote = 0; break; }
+        if (b === 34 || b === 39) this.quote = b;
+        else if (b === 60) this.state = 'doctypeOpen';
+        else if (b === 91) this.depth++;
+        else if (b === 93) { if (!this.depth) fail(); else this.depth--; }
+        else if (b === 62 && this.depth === 0) this.state = 'space';
+        break;
+      case 'doctypeOpen':
+        this.returnState = 'doctype';
+        if (b === 63) this.state = 'piTarget';
+        else if (b === 33) this.state = 'doctypeBang';
+        else { this.state = 'doctype'; this.consume(b); }
+        break;
+      case 'doctypeBang':
+        if (b === 45) this.state = 'doctypeDash';
+        else { this.state = 'doctype'; this.consume(b); }
+        break;
+      case 'doctypeDash': if (b === 45) this.state = 'comment'; else fail(); break;
+      case 'root':
+        if (whitespace || b === 62 || b === 47) {
+          if (this.token !== 'svg') fail();
+          else if (b === 47) this.state = 'rootSlash';
+          else this.result = true;
+        } else { this.token += c; if (!'svg'.startsWith(this.token)) fail(); }
+        break;
+      case 'rootSlash': this.result = b === 62; break;
+    }
+  }
+}
+
+export function hasSvgRoot(bytes: Uint8Array): boolean {
+  const scanner = new SvgPrefix();
+  scanner.write(bytes);
+  return scanner.isSvg;
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/svg-stream.test.ts tests/server/media-formats.test.ts tests/server/media-preview.test.ts`, then `npm run typecheck`. Expected: 45 tests in three files pass and TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/server/files/formats.ts' 'src/server/files/storage.ts' 'src/server/files/svg-prefix.ts' 'tests/server/media-preview.test.ts' 'tests/server/svg-stream.test.ts'
+git commit -m "fix: recognize long SVG prologs while streaming uploads"
+```
+
 ## Implementation closeout
 
 - [ ] Run the entire suite and TypeScript check after the final task. Record actual implementation commits and counts. Run `git diff --check`.
@@ -16248,12 +17400,15 @@ Current named integration checks: `getRecordDetail`, `listOptions`, `listMeasure
 
 ## Replay and review evidence
 
-On 2026-10-03 the complete code blocks were replayed incrementally in a separate disposable checkout. The earlier Tasks 1–14 passed 365 tests in 47 files. The external-review follow-up added Tasks 15–16 and corrected the Task 14 handoff. Each changed runtime task failed its new assertions before implementation, then passed its focused tests and TypeScript check. The real-network tests initially passed against the existing parser; no artificial parser failure was introduced.
+On 2026-10-03 the complete code blocks were replayed incrementally in a separate disposable checkout. The earlier Tasks 1–14 passed 365 tests in 47 files. The first external-review follow-up added Tasks 15–16 and corrected the Task 14 handoff, reaching 393 tests in 50 files. The subsequent authorization/SVG review added Tasks 17–19 and clarified that handoff again. Each changed runtime task failed its new assertions before implementation, then passed its focused tests and TypeScript check. The real-network tests initially passed against the existing parser; no artificial parser failure was introduced.
 
-**Final independent replay:** checkpoint `52b24cb` passed `npm test -- --reporter=dot`: **393 tests in 50 files**. `npm run typecheck` passed. Final source, tests, scripts, configuration and handoff documents match authoring checkpoint `4d2c0b1`, ignoring line endings. Every task's exact staging paths and commit commands were checked. Code-block SHA-256 values are verified against the final replay files. This is planning evidence; the product on main remains the Plan 3 baseline.
+**Final independent replay:** checkpoint `d79ddec` passed `npm test -- --reporter=dot`: **423 tests in 53 files**. `npm run typecheck` passed. Final source, tests, scripts, configuration and handoff documents match authoring checkpoint `5e6b347`, ignoring line endings. Every task's exact staging paths and commit commands were checked. Code-block SHA-256 values are verified against the final replay files. This is planning evidence; the product on main remains the Plan 3 baseline.
 
 Review follow-up dispositions:
 
+- Login race: second-connection owner/contributor resets and contributor disable were reproduced after password verification. Task 17 keeps hashing outside the write lock, then atomically rechecks identity, active state and the exact verified hash and inserts the session under an IMMEDIATE transaction. Stale verification returns 401 without a new session or cookie.
+- Upload race: Task 18 rechecks the actual session token in the final IMMEDIATE transaction for both owner and contributor uploads, with current role/grant checks. Tests cover photo/attachment logout, reset, expiry and deactivation, unchanged record timestamps/activity on denial, and second-connection proof that the write lock precedes the live-session read. Published orphan bytes retain the existing immutable-storage treatment.
+- SVG compatibility: Task 19 replaces the 512-byte-root assumption with bounded-memory UTF-8 prolog recognition for every staged file, independently of filename. Tests cover long declarations/comments, one-byte and other chunk boundaries, DTD quoted/comment/PI content, malformed/unfinished prologs and wrong roots, plus same-byte deduplication and occurrence-specific viewing. It neither expands entities nor fetches DTDs and does not claim full XML validation or encoding conversion. Existing sandbox/viewer safeguards remain in place.
 - The owner chose a configurable total managed-file budget and free-space reserve, with no per-user quota and no deletion of published blobs. Task 16 counts retained orphan/stale files and concurrent reservations. Production values remain a Plan 6 deployment decision against the actual account allowance; there are no defaults.
 - Diagnostic logging exposes only static allowlisted categories/codes, never arbitrary error names, messages, paths or stacks. Tests reproduced and fixed Pino's raw-message fallback and preserved wrapped filesystem diagnostics.
 - Six real loopback HTTP cases cover normal and exactly-100-MB uploads, streamed overflow with readable 413, declared oversize, interrupted staging and disconnect while the disk-space check is pending. Independent review reproduced a reservation leak in that last timing window; the permanent regression failed with 507 before the fix and passed afterwards. A final test correction explicitly closes replacement listeners.
@@ -16261,7 +17416,7 @@ Review follow-up dispositions:
 - The browser handoff forbids original-upload Blob navigation/document embedding, protects shared SVG via rasterisation, and requires a reviewed PDF rendering path. Office macros and archives remain download-only under the approved format policy. Optional task restructuring was deferred; the corrected execution order remains explicit.
 - The design document now uses consistent LF line endings. Restore rules disable contributors, clear grants and require deliberate password reset before enabling restored access.
 
-Independent security review found no remaining actionable issue after the fixes. It checked owner-default authorization, public projections, occurrence-level privacy, session/grant rechecks, safe diagnostics, native MIME/SVG/ranges/HEAD, whole-request limits and storage reservation lifecycle. No further code or test changes were requested.
+Independent security review found no remaining actionable issue after the fixes. It checked owner-default authorization, public projections, occurrence-level privacy, atomic login/reset behavior, owner/contributor session/grant rechecks, streaming SVG recognition, safe diagnostics, native MIME/SVG/ranges/HEAD, whole-request limits and storage reservation lifecycle. No further code or test changes were requested.
 
 The browser email-parser probe passed its pinned browser-target build and isolated synthetic EML/MSG assertions with zero attempted network requests. Source and reproducible commands remain in [the research fixture](../research/fixtures/2026-10-03-email-viewer-probe). This establishes parser feasibility, not completed browser UI or guaranteed 100 MB email decoding on every phone.
 
@@ -16278,3 +17433,5 @@ Remaining execution checks: browser viewers/HEIC/cancellation, Blob navigation p
 
 
 - [MDN Blob URLs](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/blob) and [SVG image restrictions](https://developer.mozilla.org/en-US/docs/Web/SVG/Guides/SVG_as_an_image): Blob URLs carry the creator origin, and SVG image-context restrictions do not apply to direct document navigation.
+
+- [W3C XML prolog and document type declaration](https://www.w3.org/TR/xml/#sec-prolog-dtd): declarations, comments and processing instructions may precede the root. The planned SVG recognizer screens this preamble without becoming a general XML validator or resolving entities.
