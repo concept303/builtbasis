@@ -31,11 +31,18 @@ describe('tags on records (design §9.3)', () => {
     expect((await getRecord(f, record.id)).tagIds).toEqual([f.tags.windows]);
   });
 
-  it('a rename applies to every record carrying the tag', async () => {
-    await postRecord(f, { subtype: 'task', tagIds: [f.tags.stone] });
-    await send(f.ctx, f.cookie, 'PATCH', tagUrl(f.tags.stone), { nameEn: 'Natural stone' });
+  it('a rename preserves tag membership and record update metadata', async () => {
+    const record = await postRecord(f, { subtype: 'task', tagIds: [f.tags.stone] });
+    const old = '2000-01-01T00:00:00.000Z';
+    const otherUser = f.ctx.db.prepare("INSERT INTO users (username, password_hash, created_at, updated_at) VALUES ('other', 'h', 't', 't')").run().lastInsertRowid;
+    f.ctx.db.prepare('UPDATE records SET updated_at = ?, updated_by = ? WHERE id = ?').run(old, otherUser, record.id);
+    const renamed = await send(f.ctx, f.cookie, 'PATCH', tagUrl(f.tags.stone), { nameEn: 'Natural stone' });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json()).toMatchObject({ id: f.tags.stone, nameEn: 'Natural stone' });
     const records = (await get(f.ctx, f.cookie, `${f.base}/records?tagId=${f.tags.stone}`)).json();
     expect(records.totals.count).toBe(1);
+    expect((await getRecord(f, record.id)).updatedAt).toBe(old);
+    expect(f.ctx.db.prepare('SELECT updated_by FROM records WHERE id = ?').pluck().get(record.id)).toBe(Number(otherUser));
   });
 });
 

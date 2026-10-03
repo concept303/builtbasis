@@ -13,10 +13,14 @@ afterEach(async () => {
 describe('records and the request rules (design §11.5)', () => {
   it('GET requests never write anything', async () => {
     const qi = await postRecord(f, { subtype: 'quality_issue', title: 'Jamb', problemTypes: ['defect'] });
-    await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/options'), { label: 'Grind' });
-    await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/measurement-sets'), { date: '2026-09-14', phase: 'before' });
-    await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/log'), { text: 'Seen on site' });
-    await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/transitions'), { to: 'open' });
+    const option = await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/options'), { label: 'Grind' });
+    expect(option.statusCode).toBe(201);
+    const measurement = await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/measurement-sets'), { date: '2026-09-14', phase: 'before' });
+    expect(measurement.statusCode).toBe(201);
+    const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/log'), { text: 'Seen on site' });
+    expect(log.statusCode).toBe(201);
+    const transition = await send(f.ctx, f.cookie, 'POST', recordUrl(f, qi.id, '/transitions'), { to: 'open' });
+    expect(transition.statusCode).toBe(200);
 
     const totalChanges = () => f.ctx.db.prepare('SELECT total_changes()').pluck().get();
     const before = totalChanges();

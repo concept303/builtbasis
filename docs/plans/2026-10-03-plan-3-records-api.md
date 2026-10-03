@@ -25,13 +25,13 @@ Task 3 refined `checkSelection` to verify project ownership for every submitted 
 
 No maintained specification exists yet. The maintained v1 specification and Architecture reconciliation remain Plan 6 work under the roadmap. The v1 design remains the implementation baseline and has not been marked Historical.
 
-Minor review suggestions remain pending final-review triage. These are test improvements, not reported implementation defects:
+Final review found no blockers or production defects. Three test improvements were applied: the verifier test now names only the inactive case it exercises; the tag-rename test checks the successful response, returned name and unchanged record update metadata; and the GET write-counter test checks all four setup responses before measuring writes.
 
-- Task 4: rename the verifier test because it currently exercises only the inactive case, despite naming the foreign-project case too.
-- Task 6: consider measurement-specific tests for a foreign measurer and retaining a retired measurer on PATCH. Shared reference helpers cover the rules.
-- Task 8: consider an explicit second-project exclusion assertion for list results and totals. The reviewed predicate is project-scoped.
-- Task 9: strengthen the rename integration assertion with the returned name and unchanged record metadata. Plan 2 already tests renaming.
-- Task 10: assert successful setup creation and transition responses before the GET write-counter check, so setup failure cannot leave empty collections unnoticed.
+The optional measurement API cases for a foreign measurer and retaining a retired measurer on PATCH remain deferred. Review confirmed the actual endpoints use the shared reference helper correctly. The optional second-project list/totals case also remains deferred because both SQL queries use the reviewed project-scoped predicate. Neither suggestion represents required work.
+
+The controller independently verified 237 tests across 29 files and a clean typecheck at `d754f38`. After the cleanup, `npm test` again passed all 237 tests across 29 files and `npm run typecheck` exited 0 without diagnostics. The affected files passed all 19 tests within that run: transitions-api 10, lists-with-records 7 and records-reads 2. No test cases or production changes were added.
+
+Execution retained the README install workaround, `npm ci --ignore-scripts` followed by `npm rebuild esbuild`, because ordinary installation attempted an unnecessary native SQLite rebuild. No dependency changes were made. Harmless blank-line differences in replacement examples were resolved by matching the actual code statements without depending on whitespace.
 
 **Goal:** The owner can create, read, update and list records of all three subtypes through the API, with every rule of design §4–§8 enforced by the server: required fields, subtype fields, status transitions with reasons and verification, decision options, measurements, Log, activity, must-be-done-before links, and the list's filters, search, sorting and totals.
 

@@ -106,7 +106,7 @@ describe('status changes (design §8)', () => {
     expect((await get(f.ctx, f.cookie, recordUrl(f, dc.id, '/verifications'))).json()).toEqual([]);
   });
 
-  it('rejects a verifier outside the project or no longer active', async () => {
+  it('rejects a verifier who is no longer active', async () => {
     const id = await qiReadyForVerification();
     const res = await move(id, { to: 'closed', verification: { ...verification(), checkedById: f.people.retired } });
     expect(res.statusCode).toBe(400);
