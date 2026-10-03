@@ -27,7 +27,7 @@ Hosted on Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.
 
 ## Boundaries
 
-- The implemented baseline has owner-only authentication. The approved Plan 4 revision adds named-user authentication and per-record grants for uploads and new public Log entries; this revision is planned, not yet implemented on main.
+- Plan 4 is implemented on main: named-user authentication and per-record grants allow uploads and new public Log entries. Browser screens for these capabilities are Plan 5 work.
 - The owner alone edits record fields, Notes and existing content. Anonymous share links stay read-only. Both contributor and share responses exclude private content.
 - The data folder (database, files, backups) is separate from the application folder and never touched by deployment.
 - All database access sits in `src/server` data-access modules.
