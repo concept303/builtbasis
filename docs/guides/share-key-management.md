@@ -1,8 +1,8 @@
 # Share-link key management and API handoff
 
 > **Document type:** Operational guide
-> **Status:** Active for the implemented Plan 4 backend, merged to `main` at `01a4477`; not deployed.
-> **Authority:** The approved v1 design defines scope. This guide documents the implemented key/account procedures and API contract, with browser and deployment work explicitly assigned to Plans 5–6.
+> **Status:** Active for the implemented Plan 4 backend and Plan 5 browser. Plan 4 is merged to `main` at `01a4477`; Plan 5 is not merged. Not deployed.
+> **Authority:** The approved v1 design defines scope. This guide documents the implemented key/account procedures and API contract, with deployment and release closeout assigned to Plan 6. See the [web interface guide](web-interface.md) for browser operation.
 > **Verified:** 2026-10-03 — implementation suite passed 423 tests across 53 files; TypeScript passed. Implementation range: `a442939..55da13a`.
 
 The application stores encrypted copies of share tokens so the owner can resend a link. The dedicated encryption key belongs in private server configuration. Losing or replacing it requires revoking existing links and issuing replacements.
@@ -50,7 +50,7 @@ Plan 6 verifies the real account allowance, selects both settings, monitors usag
 
 ## Named accounts and record grants
 
-These commands become available when Plan 4 is implemented. Run them against the intended `BUILTBASIS_DATA_DIR`. Account administration does not require a share-link encryption key.
+These commands are available. Run them against the intended `BUILTBASIS_DATA_DIR`. Account administration does not require a share-link encryption key.
 
 ```sh
 npm run owner -- owner "Project owner"
@@ -66,9 +66,9 @@ The owner selects an active contributor and grants access to individual records.
 
 The owner APIs list contributors and manage `/api/projects/:projectId/records/:id/grants`. Contributor access uses `/api/assigned-records`. Every request checks the current account and grant. Every upload, including the owner's, revalidates the actual session token and current role or grant in the same short IMMEDIATE transaction that commits its occurrence. Receiving and publishing file bytes happen before this transaction. Logout, password reset or expiry during that asynchronous work must prevent the evidence commit. Removing a grant or disabling an account stops subsequent access. Already delivered bytes cannot be recalled. Public share links remain read-only and never grant contributor permissions.
 
-Plan 5 supplies screens to display and select existing CLI-provisioned accounts, manage record grants, show separate Upload and Add Log controls, and follow assigned records. It does not imply an account-creation or password-management API. It must not infer one permission from the other. Current command/API availability and future screens must be labelled accurately during implementation.
+The browser supplies screens to display and select existing CLI-provisioned accounts, manage record grants, show separate Upload and Add Log controls, and follow assigned records. It does not imply an account-creation or password-management API. Neither permission implies the other.
 
-## Plan 5 evidence and viewer contract
+## Evidence and viewer contract
 
 The browser uploads one attachment or one photo bundle per request. A bundle supplies an original plus JPEG display and thumbnail copies. The entire multipart request body may contain at most **100,000,000 bytes**, including preamble, metadata, part headers, boundaries and epilogue. Original files share this budget with the other parts; do not advertise a 100 MB file plus overhead. Generated display and thumbnail copies remain limited to 5,000,000 and 500,000 bytes. The server counts actual streamed bytes and rejects oversize requests with 413, including chunked bodies.
 
@@ -82,13 +82,13 @@ GET file/view routes support one byte range, including suffix and open ranges. U
 
 ### Email reader
 
-EML/MSG upload and original download are part of Plan 4. Their readable preview is a Plan 5 browser feature. The descriptor identifies `reader: eml|msg`; the server does not parse the email or extract embedded attachments.
+EML/MSG upload and original download are part of Plan 4. Their readable preview is implemented in the browser. The descriptor identifies `reader: eml|msg`; the server does not parse the email or extract embedded attachments.
 
-Use the [synthetic email-viewer probe](../research/fixtures/2026-10-03-email-viewer-probe) as implementation evidence and a starting fixture. It verifies browser-target parser bundles, not a completed browser UI. The researched pins are postal-mime 4.0.2, @kenjiuno/msgreader 1.28.0 and htmlparser2 12.0.0. Plan 5 owns installation, integration and browser tests.
+The [synthetic email-viewer probe](../research/fixtures/2026-10-03-email-viewer-probe) records the earlier parser research. The delivered browser integrates postal-mime 4.0.2, @kenjiuno/msgreader 1.28.0 and htmlparser2 12.0.0. Its browser tests cover the integrated reader.
 
 Fetch the authorized original into a cancellable Worker. Transfer its ArrayBuffer rather than cloning it. Render a reviewed selection of headers and readable body text through escaped text/textContent. HTML-only messages use inert text extraction. Never insert email HTML into a live document or fetch remote images, styles or scripts. List embedded attachments and download selected bytes locally as cleaned-filename, application/octet-stream Blob downloads. Do not automatically preview or recursively parse them.
 
-Close/cancel must terminate the Worker and revoke Blob URLs. Malformed, encrypted, unsupported RTF-only or memory-constrained messages need an explicit unavailable-preview message and original download. A successful synthetic parser probe does not guarantee every 100 MB message can be decoded on a phone. Plan 5 must test parser failure, cancellation, encoded headers, embedded attachments, HTML-only messages and zero external fetches.
+Close/cancel must terminate the Worker and revoke Blob URLs. Malformed, encrypted, unsupported RTF-only or memory-constrained messages need an explicit unavailable-preview message and original download. A successful synthetic parser probe does not guarantee every 100 MB message can be decoded on a phone. Plan 5 browser tests cover parser failure, cancellation, encoded headers, embedded attachments, HTML-only messages and zero external fetches.
 
 ## Privacy and public-link browser contract
 
@@ -102,8 +102,10 @@ Only a successful public record GET updates view count and last-viewed time. HEA
 
 PDF generation reuses an owner-selected existing share URL and never creates a link on GET. Its QR code may contain that selected URL. Private content remains excluded from PDF as required by the design.
 
-The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented, verified and merged to main. Browser delivery and production deployment remain future work. No maintained specification exists to update at this stage; the approved design remains the requirements baseline until Plan 6 consolidates it.
+The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented, verified and merged to main. Plan 5 browser delivery is implemented and verified on its feature branch, with final integration review pending. Production deployment remains future work. No maintained specification exists to update at this stage; the approved design remains the requirements baseline until Plan 6 consolidates it.
 
 ## Verification evidence
+
+Plan 5 implementation verification on 2026-10-04 passed the browser build, TypeScript check, 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files. Desktop/phone screenshots and keyboard focus were inspected. Runtime commits are `b80dbcb` through `1e6bd06`; planning replay evidence is recorded separately in the [historical Plan 5](../plans/2026-10-04-plan-5-web-interface.md).
 
 The key-command integration test runs the same script entrypoint as `npm run shares:revoke-all` in a separate process, with a temporary working directory and database. It covers missing and replacement keys, aggregate safe output, retained activity counts and idempotent repeat runs. Crypto tests cover tampering, wrong key, wrong record, nonce uniqueness and authenticated but noncanonical plaintext. API tests cover owner guards, private projection, early rejection headers, occurrence access and explicit HEAD handling. The review follow-up also exercises real loopback HTTP requests, oversized chunked bodies and connection aborts. Server diagnostics use only recognized error categories and codes, with messages, stacks, paths and unrecognized error properties excluded.

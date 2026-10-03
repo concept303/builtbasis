@@ -1,14 +1,26 @@
 # Plan 5 — Web interface
 
 > **Document type:** Implementation plan
-> **Status:** In progress
-> **Retention:** Active execution instructions. Retain as historical evidence after implementation and documentation closeout.
+> **Status:** Completed
+> **Retention:** Historical execution evidence. Do not execute this plan again.
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §3, §5–10, §13, and the [Plan 4 browser contract](../guides/share-key-management.md).
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
-> **Implemented by:** Not implemented
-> **Verified:** Not yet verified as an implementation. Planning replay is recorded separately below.
+> **Implemented by:** Runtime commits `b80dbcb` through `1e6bd06` on `feat/plan-5-web-interface`, from base `e04189a`; documentation closeout in the following commit.
+> **Verified:** 2026-10-04 — build and typecheck passed; 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files passed. Documentation reconciled. Final integration review pending. Planning replay remains separate below.
 > **Merged to main:** Browser implementation not merged
-> **Checklist note:** Unchecked items are execution work. Authoring and replay do not complete them.
+> **Checklist note:** The original unchecked execution lists are preserved as history, not outstanding work. Tasks 1–6 are completed; final integration review remains pending before merge.
+
+## Actual implementation and closeout
+
+Tasks 1–6 were executed on 2026-10-04 in the isolated `feat/plan-5-web-interface` worktree from `e04189a`. Runtime delivery spans `b80dbcb` through `1e6bd06`. Task reviews 1–5 passed. Final integration review is pending; the branch is not merged or deployed.
+
+The implementation build and TypeScript check passed. The complete unit/API suite passed **464 tests across 64 files**. Installed Chrome passed **39 browser tests across 9 spec files** against the production build and isolated fixture servers. Desktop and phone screenshots, responsive overflow and visible keyboard focus were checked. This is actual implementation evidence, separate from the planning replay below. Task 1 preserved all 262 existing dependency resolutions. All 83 non-guide extracted payloads match the approved hashes.
+
+The [browser operator guide](../guides/web-interface.md) was extracted with the approved helper. Its only departure from the payload is the lifecycle status line, changed to Active for the delivered capability. That status-only reconciliation intentionally changes its hash. No embedded plan payload was altered. README, [Architecture](../ARCHITECTURE.md), the [access/evidence guide](../guides/share-key-management.md) and [roadmap](2026-10-02-v1-roadmap.md) now describe delivery. Documentation links and the scoped documentation whitespace check passed. No runtime changes or test reruns were needed for this closeout.
+
+No maintained Specification exists to update. A separate partial browser Specification is not warranted at this boundary because Plan 6 owns consolidation of the maintained v1 release Specification. The approved v1 design remains active. Architecture and the operating guides describe delivered structure and procedures; code and tests provide implementation evidence without becoming a normative Specification. Plan 6 retains A3/PDF printing, hosting/proxy/capacity/memory checks, deployment, backup/restore and drill, and final design reconciliation.
+
+The remaining sections preserve the approved execution instructions and planning evidence. Present/future-tense statements within that historical material describe its authoring state, not current delivery status.
 
 ## Outcome and boundary
 
@@ -4306,7 +4318,7 @@ All four findings were verified and corrected in the existing tasks, without cha
 
 The timestamp drift, enabled retry after a committed-but-lost response, Draft/inactive controls and rounded numeric display were reproduced before fixing them. A bounded independent review then checked the corrections and identified the XHR truncated-response gap; it was corrected and regression-tested before publication.
 
-The amended Markdown's **84 complete payloads** were extracted into a new checkout of `0cb7470`, with dependencies installed independently. That checkout has the same Plan 4 runtime baseline as `e27a535`. The complete unit/API and browser suites ran against these extracted files and the newly built production bundle. No source files or node_modules were copied from the authoring checkout. The browser suite finished with **39/39 passing**, including the eight new review regressions. All payload hashes were checked against the replayed files. Execution remains unstarted on main.
+The amended Markdown's **84 complete payloads** were extracted into a new checkout of `0cb7470`, with dependencies installed independently. That checkout has the same Plan 4 runtime baseline as `e27a535`. The complete unit/API and browser suites ran against these extracted files and the newly built production bundle. No source files or node_modules were copied from the authoring checkout. The browser suite finished with **39/39 passing**, including the eight new review regressions. All payload hashes were checked against the replayed files. At planning publication, execution remained unstarted on main.
 
 ### Original authoring replay retained for provenance
 
@@ -4339,7 +4351,7 @@ The initial PDF/static pins were replaced before the final replay. Task 1 now pi
 
 Vite reports a large-chunk warning. The main bundle is approximately 886 kB before gzip, with separately loaded PDF, HEIC and email workers. That warning is recorded rather than hidden. The replay proves the tested integrations and synthetic fixtures, not every possible codec, malformed document or 100 MB message on a phone. Original-download fallback remains part of the delivered behavior. Physical-device capacity and production hosting/proxy/memory/durability checks remain release work in Plan 6, together with printing, backup/restore and documentation closeout.
 
-The six execution tasks remain unchecked. Main still contains the Plan 4 runtime; this commit publishes the plan, helper and supporting documentation only.
+At planning publication, the six execution tasks remained unchecked and main contained the Plan 4 runtime. The publication commit contained the plan, helper and supporting documentation only. The preserved boxes are now historical; actual execution is recorded above.
 
 ## References checked during authoring
 
