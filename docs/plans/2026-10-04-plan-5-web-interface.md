@@ -1,7 +1,7 @@
 # Plan 5 — Web interface
 
 > **Document type:** Implementation plan
-> **Status:** Draft
+> **Status:** In progress
 > **Retention:** Active execution instructions. Retain as historical evidence after implementation and documentation closeout.
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §3, §5–10, §13, and the [Plan 4 browser contract](../guides/share-key-management.md).
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
