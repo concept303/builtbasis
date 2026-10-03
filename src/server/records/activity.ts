@@ -4,7 +4,7 @@ import { ItemParams } from '../http/params';
 import { requireProject } from '../lists/projects';
 import { requireRecord } from './store';
 
-export type ActivityAction = 'created' | 'field_changed' | 'status_changed';
+export type ActivityAction = 'created' | 'field_changed' | 'status_changed' | 'share_created' | 'share_revoked';
 
 export interface ActivityInput {
   recordId: number;

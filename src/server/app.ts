@@ -1,6 +1,6 @@
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { ZodError } from 'zod';
 import { DEFAULT_LOGIN_LIMITS, LoginLimiter } from './auth/login-limiter';
 import type { AppConfig } from './config';
@@ -17,6 +17,8 @@ import { registerRecordRoutes } from './records/routes';
 import { registerFileRoutes } from './files/routes';
 import { requireShareKey } from './sharing/crypto';
 import { reconcileShareKey } from './sharing/links';
+import { registerSharingRoutes } from './sharing/routes';
+import { safeLogger } from './http/logging';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 
@@ -25,14 +27,14 @@ export interface AppDeps {
   db: Db;
   /** Tests may pass their own limiter; the server uses the defaults. */
   limiter?: LoginLimiter;
-  logger?: boolean;
+  logger?: FastifyServerOptions['logger'];
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, db } = deps;
   requireShareKey(config.shareKey);
   const revokedLinks = reconcileShareKey(db, config.shareKey);
-  const app = Fastify({ logger: deps.logger ?? false, bodyLimit: 1024 * 1024 });
+  const app = Fastify({ logger: safeLogger(deps.logger), bodyLimit: 1024 * 1024 });
   if (revokedLinks > 0) app.log.info({ event: 'share_key_changed', revokedLinks });
   await app.register(cookie);
   await app.register(multipart);
@@ -54,7 +56,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
       return reply.status(statusCode).send({ error: 'bad_request' });
     }
-    request.log.error(error);
+    request.log.error({ event: 'internal_error' });
     return reply.status(500).send({ error: 'internal_error' });
   });
   app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));
@@ -69,5 +71,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerLocationRoutes(app, db);
   registerRecordRoutes(app, db);
   registerFileRoutes(app, db, config);
+  registerSharingRoutes(app, db, config);
   return app;
 }
