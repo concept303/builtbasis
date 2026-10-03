@@ -3218,7 +3218,7 @@ Query parameters of `GET /records` (all optional; several values of one filter a
 | `sort` | `id` (default), `due`, `priority`, `severity`, `updated` |
 | `dir` | `asc` or `desc`; default `asc`, except `updated` (`desc`). Empty values sort last either way. |
 
-- [ ] **Step 1: Write the failing test `tests/server/records-list.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/records-list.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3369,12 +3369,12 @@ describe('record list order and totals (design §10.2)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/records-list.test.ts`
 Expected: FAIL — all 10 tests fail with `list failed: 404 {"error":"not_found"}`: `GET /records` does not exist yet.
 
-- [ ] **Step 3: Create `src/server/records/list.ts`**
+- [x] **Step 3: Create `src/server/records/list.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -3602,7 +3602,7 @@ export function registerRecordListRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -3627,11 +3627,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/records-list.test.ts` → PASS (10 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/list.ts src/server/records/routes.ts tests/server/records-list.test.ts
