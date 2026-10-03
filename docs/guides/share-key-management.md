@@ -1,8 +1,8 @@
 # Share-link key management and API handoff
 
 > **Document type:** Operational guide
-> **Status:** Draft — proposed Plan 4 procedure; subject to implementation approval.
-> **Authority:** The approved v1 design remains the implementation baseline. Plan 4 decisions 11–12 remain proposed design clarifications/exceptions until separately approved and reconciled.
+> **Status:** Draft — approved Plan 4 scope; operational procedure awaits implementation and closeout.
+> **Authority:** The approved v1 design and reconciled Plan 4 decisions define scope. This guide describes the planned API and operational contract; scratch replay is not production implementation.
 
 The application stores encrypted copies of share tokens so the owner can resend a link. The dedicated encryption key belongs in private server configuration. Losing or replacing it requires revoking existing links and issuing replacements.
 
@@ -27,34 +27,82 @@ The command opens and migrates the configured database through the existing boot
 
 Startup also revokes all unrevoked links when the key fingerprint changes. Missing fingerprint state with existing links is treated as a change. Revocation and fingerprint replacement form one SQLite transaction. A failure rolls both back and prevents startup.
 
-Old link rows are retained. The owner sees `url:null` when a row was encrypted with an unavailable old key. A corrupt copy under the matching current key fails with `share_copy_failed`; it never yields a fabricated URL. Owner-requested revocation is idempotent and appends one activity entry. Administrative revocation emits only a safe aggregate event and does not fabricate an owner actor. That last behaviour is proposed design exception 12, not an independently approved change to design §5.12.
+Old link rows are retained. The owner sees `url:null` when a row was encrypted with an unavailable old key. A corrupt copy under the matching current key fails with `share_copy_failed`; it never yields a fabricated URL. Owner-requested revocation is idempotent and appends one activity entry. Administrative revocation emits only a safe aggregate event and does not fabricate an owner actor. This aggregate maintenance event does not invent a record author.
 
 ## Restore requirements for Plan 6
 
-Keep the application stopped throughout a restore. Restore the database and complete immutable file bytes together. Delete all sessions and revoke every share link before reopening access, even if the encryption key is unchanged. Restored links must never become usable merely because a backup predates their revocation.
+Keep the application stopped throughout a restore. Restore the database and complete immutable file bytes together. Delete all sessions and revoke every share link before reopening access, even if the encryption key is unchanged. Restored links must never become usable merely because a backup predates their revocation. Disable every non-owner account and delete all record grants before reopening access. A backup can restore previously disabled users, revoked grants and old passwords. The owner must reset each retained contributor password before enabling that account, then deliberately regrant record access. Enabling alone is insufficient.
 
 Backup enumeration must cover every hash in `blobs`, or at minimum all three photo references and all attachment references. Stored blobs are never deleted in v1, including completed unreferenced blobs left by a failed occurrence transaction. Exclude unpublished `.tmp` files and private configuration from backups. The key is preserved separately from backups.
 
-Reverse-proxy and Cloudflare rules must preserve `no-store` and avoid logging Authorization or request bodies. The application uses registered route patterns and controlled errors in its logs, but upstream logging policy remains deployment work. Validate the full 50 MB upload path, streaming memory use and Linux file/directory sync behaviour on hosting. Windows tests do not establish Linux crash durability. The recovery drill and production rollout remain Plan 6 work.
+Reverse-proxy and Cloudflare rules must preserve `no-store` and avoid logging Authorization or request bodies. The application uses registered route patterns and controlled errors in its logs, but upstream logging policy remains deployment work. Validate the full 100,000,000-byte multipart request-body path, including overhead, streaming memory use and Linux file/directory sync behaviour on hosting. Windows tests do not establish Linux crash durability. The recovery drill and production rollout remain Plan 6 work.
 
-## Plan 5 browser contract
+## Storage budget and free-space reserve
 
-The browser uploads one attachment or one photo bundle per request. A bundle supplies the original plus JPEG display and thumbnail copies. Original limits are 25,000,000 bytes, display 5,000,000, thumbnail 500,000, and attachment 50,000,000. The server checks streamed bytes and bounded format signatures. It does not decode images, convert HEIC, extract EXIF, execute Office documents or scan for malware. DWG is accepted only for the documented version signatures and is always downloaded as `application/octet-stream`.
+Before starting the HTTP app, set `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES` to explicit positive safe-integer byte counts. There are no production defaults. Offline account, seed and share-revocation commands may omit them. Choose the managed-file budget below the actual hosting-account allowance, leaving room for SQLite, backups and other account usage. The reserve is minimum filesystem space to keep available. A `statfs` probe does not report the shared-hosting account quota.
 
-EXIF extraction, explicit-offset date handling, HEIC decoding and fallback belong to the browser. Missing or ambiguous capture dates stay null. The server tests do not prove browser HEIC support. Owner screens must resolve created/updated login usernames too; current owner RecordDetail contains timestamps, while public payloads intentionally omit automatic login identities under proposed clarification 11.
+One HTTP process owns the upload directory in v1. Do not run multiple workers or write managed files externally while it runs. Startup inventories actual files, including unreferenced blobs and stale temporary files. New uploads reserve their declared complete request length, or the full 100,000,000 bytes when length is unknown, before staging. Concurrent reservations count together. Budget checks may conservatively reject a retry that would ultimately deduplicate; they do not promise capacity based on an unverified hash.
 
-Share URLs have the form `${publicOrigin}/share#${token}`. The `/share` shell reads the fragment locally and sends the token only in an Authorization bearer header. Fetch images and downloads through those authenticated APIs, create Blob object URLs for display/download, and revoke them after use. Do not place tokens in query strings, route parameters, redirects or image URLs. Greek is the default share-page language. The shell must send noindex and no-referrer and load no third-party scripts.
+Capacity refusal returns `507 storage_capacity`. Reads and login remain available when the budget is exhausted. Uncertain temporary-file cleanup blocks further uploads until an operator investigates and restarts; startup then recounts actual bytes. Published blobs are never deleted, including those whose occurrence transaction failed. There is no per-user quota or automatic garbage collection.
 
-Public JSON is constructed from reviewed field lists. It excludes Notes, Outside contract scope, estimated cost, private Logs and their attachments, login usernames, the record's internal ID, share metadata and storage paths/hashes. Referenced retired business people remain available as labels. Relationships expose only visible human IDs and titles and grant no access to another record.
+Plan 6 verifies the real account allowance, selects both settings, monitors usage and documents the capacity response. When full, raise the budget only after increasing or verifying available hosting capacity, or move storage through a separately planned operation. Do not delete retained evidence or files needed by historical backups. Filesystem checks are point-in-time observations; external disk use can still cause writes to fail. Keep the existing failure cleanup and safe diagnostics.
 
-Only a successful public record GET updates view count and last-viewed time. HEAD and all file reads are read-only. Each file request rechecks the link and current Log privacy by occurrence; identical bytes do not grant access to a private occurrence. Only display/thumbnail JPEGs are inline. Originals and every attachment, including PDF and DWG, use download disposition. Already delivered or in-flight authorised bytes cannot be recalled; subsequent requests recheck access.
+## Named accounts and record grants
+
+These commands become available when Plan 4 is implemented. Run them against the intended `BUILTBASIS_DATA_DIR`. Account administration does not require a share-link encryption key.
+
+```sh
+npm run owner -- owner "Project owner"
+npm run user -- create contractor "Contractor name"
+npm run user -- reset contractor
+npm run user -- disable contractor
+npm run user -- enable contractor
+```
+
+Create and reset prompt for a password twice in an interactive terminal. Passwords are never command arguments or piped input. Reset ends that account's sessions. Login verifies the password before acquiring the write lock, then rechecks the active account and unchanged verified hash and inserts the session atomically. A reset that commits first prevents a login based on the old verification. Disable blocks login and ends sessions. Enable requires a fresh login and leaves existing record grants in place. The contributor command cannot change the owner. A reset does not implicitly enable a disabled account.
+
+The owner selects an active contributor and grants access to individual records. A grant with both write permissions false provides read access. `canUpload` permits photos and attachments. `canAddLog` permits new public Log entries. Either permission can be enabled independently. Upload alone also permits a new attachment on an existing public Log entry of the same record. Creating a new entry with files needs both permissions. Contributors cannot add private entries, edit record fields, manage grants or change existing evidence. Draft records remain unavailable.
+
+The owner APIs list contributors and manage `/api/projects/:projectId/records/:id/grants`. Contributor access uses `/api/assigned-records`. Every request checks the current account and grant. Every upload, including the owner's, revalidates the actual session token and current role or grant in the same short IMMEDIATE transaction that commits its occurrence. Receiving and publishing file bytes happen before this transaction. Logout, password reset or expiry during that asynchronous work must prevent the evidence commit. Removing a grant or disabling an account stops subsequent access. Already delivered bytes cannot be recalled. Public share links remain read-only and never grant contributor permissions.
+
+Plan 5 supplies screens to display and select existing CLI-provisioned accounts, manage record grants, show separate Upload and Add Log controls, and follow assigned records. It does not imply an account-creation or password-management API. It must not infer one permission from the other. Current command/API availability and future screens must be labelled accurately during implementation.
+
+## Plan 5 evidence and viewer contract
+
+The browser uploads one attachment or one photo bundle per request. A bundle supplies an original plus JPEG display and thumbnail copies. The entire multipart request body may contain at most **100,000,000 bytes**, including preamble, metadata, part headers, boundaries and epilogue. Original files share this budget with the other parts; do not advertise a 100 MB file plus overhead. Generated display and thumbnail copies remain limited to 5,000,000 and 500,000 bytes. The server counts actual streamed bytes and rejects oversize requests with 413, including chunked bodies.
+
+`ACCEPTED_ATTACHMENT_EXTENSIONS` in `src/domain/files.ts` is the shared 145-extension catalog. Browser pickers reuse it. Storage-only Office, CAD/BIM, archive and specialist formats are screened by suffix and never executed or converted. DWG version signatures do not limit storage admission. Native-view formats receive content-based screening before selecting their response MIME. SVG preambles stream through a constant-memory UTF-8 recognizer, so long comments, declarations and processing instructions are not limited to the initial 512-byte prefix. The recognizer never expands entities or loads a DTD and is not full-document validation. Canonical MIME is independent of the occurrence filename. This is not document validation or malware scanning. The `.a` and `.mat` entries are intentionally download-only.
+
+EXIF extraction, explicit-offset date handling, HEIC decoding and fallback belong to the browser. Missing or ambiguous capture dates stay null. Photo bundles retain immutable original bytes. Server tests do not establish browser image-decoder support.
+
+Attachment collections expose `capabilities`, with a viewer kind, view mode, download fallback and optional media type or email reader. Authorized `/preview` returns the same descriptor. Authorized `/file` returns the original as a download. Authorized `/view` returns image, PDF, audio or video bytes inline. Unsupported view modes return `preview_unavailable`. Owner, shared and assigned-record routes enforce their own access before resolving the occurrence.
+
+GET file/view routes support one byte range, including suffix and open ranges. Unsatisfiable or unsupported multiple ranges return 416. HEAD ignores Range and opens no file stream. If-Range falls back to a full 200 response because this no-store API supplies no validator. Media playback remains dependent on browser/container/codec support. Keep a visible original-download option when decoding fails. Owner/contributor SVG viewers use the authorised server URL, whose sandbox CSP and nosniff remain attached to direct navigation. Never inject SVG source or embed it as an iframe/object. On bearer-only share pages, decode SVG as an image, draw it to canvas, then display a generated PNG. Never place the original SVG Blob URL in the DOM: even an img element offers browser navigation to the source. Revoke temporary source URLs; conversion failure falls back to original download.
+
+### Email reader
+
+EML/MSG upload and original download are part of Plan 4. Their readable preview is a Plan 5 browser feature. The descriptor identifies `reader: eml|msg`; the server does not parse the email or extract embedded attachments.
+
+Use the [synthetic email-viewer probe](../research/fixtures/2026-10-03-email-viewer-probe) as implementation evidence and a starting fixture. It verifies browser-target parser bundles, not a completed browser UI. The researched pins are postal-mime 4.0.2, @kenjiuno/msgreader 1.28.0 and htmlparser2 12.0.0. Plan 5 owns installation, integration and browser tests.
+
+Fetch the authorized original into a cancellable Worker. Transfer its ArrayBuffer rather than cloning it. Render a reviewed selection of headers and readable body text through escaped text/textContent. HTML-only messages use inert text extraction. Never insert email HTML into a live document or fetch remote images, styles or scripts. List embedded attachments and download selected bytes locally as cleaned-filename, application/octet-stream Blob downloads. Do not automatically preview or recursively parse them.
+
+Close/cancel must terminate the Worker and revoke Blob URLs. Malformed, encrypted, unsupported RTF-only or memory-constrained messages need an explicit unavailable-preview message and original download. A successful synthetic parser probe does not guarantee every 100 MB message can be decoded on a phone. Plan 5 must test parser failure, cancellation, encoded headers, embedded attachments, HTML-only messages and zero external fetches.
+
+## Privacy and public-link browser contract
+
+Public Notes are visible to contributors and public-link readers. Private Notes are owner-only. The owner edits both fields; contributors cannot change either. Contributor and public-link responses also exclude Outside contract scope, estimated cost, private Log entries and their attachments. Visible Log entries and uploads use human display names for attribution. Login usernames, automatic internal audit identities, share metadata and storage paths/hashes remain outside the shared projection. Referenced retired business people remain available as labels. Relationships expose visible human IDs and titles without granting access to another record.
+
+Share URLs have the form `${publicOrigin}/share#${token}`. The `/share` shell reads the fragment locally and sends the token only in an Authorization bearer header. Fetch images, viewer bytes and downloads through those APIs. Blob URLs are limited to suitable image/video/audio elements and explicit download links; never open them in a new tab or embed them as documents/frames. The original SVG exception follows the rasterisation rule above. Shared PDF viewing must use a data-fed renderer or another reviewed sandboxed mechanism. Disable PDF scripting and automatic external resources/actions; links and embedded attachments require deliberate user action. Revoke Blob URLs after use. Native player requests cannot add bearer headers directly; use authorized fetches rather than putting a share token in a player URL. Owner/contributor cookie routes use the authorised server URLs, preserving response headers and native ranged requests. Do not place tokens in queries, route parameters, redirects or image URLs. Greek is the default share-page language. The shell sends noindex and no-referrer and loads no third-party scripts.
+
+Only a successful public record GET updates view count and last-viewed time. HEAD, descriptors and all file reads are read-only. Each file request rechecks the link and current Log privacy by occurrence. Identical bytes never grant access to a private occurrence. State-changing session requests require the matching Origin. Upstream logs and caches must preserve these protections.
 
 ## Plan 6 PDF and documentation contract
 
 PDF generation reuses an owner-selected existing share URL and never creates a link on GET. Its QR code may contain that selected URL. Private content remains excluded from PDF as required by the design.
 
-The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and documentation closeout. Plan 4 and this guide remain Draft until implementation approval and closeout.
+The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and documentation closeout. Plan 4 and this guide remain Draft until execution and closeout. Approved scope and scratch verification do not mark a release implemented.
 
 ## Verification evidence
 
-The key-command integration test runs the same script entrypoint as `npm run shares:revoke-all` in a separate process, with a temporary working directory and database. It covers missing and replacement keys, aggregate safe output, retained activity counts and idempotent repeat runs. Crypto tests cover tampering, wrong key, wrong record, nonce uniqueness and authenticated but noncanonical plaintext. API tests cover owner guards, private projection, early rejection headers, occurrence access and explicit HEAD handling.
+The key-command integration test runs the same script entrypoint as `npm run shares:revoke-all` in a separate process, with a temporary working directory and database. It covers missing and replacement keys, aggregate safe output, retained activity counts and idempotent repeat runs. Crypto tests cover tampering, wrong key, wrong record, nonce uniqueness and authenticated but noncanonical plaintext. API tests cover owner guards, private projection, early rejection headers, occurrence access and explicit HEAD handling. The review follow-up also exercises real loopback HTTP requests, oversized chunked bodies and connection aborts. Server diagnostics use only recognized error categories and codes, with messages, stacks, paths and unrecognized error properties excluded.

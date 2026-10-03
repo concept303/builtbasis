@@ -1,8 +1,8 @@
 # BuiltBasis
 
-Lightweight construction-control application: quality issues, detail clarifications and tasks — with measurements, decisions, photos and read-only sharing — in English and Greek.
+Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–3 are complete. The server foundation and records API are implemented and merged to `main`. Plan 4 (files and sharing) is next (see roadmap).
+**Status:** Plans 0–3 are implemented and merged to `main`. Plan 4 covers files, sharing and named contributor access. Its scope is approved; its revised implementation plan remains pending execution and closeout. Scratch implementation and replay evidence do not change that status. Plan 5 supplies the browser screens and viewers.
 
 ## Local dependency installation
 
@@ -13,7 +13,17 @@ npm ci --ignore-scripts
 npm rebuild esbuild
 ```
 
-On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrectly attempted a SQLite source build despite the package declaring `gypfile: false`. The commands above were verified with all 155 tests and typechecking. Reassess install scripts when dependencies change.
+On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrectly attempted a SQLite source build despite the package declaring `gypfile: false`. Reassess install scripts when dependencies change. Use each completed plan's verification record for current test counts.
+
+## Planned access and evidence contract
+
+There is one owner and separately named contributor accounts. The owner grants access per record. Upload and Add Log are independent permissions. Contributors cannot edit record fields or either Notes field. Public Notes are visible to readers. Private Notes, commercial fields, private Log entries and their attachments remain owner-only. Both Notes fields are edited by the owner. Public share links remain read-only.
+
+Plan 4 adds interactive administrative commands to create, reset, disable and enable contributors. It adds grant APIs and assigned-record APIs. Plan 5 adds screens to display and select existing CLI-provisioned accounts, manage their record grants, and support contributor workflows. Account creation and password administration stay with the CLI. Display names identify contributors on visible evidence; login usernames are not public attribution.
+
+Uploads have a **100,000,000-byte total multipart request-body limit**, including metadata, part headers and boundaries. A file or photo original shares that budget with the rest of the request. Browser-generated photo display and thumbnail copies have separate 5,000,000 and 500,000-byte limits. The 145-extension catalog is exported by `src/domain/files.ts` for server validation and browser file pickers. Office, CAD/BIM and archive files are stored for download.
+
+Image, PDF, audio and video attachments have authorized native-view routes with download fallback. GET supports single byte ranges; HEAD returns headers without opening a file stream. Browser codec support still determines playback. EML/MSG viewing belongs to Plan 5's browser reader, using authorized original bytes. Plan 4 does not parse email on the server.
 
 ## Documentation
 
@@ -22,14 +32,18 @@ On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrect
 | [docs/VISION.md](docs/VISION.md) | What we are building and why |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System structure |
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
-| [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | **Full v1 design** — records, fields, value lists, rules, screens, operations. Basis for the spec and implementation plan. |
-| [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Implementation roadmap: the sequence of v1 plans and their status |
-| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Proposed Plan 4 key setup, administrative revocation and Plan 5/6 handoff |
-| [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research (non-authoritative input) |
+| [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
+| [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
+| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Planned key/account operations, access rules and Plan 5/6 handoff |
+| [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
+| [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research |
 
 Documentation follows `X:\1976KN\Dev\Code\DOCS-STANDARD.md` (v1.4).
-## Share-link key setup
 
-The proposed Plan 4 HTTP app requires `SHARE_LINK_KEY`, a dedicated random 32-byte key encoded as 64 hexadecimal characters. Store it in server configuration outside the repository, data directory and backups. Preserve it across deployments. Offline owner, seed and share-revocation commands permit an absent key.
+## Planned share-key setup
+
+Plan 4 requires `SHARE_LINK_KEY`, a dedicated random 32-byte key encoded as 64 hexadecimal characters. Store it in private server configuration outside the repository, data directory and backups. Preserve it across deployments. Offline owner, contributor, seed and share-revocation commands permit an absent key.
 
 After key loss or replacement, stop the application and run `npm run shares:revoke-all` against the intended data directory. Install a newly generated key in private configuration, restart, and issue replacement links. Startup also revokes unrevoked links when the key fingerprint changes. Never publish a key or put it in command logs.
+
+**Storage configuration for Plan 4:** HTTP startup requires explicit `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`. One upload-writing process enforces the total managed-file budget, concurrent reservations and the free-space reserve. No per-user quota or published-file deletion is added. Plan 6 chooses values against the actual hosting allowance and documents the capacity response.
