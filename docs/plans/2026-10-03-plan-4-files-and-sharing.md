@@ -35,7 +35,7 @@
 
 These fill implementation details left open by the design. They are proposals for this plan, not additional product features.
 
-1. **Share URL:** `${publicOrigin}/share#${token}`. Plan 5 reads the fragment and sends `Authorization: Bearer <token>` to the public API. No tokens in query strings, route parameters, image URLs or redirects. Shared images/downloads use authenticated fetch and browser object URLs. This keeps the token out of ordinary proxy request URLs. The `/share` page itself arrives in Plan 5; Plan 4 delivers its API.
+1. **Share URL:** `${publicOrigin}/share#${token}`. Plan 5 reads the fragment and sends `Authorization: Bearer <token>` to the public API. No tokens in query strings, route parameters, image URLs or redirects. Shared images/downloads use authenticated fetch and browser object URLs. Never open or frame an uploaded-content Blob URL, including in a new tab. Use Blob URLs only in image/video/audio elements or forced-download links; email content is parsed as inert data and rendered as escaped text. Shared PDF viewing must use a data-fed PDF renderer or another reviewed sandboxed route, never unsandboxed Blob navigation; disable document scripting and automatic external resources/actions. Owner and contributor views use authorised server URLs with protective response headers. For bearer-only SVG viewing, decode the source in an image context, draw it to canvas and display a generated PNG; never expose the original SVG Blob URL in the DOM, where the browser could offer Open image in new tab. Revoke temporary source URLs; conversion failure falls back to original download. This keeps the token out of ordinary proxy request URLs. The `/share` page itself arrives in Plan 5; Plan 4 delivers its API.
 2. **Upload unit:** one attachment, or one photo bundle, per request. A photo bundle contains exactly `original`, `display` and `thumbnail`. No batch protocol or replacement of bytes. Metadata can be edited separately.
 3. **Limits:** 100,000,000 bytes for the complete multipart request, including boundaries, metadata and all files. Original photos and attachments are bounded by that envelope. Generated JPEG display/thumbnail copies remain bounded at 5,000,000/500,000 bytes. Metadata JSON is at most 16,384 bytes. Streamed counts enforce the ceiling with or without Content-Length. The browser must account for envelope overhead; a 100 MB original plus metadata does not fit the 100 MB request ceiling.
 4. **Types and capabilities:** the revised explicit extension policy is defined in the attachment task below, using the combined documented vendor-supported formats. Images, PDFs, EML/MSG email, video and audio support upload, viewing/playback and download. Office documents, CAD/BIM and archives support upload/download. Bytes remain immutable; MIME and filenames are screened, not trusted. Format screening is not malware scanning. Email parsing and native media rendering are Plan 5 browser work, backed by Plan 4 authorised original/view APIs and a tested reader handoff. No server transcoder or CAD/Office viewer.
@@ -51,6 +51,8 @@ These fill implementation details left open by the design. They are proposals fo
 14. **Notes:** preserve the existing notes column as Private Notes. Add Public Notes with an empty/null initial value. Only owner record saves may change either; public projections include only Public Notes. Existing A3 Notes exclusions stay unchanged until Plan 6 layout review.
 15. **Account administration:** owner-controlled server commands provision/reset/disable/enable named users. Passwords use the existing limits/hashing and hidden prompts. Reset/disable ends that user's sessions; enabling requires a fresh login. The contributor command cannot replace/reset/disable the owner. The owner manages record grants through protected APIs; Plan 5 adds the controls. There is no self-signup or email-reset service. Plan 6 restore must disable all non-owner accounts and clear grants, followed by deliberate password resets, enable and regrant; deleting sessions alone cannot invalidate restored passwords.
 16. **New contributions:** contributors may upload new evidence and/or create public Log entries according to their grants. They cannot edit/delete existing content, change record fields/status, touch either Notes field or access private entries. Upload alone may append a new attachment to an accessible public Log entry on the granted record. Add Log is required to create new entry text; creating a new entry with files requires both grants. Existing text and attachments remain owner-editable only.
+
+17. **Storage admission:** the owner approved a configurable managed-file budget and physical free-space reserve, with no per-user quota and no published-file deletion. HTTP startup requires explicit positive byte values for `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`; offline commands can omit them. Inventory real retained files at startup, including orphan blobs and stale temporary files. Reserve in-flight capacity before staging; a request without Content-Length reserves the full 100 MB envelope. Return controlled `507 storage_capacity` on exhaustion while retaining reads/login. The single HTTP process owns the ledger and upload directory. Choose the file budget below the actual hosting allowance to leave space for the database, backups and other account use. A filesystem free-space probe is not a shared-hosting quota query or a guarantee against external writers.
 
 The owner selected a full-code plan with scratch replay, then approved the broader attachment capabilities, 100 MB request ceiling, named-user grants and two owner-edited Notes fields. The complete file blocks below implement the backend of that revised scope in a disposable scratch checkout. Astra Medium is an explicit owner instruction from this conversation and remains the execution preference.
 
@@ -72,6 +74,7 @@ Each item has a regression test in the named task.
 | `src/server/db/migration-0003-files-sharing.ts` | Blob, occurrence, share and key-state tables |
 | `src/server/files/storage.ts` | Stream staging, hashing, immutable publication and byte reads |
 | `src/server/files/formats.ts` | Bounded signature/extension checks and canonical content types |
+| `src/server/files/capacity.ts` | Actual retained-file accounting, in-flight reservations and free-space reserve |
 | `src/server/files/uploads.ts` | Multipart envelope parsing and cleanup |
 | `src/server/files/occurrences.ts` | Occurrence CRUD and metadata lists |
 | `src/server/files/routes.ts` | Owner upload, metadata, delete and download routes |
@@ -795,6 +798,8 @@ git commit -m "feat: store immutable content-addressed file bytes"
 **Scratch checkpoint:** `9832e62`. **Depends on:** Task 2.
 
 **Deliverable:** Real multipart uploads, metadata changes, private Log attachment cascade and atomic occurrence commits.
+
+**Before writing either dependency file:** repeat the mandatory dependency baseline command from Preflight. Tasks 1–2 do not change these files. A mismatch stops execution; reconcile and replay instead of overwriting changed dependencies.
 
 **Reviewed corrections:** the listed file blocks incorporate fixes from `40e6663` directly. Execute the corrected blocks below; do not reproduce the earlier defects.
 
@@ -14030,6 +14035,8 @@ git commit -m "feat: integrate contributor previews and independent log uploads"
 
 **Deliverable:** Final account, permission, attachment and viewer guidance; preserve the distinction between approved scope, planning replay and future product implementation.
 
+**Reviewed corrections:** the listed file blocks incorporate fixes from `1096350` directly. Execute the corrected blocks below; do not reproduce the earlier defects.
+
 - [ ] **Step 1: Write these complete test and fixture files.**
 
 This final documentation task adds no tests. Preserve the passing implementation tests.
@@ -14044,7 +14051,7 @@ Expected: existing command tests remain green; this task changes documentation o
 
 #### File: `README.md`
 
-<!-- replay task=14 phase=implementation sha256=2778af3b8b7da9a78a1bb69ed2658e591ae774826c91f4390860e210a7dd26cc -->
+<!-- replay task=14 phase=implementation sha256=afacc73cbc73fe342e292a5f2eadfd19918130aa1befd25d9d71c4f03a943420 -->
 
 ``````markdown
 # BuiltBasis
@@ -14094,11 +14101,13 @@ Documentation follows `X:\1976KN\Dev\Code\DOCS-STANDARD.md` (v1.4).
 Plan 4 requires `SHARE_LINK_KEY`, a dedicated random 32-byte key encoded as 64 hexadecimal characters. Store it in private server configuration outside the repository, data directory and backups. Preserve it across deployments. Offline owner, contributor, seed and share-revocation commands permit an absent key.
 
 After key loss or replacement, stop the application and run `npm run shares:revoke-all` against the intended data directory. Install a newly generated key in private configuration, restart, and issue replacement links. Startup also revokes unrevoked links when the key fingerprint changes. Never publish a key or put it in command logs.
+
+**Storage configuration for Plan 4:** HTTP startup requires explicit `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`. One upload-writing process enforces the total managed-file budget, concurrent reservations and the free-space reserve. No per-user quota or published-file deletion is added. Plan 6 chooses values against the actual hosting allowance and documents the capacity response.
 ``````
 
 #### File: `docs/guides/share-key-management.md`
 
-<!-- replay task=14 phase=implementation sha256=faa0f06933a9693210d91101b167bed5887a1846472183f12aabfa710f842d5e -->
+<!-- replay task=14 phase=implementation sha256=5f78af8626d279067669d5e9e9959988ce92f42e40ad850a1130ff6791bb095e -->
 
 ``````markdown
 # Share-link key management and API handoff
@@ -14140,6 +14149,16 @@ Backup enumeration must cover every hash in `blobs`, or at minimum all three pho
 
 Reverse-proxy and Cloudflare rules must preserve `no-store` and avoid logging Authorization or request bodies. The application uses registered route patterns and controlled errors in its logs, but upstream logging policy remains deployment work. Validate the full 100,000,000-byte multipart request-body path, including overhead, streaming memory use and Linux file/directory sync behaviour on hosting. Windows tests do not establish Linux crash durability. The recovery drill and production rollout remain Plan 6 work.
 
+## Storage budget and free-space reserve
+
+Before starting the HTTP app, set `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES` to explicit positive safe-integer byte counts. There are no production defaults. Offline account, seed and share-revocation commands may omit them. Choose the managed-file budget below the actual hosting-account allowance, leaving room for SQLite, backups and other account usage. The reserve is minimum filesystem space to keep available. A `statfs` probe does not report the shared-hosting account quota.
+
+One HTTP process owns the upload directory in v1. Do not run multiple workers or write managed files externally while it runs. Startup inventories actual files, including unreferenced blobs and stale temporary files. New uploads reserve their declared complete request length, or the full 100,000,000 bytes when length is unknown, before staging. Concurrent reservations count together. Budget checks may conservatively reject a retry that would ultimately deduplicate; they do not promise capacity based on an unverified hash.
+
+Capacity refusal returns `507 storage_capacity`. Reads and login remain available when the budget is exhausted. Uncertain temporary-file cleanup blocks further uploads until an operator investigates and restarts; startup then recounts actual bytes. Published blobs are never deleted, including those whose occurrence transaction failed. There is no per-user quota or automatic garbage collection.
+
+Plan 6 verifies the real account allowance, selects both settings, monitors usage and documents the capacity response. When full, raise the budget only after increasing or verifying available hosting capacity, or move storage through a separately planned operation. Do not delete retained evidence or files needed by historical backups. Filesystem checks are point-in-time observations; external disk use can still cause writes to fail. Keep the existing failure cleanup and safe diagnostics.
+
 ## Named accounts and record grants
 
 These commands become available when Plan 4 is implemented. Run them against the intended `BUILTBASIS_DATA_DIR`. Account administration does not require a share-link encryption key.
@@ -14170,7 +14189,7 @@ EXIF extraction, explicit-offset date handling, HEIC decoding and fallback belon
 
 Attachment collections expose `capabilities`, with a viewer kind, view mode, download fallback and optional media type or email reader. Authorized `/preview` returns the same descriptor. Authorized `/file` returns the original as a download. Authorized `/view` returns image, PDF, audio or video bytes inline. Unsupported view modes return `preview_unavailable`. Owner, shared and assigned-record routes enforce their own access before resolving the occurrence.
 
-GET file/view routes support one byte range, including suffix and open ranges. Unsatisfiable or unsupported multiple ranges return 416. HEAD ignores Range and opens no file stream. If-Range falls back to a full 200 response because this no-store API supplies no validator. Media playback remains dependent on browser/container/codec support. Keep a visible original-download option when decoding fails. Render SVG only as an image; never inject its source or use an iframe/object. SVG responses block scripts and external resources through CSP and nosniff.
+GET file/view routes support one byte range, including suffix and open ranges. Unsatisfiable or unsupported multiple ranges return 416. HEAD ignores Range and opens no file stream. If-Range falls back to a full 200 response because this no-store API supplies no validator. Media playback remains dependent on browser/container/codec support. Keep a visible original-download option when decoding fails. Owner/contributor SVG viewers use the authorised server URL, whose sandbox CSP and nosniff remain attached to direct navigation. Never inject SVG source or embed it as an iframe/object. On bearer-only share pages, decode SVG as an image, draw it to canvas, then display a generated PNG. Never place the original SVG Blob URL in the DOM: even an img element offers browser navigation to the source. Revoke temporary source URLs; conversion failure falls back to original download.
 
 ### Email reader
 
@@ -14186,7 +14205,7 @@ Close/cancel must terminate the Worker and revoke Blob URLs. Malformed, encrypte
 
 Public Notes are visible to contributors and public-link readers. Private Notes are owner-only. The owner edits both fields; contributors cannot change either. Contributor and public-link responses also exclude Outside contract scope, estimated cost, private Log entries and their attachments. Visible Log entries and uploads use human display names for attribution. Login usernames, automatic internal audit identities, share metadata and storage paths/hashes remain outside the shared projection. Referenced retired business people remain available as labels. Relationships expose visible human IDs and titles without granting access to another record.
 
-Share URLs have the form `${publicOrigin}/share#${token}`. The `/share` shell reads the fragment locally and sends the token only in an Authorization bearer header. Fetch images, viewer bytes and downloads through those APIs, create Blob URLs as needed, and revoke them after use. Native player requests cannot add bearer headers directly; use authorized fetches rather than putting a share token in a player URL. Owner/contributor cookie routes can use native ranged requests. Do not place tokens in queries, route parameters, redirects or image URLs. Greek is the default share-page language. The shell sends noindex and no-referrer and loads no third-party scripts.
+Share URLs have the form `${publicOrigin}/share#${token}`. The `/share` shell reads the fragment locally and sends the token only in an Authorization bearer header. Fetch images, viewer bytes and downloads through those APIs. Blob URLs are limited to suitable image/video/audio elements and explicit download links; never open them in a new tab or embed them as documents/frames. The original SVG exception follows the rasterisation rule above. Shared PDF viewing must use a data-fed renderer or another reviewed sandboxed mechanism. Disable PDF scripting and automatic external resources/actions; links and embedded attachments require deliberate user action. Revoke Blob URLs after use. Native player requests cannot add bearer headers directly; use authorized fetches rather than putting a share token in a player URL. Owner/contributor cookie routes use the authorised server URLs, preserving response headers and native ranged requests. Do not place tokens in queries, route parameters, redirects or image URLs. Greek is the default share-page language. The shell sends noindex and no-referrer and loads no third-party scripts.
 
 Only a successful public record GET updates view count and last-viewed time. HEAD, descriptors and all file reads are read-only. Each file request rechecks the link and current Log privacy by occurrence. Identical bytes never grant access to a private occurrence. State-changing session requests require the matching Origin. Upstream logs and caches must preserve these protections.
 
@@ -14198,12 +14217,12 @@ The approved v1 design remains active. Plan 6 still owns the maintained v1 speci
 
 ## Verification evidence
 
-The key-command integration test runs the same script entrypoint as `npm run shares:revoke-all` in a separate process, with a temporary working directory and database. It covers missing and replacement keys, aggregate safe output, retained activity counts and idempotent repeat runs. Crypto tests cover tampering, wrong key, wrong record, nonce uniqueness and authenticated but noncanonical plaintext. API tests cover owner guards, private projection, early rejection headers, occurrence access and explicit HEAD handling.
+The key-command integration test runs the same script entrypoint as `npm run shares:revoke-all` in a separate process, with a temporary working directory and database. It covers missing and replacement keys, aggregate safe output, retained activity counts and idempotent repeat runs. Crypto tests cover tampering, wrong key, wrong record, nonce uniqueness and authenticated but noncanonical plaintext. API tests cover owner guards, private projection, early rejection headers, occurrence access and explicit HEAD handling. The review follow-up also exercises real loopback HTTP requests, oversized chunked bodies and connection aborts. Server diagnostics use only recognized error categories and codes, with messages, stacks, paths and unrecognized error properties excluded.
 ``````
 
 #### File: `docs/plans/2026-10-02-v1-roadmap.md`
 
-<!-- replay task=14 phase=implementation sha256=fd3d89f554b0555b41e97fd4734108f00c0acbc748b7e6adcd4b9a878c0995ec -->
+<!-- replay task=14 phase=implementation sha256=fc8bed8a08661c037c549bcd0edf2ebf5eb7628f46d9d5a281424244382c673a -->
 
 ``````markdown
 # BuiltBasis v1 — Implementation Roadmap
@@ -14234,6 +14253,8 @@ v1 is delivered through sequential plans. Each plan produces working, tested sof
 **Plan 5 handoff:** Reuse the shared 145-extension catalog from `src/domain/files.ts`. The 100,000,000-byte upload limit covers the whole multipart request, so UI help must include overhead and photo copies. Consume capability descriptors and authorized original/view endpoints. Native browser codecs decide image/media decoding. EML/MSG parsing stays in a cancellable browser Worker with escaped headers/text and local embedded attachment downloads. The [synthetic browser-parser probe](../research/fixtures/2026-10-03-email-viewer-probe) supplies fixtures and build evidence; it is not completed viewer UI. Grant screens select existing CLI-provisioned accounts and expose Upload and Add Log independently. Public Notes are visible to readers; Private Notes remain owner-only. Only the owner edits either field. Account creation and password administration remain CLI operations.
 
 **Plan 6 handoff:** Verify the full upload budget and streaming behavior behind Cloudflare, range/HEAD behavior, private/no-store responses and Linux durability on hosting. Restore revokes every session and share link before access reopens. Restore also disables all non-owner accounts and clears every record grant. Before restoring contributor access, the owner resets passwords, enables selected accounts and grants records again. Include these rules in the restore drill. Complete the browser, operational and documentation checks before marking the release delivered.
+
+**Storage configuration for Plan 4:** HTTP startup requires explicit `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`. One upload-writing process enforces the total managed-file budget, concurrent reservations and the free-space reserve. No per-user quota or published-file deletion is added. Plan 6 chooses values against the actual hosting allowance and documents the capacity response.
 ``````
 
 - [ ] **Step 4: Verify the completed task.**
@@ -14247,6 +14268,1963 @@ git add 'README.md' 'docs/guides/share-key-management.md' 'docs/plans/2026-10-02
 git commit -m "docs: reconcile accounts attachments and browser handoff"
 ```
 
+## Task 15: Preserve safe diagnostics and verify real HTTP uploads
+
+**Scratch checkpoint:** `c4125c9`. **Depends on:** Task 14.
+
+**Deliverable:** Allowlisted error categories/codes, protection against Pino message fallback, diagnostic causes for controlled server failures, and real loopback streaming/overflow/disconnect regression tests.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/share-logging.test.ts`
+
+<!-- replay task=15 phase=test sha256=c45fb980436b6f0750c8eece0bcda6023028070d2ca92a4d2da3bc69f367dc02 -->
+
+``````ts
+import { Writable } from 'node:stream';
+import * as fsPromises from 'node:fs/promises';
+import { expect, it, vi } from 'vitest';
+import { buildApp } from '../../src/server/app';
+import { addAttachment } from './file-fixture';
+import { get, send } from './helpers';
+import { makeFixture, postRecord, recordUrl } from './record-fixture';
+
+vi.mock('node:fs/promises', async importOriginal => ({ ...await importOriginal<typeof import('node:fs/promises')>() }));
+
+it('logs route patterns and controlled errors without URLs, credentials, parameters or response tokens', async () => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  try {
+    const record = await postRecord(f, { subtype: 'task' });
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    f.ctx.app.get('/api/probe/:value', async () => { throw new Error('SECRET_THROWN_MESSAGE'); });
+    const create = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/share-links'), { label: 'SECRET_LABEL' });
+    expect(create.statusCode).toBe(201);
+    const token = create.json().url.split('#')[1];
+    await get(f.ctx, f.cookie, recordUrl(f, record.id, '/share-links'));
+    await f.ctx.app.inject({ method: 'GET', url: `/api/probe/SECRET_PARAMETER?token=${token}`, headers: { cookie: f.cookie, authorization: `Bearer ${token}` } });
+    await f.ctx.app.inject({ method: 'GET', url: `/unknown/${token}?session=SECRET_QUERY`, headers: { authorization: `Bearer ${token}` } });
+    await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, record.id, '/share-links'), headers: { cookie: f.cookie, origin: `https://${token}.example` }, payload: { label: token } });
+    await f.ctx.app.close();
+    expect(captured).toContain('/api/projects/:projectId/records/:id/share-links');
+    expect(captured).toContain('/api/probe/:value');
+    expect(captured).toContain('<unmatched>');
+    expect(captured).toContain('internal_error');
+    for (const secret of [token, f.cookie.split('=')[1]!, 'SECRET_PARAMETER', 'SECRET_THROWN_MESSAGE', 'SECRET_QUERY', 'SECRET_LABEL']) expect(captured).not.toContain(secret);
+  } finally { await f.ctx.close(); }
+});
+
+it('preserves a controlled download permission failure diagnostic without logging the filesystem path', async () => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  try {
+    const record = await postRecord(f, { subtype: 'task' });
+    const file = await addAttachment(f, record.id);
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    vi.spyOn(fsPromises, 'stat').mockRejectedValueOnce(Object.assign(new Error('SECRET_PERMISSION_PATH'), {
+      name: 'SECRET_ERROR_NAME', code: 'EACCES', path: 'SECRET_ABSOLUTE_PATH',
+    }));
+    const response = await get(f.ctx, f.cookie, recordUrl(f, record.id, `/attachments/${file.id}/file`));
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: 'file_unavailable' });
+    expect(captured).toContain('"code":"EACCES"');
+    expect(captured).not.toContain('SECRET');
+  } finally { vi.restoreAllMocks(); await f.ctx.close(); }
+});
+
+it('logs only controlled diagnostic types and codes even when error properties contain secrets', async () => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  const errors = [
+    Object.assign(new Error('SECRET_PATH_AND_MESSAGE'), { name: 'SECRET_NAME', code: 'ENOSPC', path: 'SECRET_PATH' }),
+    Object.assign(new Error('SECRET_SQL'), { name: 'SECRET_DATABASE_NAME', code: 'SQLITE_BUSY' }),
+    Object.assign(new TypeError('SECRET_TYPE_MESSAGE'), { name: 'SECRET_TYPE_NAME', code: 'SECRET_CODE' }),
+    Object.assign(new Error('SECRET_UNKNOWN'), { name: 'SECRET_ARBITRARY_NAME', code: 'SQLITE_SECRET_SUFFIX' }),
+  ];
+  try {
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    f.ctx.app.get('/api/diagnostic/:index', async request => {
+      const error = errors[Number((request.params as { index: string }).index)];
+      request.log.error({ err: error }, 'controlled_probe');
+      request.log.error({ err: error });
+      request.log.error(error);
+      throw error;
+    });
+    for (let i = 0; i < errors.length; i++) {
+      expect((await get(f.ctx, f.cookie, `/api/diagnostic/${i}`)).statusCode).toBe(500);
+    }
+    await f.ctx.app.close();
+    const entries = captured.trim().split('\n').map(line => JSON.parse(line));
+    const diagnostics = entries.filter(entry => entry.event === 'internal_error');
+    expect(diagnostics.map(({ type, code }) => ({ type, code }))).toEqual([
+      { type: 'filesystem_error', code: 'ENOSPC' },
+      { type: 'sqlite_error', code: 'SQLITE_BUSY' },
+      { type: 'TypeError', code: undefined },
+      { type: 'internal_error', code: undefined },
+    ]);
+    expect(entries.filter(entry => entry.err).map(entry => entry.err))
+      .toEqual(diagnostics.flatMap(({ type, code }) => Array(3).fill({
+        type, ...(code ? { code } : {}), message: 'internal_error', stack: '',
+      })));
+    expect(captured).not.toContain('SECRET');
+    expect(captured).not.toContain(f.cookie.split('=')[1]!);
+  } finally { await f.ctx.close(); }
+});
+``````
+
+#### File: `tests/server/upload-http.test.ts`
+
+<!-- replay task=15 phase=test sha256=b7b9abe7398b23d10300f873189972bf5a73d16e51ad086786ab69e627242ea1 -->
+
+``````ts
+import { request as httpRequest } from 'node:http';
+import { Readable } from 'node:stream';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+let address: string;
+let id: number;
+const prefix = Buffer.from('--wire\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--wire\r\nContent-Disposition: form-data; name="file"; filename="wire.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.7\n');
+const suffix = Buffer.from('\r\n--wire--\r\n');
+
+beforeEach(async () => {
+  f = await makeFixture();
+  id = (await postRecord(f, { subtype: 'task' })).id;
+  address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
+});
+afterEach(async () => { await f.ctx.close(); });
+
+function body(total: number): Readable {
+  return Readable.from((function* () {
+    yield prefix;
+    const chunk = Buffer.alloc(64 * 1024);
+    let remaining = total - prefix.length - suffix.length;
+    while (remaining > 0) {
+      const size = Math.min(remaining, chunk.length);
+      yield chunk.subarray(0, size);
+      remaining -= size;
+    }
+    yield suffix;
+  })());
+}
+
+function headers(declared?: number) {
+  return { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=wire',
+    ...(declared === undefined ? {} : { 'content-length': String(declared) }) };
+}
+
+function upload(total: number, declared?: number): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const source = body(total);
+    const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
+      method: 'POST', headers: headers(declared), agent: false,
+    });
+    const timer = setTimeout(() => req.destroy(new Error('Loopback upload timed out')), 20_000);
+    req.on('error', reject);
+    req.once('close', () => { clearTimeout(timer); source.destroy(); });
+    source.on('error', error => req.destroy(error));
+    req.on('response', response => {
+      let responseBody = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { responseBody += chunk; });
+      response.on('error', reject);
+      response.on('end', () => {
+        resolve({ status: response.statusCode!, body: responseBody });
+        source.destroy();
+        req.destroy();
+      });
+    });
+    source.pipe(req);
+  });
+}
+
+async function stagedNames(): Promise<string[]> {
+  try { return await readdir(join(f.ctx.config.filesDir, '.tmp')); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
+function occurrenceCount(): number {
+  return f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get() as number;
+}
+
+it('accepts a normal Content-Length upload over a real HTTP socket', async () => {
+  const response = await upload(1024, 1024);
+  expect(response.status, response.body).toBe(201);
+  expect(JSON.parse(response.body).size).toBe(1024 - prefix.length - suffix.length + 9);
+  expect(occurrenceCount()).toBe(1);
+  expect(await stagedNames()).toEqual([]);
+});
+
+it('accepts an exactly 100 MB chunked request streamed over a real HTTP socket', async () => {
+  const response = await upload(100_000_000);
+  expect(response.status, response.body).toBe(201);
+  expect(JSON.parse(response.body).size).toBe(100_000_000 - prefix.length - suffix.length + 9);
+  expect(occurrenceCount()).toBe(1);
+  expect(await stagedNames()).toEqual([]);
+}, 30_000);
+
+it('returns a readable 413 over the socket for chunked overflow and removes staging', async () => {
+  const response = await upload(100_000_001);
+  expect(response.status).toBe(413);
+  expect(JSON.parse(response.body)).toEqual({ error: 'upload_too_large' });
+  expect(occurrenceCount()).toBe(0);
+  expect(await stagedNames()).toEqual([]);
+}, 30_000);
+
+it('returns 413 for declared oversize without requiring the client to send the declared body', async () => {
+  const response = await upload(1024, 100_000_001);
+  expect(response.status).toBe(413);
+  expect(JSON.parse(response.body)).toEqual({ error: 'upload_too_large' });
+  expect(occurrenceCount()).toBe(0);
+  expect(await stagedNames()).toEqual([]);
+});
+
+it('removes a partial staged file after client disconnect and continues serving requests', async () => {
+  const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
+    method: 'POST', headers: headers(), agent: false,
+  });
+  req.on('error', () => {}); // Deliberate local socket cancellation below.
+  try {
+    req.write(prefix);
+    req.write(Buffer.alloc(64 * 1024));
+    await vi.waitFor(async () => { expect((await stagedNames()).length).toBe(1); }, { timeout: 5000 });
+    req.destroy();
+    await vi.waitFor(async () => { expect(await stagedNames()).toEqual([]); }, { timeout: 5000 });
+    expect(occurrenceCount()).toBe(0);
+    const response = await upload(1024, 1024);
+    expect(response.status, response.body).toBe(201);
+  } finally { req.destroy(); }
+}, 15_000);
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/share-logging.test.ts tests/server/upload-http.test.ts tests/server/upload-budget.test.ts tests/server/file-access.test.ts`.
+
+Expected: new diagnostic assertions fail before the logging changes. The five real HTTP cases already pass; do not introduce an artificial upload failure.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/server/app.ts`
+
+<!-- replay task=15 phase=implementation sha256=51cb73c9bb4a4c3f76667c248d1cd041ec0fd0b01a3686d4a3400ad44f340b99 -->
+
+``````ts
+import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { ZodError } from 'zod';
+import { DEFAULT_LOGIN_LIMITS, LoginLimiter } from './auth/login-limiter';
+import type { AppConfig } from './config';
+import type { Db } from './db/connection';
+import { HttpError } from './errors';
+import { registerGuards } from './http/guards';
+import { registerProjectRoutes } from './lists/projects';
+import { registerPeopleRoutes } from './lists/people';
+import { registerTradeRoutes } from './lists/trades';
+import { registerZoneTypeRoutes } from './lists/zone-types';
+import { registerTagRoutes } from './lists/tags';
+import { registerLocationRoutes } from './lists/locations';
+import { registerRecordRoutes } from './records/routes';
+import { registerFileRoutes } from './files/routes';
+import { requireShareKey } from './sharing/crypto';
+import { reconcileShareKey } from './sharing/links';
+import { registerSharingRoutes } from './sharing/routes';
+import { safeErrorDiagnostic, safeLogger } from './http/logging';
+import { registerAccessRoutes } from './access/routes';
+import { registerAuthRoutes } from './routes/auth';
+import { registerHealthRoutes } from './routes/health';
+
+export interface AppDeps {
+  config: AppConfig;
+  db: Db;
+  /** Tests may pass their own limiter; the server uses the defaults. */
+  limiter?: LoginLimiter;
+  logger?: FastifyServerOptions['logger'];
+}
+
+export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+  const { config, db } = deps;
+  requireShareKey(config.shareKey);
+  const revokedLinks = reconcileShareKey(db, config.shareKey);
+  const app = Fastify({ logger: safeLogger(deps.logger), bodyLimit: 1024 * 1024 });
+  if (revokedLinks > 0) app.log.info({ event: 'share_key_changed', revokedLinks });
+  await app.register(cookie);
+  await app.register(multipart);
+  registerGuards(app, config, db);
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof HttpError) {
+      if (error.statusCode >= 500) {
+        const cause: unknown = Object.getOwnPropertyDescriptor(error, 'cause')?.value;
+        request.log.error({ event: 'internal_error', ...safeErrorDiagnostic(cause ?? error) });
+      }
+      return reply
+        .status(error.statusCode)
+        .send(error.details === undefined ? { error: error.code } : { error: error.code, details: error.details });
+    }
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        error: 'invalid_input',
+        details: error.issues.map((issue) => ({ path: issue.path.map(String).join('.'), message: issue.message })),
+      });
+    }
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      return reply.status(statusCode).send({ error: 'bad_request' });
+    }
+    request.log.error({ event: 'internal_error', ...safeErrorDiagnostic(error) });
+    return reply.status(500).send({ error: 'internal_error' });
+  });
+  app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));
+
+  registerHealthRoutes(app);
+  registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
+  registerProjectRoutes(app, db);
+  registerPeopleRoutes(app, db);
+  registerTradeRoutes(app, db);
+  registerZoneTypeRoutes(app, db);
+  registerTagRoutes(app, db);
+  registerLocationRoutes(app, db);
+  registerRecordRoutes(app, db);
+  registerFileRoutes(app, db, config);
+  registerSharingRoutes(app, db, config);
+  registerAccessRoutes(app, db, config);
+  return app;
+}
+``````
+
+#### File: `src/server/errors.ts`
+
+<!-- replay task=15 phase=implementation sha256=4ee36bde4ee7bb3d7fd8a625233f8731b591697badeeb59b58914d5aaf5c5954 -->
+
+``````ts
+/** An error with an HTTP status and a stable, machine-readable code; sent as { error: code, details? }. */
+export class HttpError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly code: string,
+    readonly details?: unknown,
+    options?: ErrorOptions,
+  ) {
+    super(code, options);
+    this.name = 'HttpError';
+  }
+}
+``````
+
+#### File: `src/server/files/downloads.ts`
+
+<!-- replay task=15 phase=implementation sha256=d6a264312797ade02d3f549dd554f37a912132b61696faa121b143759823c96a -->
+
+``````ts
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { PhotoVariant } from '../../domain';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { shareHeaders } from '../http/privacy';
+import { blobPath } from './storage';
+
+export interface FileTarget {
+  hash: string;
+  size: number;
+  contentType: string;
+  filename: string;
+}
+
+function safeFilename(filename: string): string {
+  return (filename.split(/[\\/]/).at(-1) ?? 'file').replace(/[\x00-\x1f\x7f]/g, '') || 'file';
+}
+
+export function resolvePhotoFile(db: Db, recordId: number, photoId: number, variant: PhotoVariant): FileTarget {
+  const column = { original: 'original_hash', display: 'display_hash', thumbnail: 'thumbnail_hash' }[variant];
+  const row = db.prepare(`SELECT b.hash, b.size, b.content_type AS contentType, p.original_filename AS filename
+    FROM photos p JOIN blobs b ON b.hash = p.${column} WHERE p.record_id = ? AND p.id = ?`).get(recordId, photoId) as FileTarget | undefined;
+  if (!row) throw new HttpError(404, 'file_not_found');
+  if (variant !== 'original') row.filename = `${safeFilename(row.filename).replace(/\.[^.]*$/, '')}-${variant}.jpg`;
+  return row;
+}
+
+export function resolveAttachmentFile(db: Db, recordId: number, attachmentId: number, audience: 'owner' | 'shared'): FileTarget {
+  const row = db.prepare(`SELECT b.hash, b.size, b.content_type AS contentType, a.original_filename AS filename,
+    l.private AS private, a.log_entry_id AS logEntryId, l.id AS existingLogId
+    FROM attachments a JOIN blobs b ON b.hash = a.blob_hash
+    LEFT JOIN log_entries l ON l.id = a.log_entry_id AND l.record_id = a.record_id
+    WHERE a.record_id = ? AND a.id = ?`).get(recordId, attachmentId) as (FileTarget & {
+      private: number | null; logEntryId: number | null; existingLogId: number | null;
+    }) | undefined;
+  if (!row || (audience === 'shared' && (row.private === 1 || (row.logEntryId !== null && row.existingLogId === null)))) {
+    throw new HttpError(404, 'file_not_found');
+  }
+  return { hash: row.hash, size: row.size, contentType: row.contentType, filename: row.filename };
+}
+
+/** Authorisation and occurrence resolution must precede this function. HEAD never opens a stream. */
+export async function sendFile(request: FastifyRequest, reply: FastifyReply, filesDir: string, target: FileTarget, disposition: 'inline' | 'attachment'): Promise<void> {
+  const path = blobPath(filesDir, target.hash);
+  let info;
+  try {
+    info = await stat(path);
+  } catch (error) {
+    if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) throw new HttpError(404, 'file_not_found');
+    throw new HttpError(500, 'file_unavailable', undefined, { cause: error });
+  }
+  if (!info.isFile() || info.size !== target.size) throw new HttpError(500, 'file_unavailable');
+  let range: { start: number; end: number } | undefined;
+  if (request.method === 'GET' && request.headers.range && !request.headers['if-range']) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range);
+    const failRange = (): never => {
+      shareHeaders(reply);
+      reply.header('Content-Range', `bytes */${info.size}`);
+      throw new HttpError(416, 'range_not_satisfiable');
+    };
+    if (!match || (!match[1] && !match[2])) failRange();
+    const first = match![1]!;
+    const last = match![2]!;
+    let start: number;
+    let end: number;
+    if (first === '') {
+      const length = Number(last);
+      if (!Number.isSafeInteger(length) || length < 1) failRange();
+      start = Math.max(0, info.size - length);
+      end = info.size - 1;
+    } else {
+      start = Number(first);
+      end = last === '' ? info.size - 1 : Number(last);
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) failRange();
+      end = Math.min(end, info.size - 1);
+    }
+    if (start >= info.size || end < start) failRange();
+    range = { start, end };
+  }
+  const filename = safeFilename(target.filename);
+  const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  const encoded = encodeURIComponent(filename).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  shareHeaders(reply);
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('Content-Security-Policy', target.contentType === 'image/svg+xml' ? "sandbox; default-src 'none'; style-src 'unsafe-inline'" : 'sandbox');
+  reply.header('Content-Type', target.contentType);
+  reply.header('Accept-Ranges', 'bytes');
+  reply.header('Content-Length', range ? range.end - range.start + 1 : info.size);
+  if (range) {
+    reply.status(206);
+    reply.header('Content-Range', `bytes ${range.start}-${range.end}/${info.size}`);
+  }
+  reply.header('Content-Disposition', `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`);
+  if (request.method === 'HEAD') {
+    reply.status(200).send();
+    return;
+  }
+  await reply.send(createReadStream(path, range));
+}
+``````
+
+#### File: `src/server/http/logging.ts`
+
+<!-- replay task=15 phase=implementation sha256=1d5156475bb8a1488ad0ed10226e676728518788f0ce7d01d3d53a374210c9b0 -->
+
+``````ts
+import type { FastifyRequest, FastifyServerOptions } from 'fastify';
+
+const filesystemCodes = new Set(['ENOENT', 'EACCES', 'EPERM', 'ENOSPC', 'EMFILE', 'ENFILE', 'EIO', 'EROFS', 'ENOTDIR', 'EISDIR', 'EEXIST', 'ENOTEMPTY']);
+const sqliteCodes = new Set(['SQLITE_BUSY', 'SQLITE_LOCKED', 'SQLITE_FULL', 'SQLITE_READONLY', 'SQLITE_CORRUPT', 'SQLITE_NOTADB', 'SQLITE_IOERR', 'SQLITE_CANTOPEN', 'SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT_UNIQUE', 'SQLITE_CONSTRAINT_FOREIGNKEY', 'SQLITE_CONSTRAINT_NOTNULL', 'SQLITE_CONSTRAINT_CHECK']);
+const systemCodes = new Set(['ENOMEM', 'ECONNRESET', 'ECONNABORTED', 'EPIPE', 'ETIMEDOUT', 'EADDRINUSE', 'ERR_STREAM_PREMATURE_CLOSE']);
+const applicationCodes = new Set(['file_unavailable', 'share_copy_failed']);
+
+/** Never copy a name, message, stack, path or arbitrary code supplied by an error. */
+export function safeErrorDiagnostic(error: unknown): { type: string; code?: string } {
+  if (!(error instanceof Error)) return { type: 'internal_error' };
+  // A data property avoids invoking an untrusted getter during error handling.
+  const code: unknown = Object.getOwnPropertyDescriptor(error, 'code')?.value;
+  if (typeof code === 'string') {
+    if (filesystemCodes.has(code)) return { type: 'filesystem_error', code };
+    if (sqliteCodes.has(code)) return { type: 'sqlite_error', code };
+    if (systemCodes.has(code)) return { type: 'system_error', code };
+    if (applicationCodes.has(code)) return { type: 'application_error', code };
+  }
+  if (error instanceof TypeError) return { type: 'TypeError' };
+  if (error instanceof RangeError) return { type: 'RangeError' };
+  if (error instanceof SyntaxError) return { type: 'SyntaxError' };
+  return { type: 'internal_error' };
+}
+
+/** Request/response data is never a log payload. Only registered patterns identify routes. */
+export function safeLogger(logger: FastifyServerOptions['logger']): FastifyServerOptions['logger'] {
+  if (!logger) return false;
+  return {
+    ...(typeof logger === 'object' ? logger : {}),
+    redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+    hooks: {
+      logMethod(args, method) {
+        const first: unknown = args[0];
+        const error = first instanceof Error ? first
+          : first !== null && typeof first === 'object' ? Object.getOwnPropertyDescriptor(first, 'err')?.value : undefined;
+        if (error !== undefined) {
+          // Pino otherwise derives msg from the raw error before running serializers.
+          method.call(this, { err: error }, 'internal_error');
+          return;
+        }
+        method.apply(this, args);
+      },
+    },
+    serializers: {
+      req: (request: FastifyRequest) => ({ method: request.method, route: request.routeOptions?.url ?? '<unmatched>' }),
+      res: (response: { statusCode: number }) => ({ statusCode: response.statusCode }),
+      err: error => ({ ...safeErrorDiagnostic(error), message: 'internal_error', stack: '' }),
+    },
+  };
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/share-logging.test.ts tests/server/upload-http.test.ts tests/server/upload-budget.test.ts tests/server/file-access.test.ts`, then `npm run typecheck`. Expected: 18 tests in four files pass and TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/server/app.ts' 'src/server/errors.ts' 'src/server/files/downloads.ts' 'src/server/http/logging.ts' 'tests/server/share-logging.test.ts' 'tests/server/upload-http.test.ts'
+git commit -m "fix: preserve safe diagnostics and verify real HTTP uploads"
+```
+
+## Task 16: Enforce the approved storage budget and free-space reserve
+
+**Scratch checkpoint:** `4d2c0b1`. **Depends on:** Task 15.
+
+**Deliverable:** Explicit deployment settings, retained-file census, concurrent upload reservations and physical reserve checks, fail-closed cleanup, safe capacity diagnostics and both pre-parser and mid-upload disconnect recovery. Published files remain immutable and there is no per-user quota.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/config.test.ts`
+
+<!-- replay task=16 phase=test sha256=4837a0cc0a690a5e6568a5d6e856e9c3e8d4942573f8738afff7a4b82e7e88a5 -->
+
+``````ts
+import { describe, expect, it } from 'vitest';
+import { loadConfig } from '../../src/server/config';
+
+describe('loadConfig (design §11.6)', () => {
+  it('requires BUILTBASIS_DATA_DIR', () => {
+    expect(() => loadConfig({})).toThrow('BUILTBASIS_DATA_DIR');
+  });
+
+  it('derives database and backup paths and local defaults', () => {
+    const config = loadConfig({ BUILTBASIS_DATA_DIR: '/data' });
+    expect(config.dbPath).toMatch(/builtbasis\.db$/);
+    expect(config.backupsDir).toMatch(/backups$/);
+    expect(config.filesDir).toMatch(/files$/);
+    expect(config.publicOrigin).toBe('http://localhost:3000');
+    expect(config.secureCookies).toBe(false);
+    expect(config.behindCloudflare).toBe(false);
+    expect(config.port).toBeNull();
+    expect(config.shareKey).toBeNull();
+  });
+
+  it('accepts exactly 32 bytes of hex key and rejects malformed keys', () => {
+    const env = { BUILTBASIS_DATA_DIR: '/data' };
+    expect(loadConfig({ ...env, SHARE_LINK_KEY: 'ab'.repeat(32) }).shareKey).toEqual(Buffer.alloc(32, 0xab));
+    for (const value of ['', 'ab', 'zz'.repeat(32), 'a'.repeat(65)]) {
+      expect(() => loadConfig({ ...env, SHARE_LINK_KEY: value })).toThrow('SHARE_LINK_KEY');
+    }
+  });
+
+  it('uses the public origin, secure cookies and Cloudflare mode in production', () => {
+    const config = loadConfig({
+      BUILTBASIS_DATA_DIR: '/data',
+      PUBLIC_BASE_URL: 'https://builtbasis.ktimanet.com/',
+      BEHIND_CLOUDFLARE: '1',
+      PORT: '3000',
+    });
+    expect(config.publicOrigin).toBe('https://builtbasis.ktimanet.com');
+    expect(config.secureCookies).toBe(true);
+    expect(config.behindCloudflare).toBe(true);
+    expect(config.port).toBe('3000');
+  });
+});
+
+it('accepts explicit positive storage budgets, permits missing settings offline and rejects invalid values', () => {
+  const base={BUILTBASIS_DATA_DIR:'/data'};
+  expect(loadConfig(base)).toMatchObject({filesStorageBudgetBytes:null,filesFreeReserveBytes:null});
+  expect(loadConfig({...base,FILES_STORAGE_BUDGET_BYTES:'500000000',FILES_FREE_RESERVE_BYTES:'10000000'})).toMatchObject({filesStorageBudgetBytes:500_000_000,filesFreeReserveBytes:10_000_000});
+  for(const key of ['FILES_STORAGE_BUDGET_BYTES','FILES_FREE_RESERVE_BYTES']) {
+    for(const value of ['0','-1','1.5','NaN','9007199254740992','']) expect(()=>loadConfig({...base,[key]:value})).toThrow(key);
+  }
+});
+``````
+
+#### File: `tests/server/helpers.ts`
+
+<!-- replay task=16 phase=test sha256=570864bec70f8ec2b1c4c789b14802af50367d41fd4524e9cb92d500a7fc41c2 -->
+
+``````ts
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { FastifyInstance } from 'fastify';
+import { buildApp } from '../../src/server/app';
+import type { LoginLimiter } from '../../src/server/auth/login-limiter';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { loadConfig, type AppConfig } from '../../src/server/config';
+import { openDatabase, type Db } from '../../src/server/db/connection';
+import { migrate } from '../../src/server/db/migrate';
+import { SESSION_COOKIE } from '../../src/server/http/guards';
+
+export interface TestContext {
+  app: FastifyInstance;
+  db: Db;
+  config: AppConfig;
+  origin: string;
+  close: () => Promise<void>;
+}
+
+export const OWNER = { username: 'owner', password: 'correct horse battery staple' } as const;
+
+export async function makeContext(
+  options: { publicBaseUrl?: string; behindCloudflare?: boolean; limiter?: LoginLimiter } = {},
+): Promise<TestContext> {
+  const dataDir = mkdtempSync(join(tmpdir(), 'builtbasis-test-'));
+  const config = loadConfig({
+    BUILTBASIS_DATA_DIR: dataDir,
+    SHARE_LINK_KEY: '07'.repeat(32),
+    FILES_STORAGE_BUDGET_BYTES: '1000000000',
+    FILES_FREE_RESERVE_BYTES: '1000000',
+    PUBLIC_BASE_URL: options.publicBaseUrl ?? 'http://localhost:3000',
+    ...(options.behindCloudflare ? { BEHIND_CLOUDFLARE: '1' } : {}),
+  });
+  const db = openDatabase(config.dbPath);
+  migrate(db, { backupsDir: config.backupsDir });
+  const app = await buildApp({ config, db, limiter: options.limiter });
+  return {
+    app,
+    db,
+    config,
+    origin: config.publicOrigin,
+    close: async () => {
+      await app.close();
+      db.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    },
+  };
+}
+
+/** Creates the owner account, logs in and returns the Cookie header value. */
+export async function loginAsOwner(ctx: TestContext): Promise<string> {
+  setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+  const res = await ctx.app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    headers: { origin: ctx.origin },
+    payload: { ...OWNER },
+  });
+  const cookie = res.cookies.find((candidate) => candidate.name === SESSION_COOKIE);
+  if (!cookie) throw new Error(`login failed: ${res.statusCode} ${res.body}`);
+  return `${SESSION_COOKIE}=${cookie.value}`;
+}
+
+/** A state-changing owner request: matching Origin, session cookie, JSON body. */
+export function send(ctx: TestContext, cookie: string, method: 'POST' | 'PATCH' | 'DELETE', url: string, payload: object = {}) {
+  return ctx.app.inject({ method, url, headers: { origin: ctx.origin, cookie }, payload });
+}
+
+export function get(ctx: TestContext, cookie: string, url: string) {
+  return ctx.app.inject({ method: 'GET', url, headers: { cookie } });
+}
+``````
+
+#### File: `tests/server/share-logging.test.ts`
+
+<!-- replay task=16 phase=test sha256=65b4480878ebebfea166a9ceb5205c33d5d067a115dc0c9b694d15240599da72 -->
+
+``````ts
+import { Writable } from 'node:stream';
+import * as fsPromises from 'node:fs/promises';
+import { expect, it, vi } from 'vitest';
+import { buildApp } from '../../src/server/app';
+import { addAttachment, multipart, PDF } from './file-fixture';
+import { get, send } from './helpers';
+import { makeFixture, postRecord, recordUrl } from './record-fixture';
+
+vi.mock('node:fs/promises', async importOriginal => ({ ...await importOriginal<typeof import('node:fs/promises')>() }));
+
+it('logs route patterns and controlled errors without URLs, credentials, parameters or response tokens', async () => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  try {
+    const record = await postRecord(f, { subtype: 'task' });
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    f.ctx.app.get('/api/probe/:value', async () => { throw new Error('SECRET_THROWN_MESSAGE'); });
+    const create = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/share-links'), { label: 'SECRET_LABEL' });
+    expect(create.statusCode).toBe(201);
+    const token = create.json().url.split('#')[1];
+    await get(f.ctx, f.cookie, recordUrl(f, record.id, '/share-links'));
+    await f.ctx.app.inject({ method: 'GET', url: `/api/probe/SECRET_PARAMETER?token=${token}`, headers: { cookie: f.cookie, authorization: `Bearer ${token}` } });
+    await f.ctx.app.inject({ method: 'GET', url: `/unknown/${token}?session=SECRET_QUERY`, headers: { authorization: `Bearer ${token}` } });
+    await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, record.id, '/share-links'), headers: { cookie: f.cookie, origin: `https://${token}.example` }, payload: { label: token } });
+    await f.ctx.app.close();
+    expect(captured).toContain('/api/projects/:projectId/records/:id/share-links');
+    expect(captured).toContain('/api/probe/:value');
+    expect(captured).toContain('<unmatched>');
+    expect(captured).toContain('internal_error');
+    for (const secret of [token, f.cookie.split('=')[1]!, 'SECRET_PARAMETER', 'SECRET_THROWN_MESSAGE', 'SECRET_QUERY', 'SECRET_LABEL']) expect(captured).not.toContain(secret);
+  } finally { await f.ctx.close(); }
+});
+
+it('preserves a controlled download permission failure diagnostic without logging the filesystem path', async () => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  try {
+    const record = await postRecord(f, { subtype: 'task' });
+    const file = await addAttachment(f, record.id);
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    vi.spyOn(fsPromises, 'stat').mockRejectedValueOnce(Object.assign(new Error('SECRET_PERMISSION_PATH'), {
+      name: 'SECRET_ERROR_NAME', code: 'EACCES', path: 'SECRET_ABSOLUTE_PATH',
+    }));
+    const response = await get(f.ctx, f.cookie, recordUrl(f, record.id, `/attachments/${file.id}/file`));
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: 'file_unavailable' });
+    expect(captured).toContain('"code":"EACCES"');
+    expect(captured).not.toContain('SECRET');
+  } finally { vi.restoreAllMocks(); await f.ctx.close(); }
+});
+
+it('logs only controlled diagnostic types and codes even when error properties contain secrets', async () => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  const errors = [
+    Object.assign(new Error('SECRET_PATH_AND_MESSAGE'), { name: 'SECRET_NAME', code: 'ENOSPC', path: 'SECRET_PATH' }),
+    Object.assign(new Error('SECRET_SQL'), { name: 'SECRET_DATABASE_NAME', code: 'SQLITE_BUSY' }),
+    Object.assign(new TypeError('SECRET_TYPE_MESSAGE'), { name: 'SECRET_TYPE_NAME', code: 'SECRET_CODE' }),
+    Object.assign(new Error('SECRET_UNKNOWN'), { name: 'SECRET_ARBITRARY_NAME', code: 'SQLITE_SECRET_SUFFIX' }),
+  ];
+  try {
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    f.ctx.app.get('/api/diagnostic/:index', async request => {
+      const error = errors[Number((request.params as { index: string }).index)];
+      request.log.error({ err: error }, 'controlled_probe');
+      request.log.error({ err: error });
+      request.log.error(error);
+      throw error;
+    });
+    for (let i = 0; i < errors.length; i++) {
+      expect((await get(f.ctx, f.cookie, `/api/diagnostic/${i}`)).statusCode).toBe(500);
+    }
+    await f.ctx.app.close();
+    const entries = captured.trim().split('\n').map(line => JSON.parse(line));
+    const diagnostics = entries.filter(entry => entry.event === 'internal_error');
+    expect(diagnostics.map(({ type, code }) => ({ type, code }))).toEqual([
+      { type: 'filesystem_error', code: 'ENOSPC' },
+      { type: 'sqlite_error', code: 'SQLITE_BUSY' },
+      { type: 'TypeError', code: undefined },
+      { type: 'internal_error', code: undefined },
+    ]);
+    expect(entries.filter(entry => entry.err).map(entry => entry.err))
+      .toEqual(diagnostics.flatMap(({ type, code }) => Array(3).fill({
+        type, ...(code ? { code } : {}), message: 'internal_error', stack: '',
+      })));
+    expect(captured).not.toContain('SECRET');
+    expect(captured).not.toContain(f.cookie.split('=')[1]!);
+  } finally { await f.ctx.close(); }
+});
+
+it.each(['ENOSPC', 'EDQUOT'])('preserves %s when upload capacity errors wrap a filesystem failure', async code => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  try {
+    const record = await postRecord(f, { subtype: 'task' });
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(Object.assign(new Error('SECRET_DISK_PATH'), { code }));
+    const form = multipart([{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }]);
+    const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, record.id, '/attachments'),
+      headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body });
+    expect(response.statusCode).toBe(507);
+    expect(response.json()).toEqual({ error: 'storage_capacity' });
+    expect(captured).toContain(JSON.stringify(code));
+    expect(captured).not.toContain('SECRET');
+  } finally { vi.restoreAllMocks(); await f.ctx.close(); }
+});
+``````
+
+#### File: `tests/server/storage-admission-api.test.ts`
+
+<!-- replay task=16 phase=test sha256=24ae91ff7ffec84e57a141d311f24d15f9708609992aa4ad42d4e718428bdb32 -->
+
+``````ts
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { buildApp } from '../../src/server/app';
+import { createContributor } from '../../src/server/auth/contributors';
+import { createSession } from '../../src/server/auth/sessions';
+import { OWNER, get } from './helpers';
+import { forceStatus, makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+import { multipart, PDF } from './file-fixture';
+let f:Fixture;let id:number;
+vi.mock('node:fs/promises', async original => ({...await original<typeof import('node:fs/promises')>()}));
+beforeEach(async()=>{f=await makeFixture();id=(await postRecord(f,{subtype:'task',title:'Capacity'})).id;});
+afterEach(async()=>{vi.restoreAllMocks();await f.ctx.app.close();await f.ctx.close();});
+const form=()=>multipart([{name:'metadata',data:'{}'},{name:'file',filename:'a.pdf',data:PDF}]);
+async function restart(budget:number){await f.ctx.app.close();f.ctx.config={...f.ctx.config,filesStorageBudgetBytes:budget,filesFreeReserveBytes:1};f.ctx.app=await buildApp({db:f.ctx.db,config:f.ctx.config});}
+function upload(cookie=f.cookie,url=recordUrl(f,id,'/attachments'),payload=form()){
+ return f.ctx.app.inject({method:'POST',url,headers:{cookie,origin:f.ctx.origin,'content-type':payload.contentType},payload:payload.body});
+}
+it('requires explicit HTTP capacity configuration while preserving offline config use',async()=>{
+ for(const missing of ['filesStorageBudgetBytes','filesFreeReserveBytes']) {
+  const outcome=await buildApp({db:f.ctx.db,config:{...f.ctx.config,[missing]:null}}).then(async app=>{await app.close();return 'started';},error=>(error as Error).message);
+  expect(outcome).toBe('storage_configuration_required');
+ }
+});
+it('rejects owner and granted contributor uploads uniformly with 507 while authorization still precedes admission',async()=>{
+ forceStatus(f,id,'open');const user=createContributor(f.ctx.db,'u','Builder',OWNER.password);
+ const cookie=`bb_session=${createSession(f.ctx.db,user).token}`;
+ f.ctx.db.prepare('INSERT INTO record_grants VALUES (?,?,1,0)').run(id,user);
+ await restart(1);
+ expect((await upload('')).statusCode).toBe(401);
+ for(const [session,url] of [[f.cookie,recordUrl(f,id,'/attachments')],[cookie,`/api/assigned-records/${id}/attachments`]]){
+  const res=await upload(session,url);expect(res.statusCode).toBe(507);expect(res.json()).toEqual({error:'storage_capacity'});
+ }
+ expect((await get(f.ctx,f.cookie,recordUrl(f,id))).statusCode).toBe(200);
+ expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+});
+it('releases a failed parse reservation so a subsequent valid request succeeds',async()=>{
+ await restart(2000);
+ const invalid=multipart([{name:'metadata',data:'{bad'},{name:'file',filename:'a.pdf',data:PDF}]);
+ expect((await upload(f.cookie,undefined,invalid)).statusCode).toBe(400);
+ expect((await upload()).statusCode).toBe(201);
+ expect(await readdir(join(f.ctx.config.filesDir,'.tmp'))).toEqual([]);
+});
+it('retains charges for published orphan bytes after a database failure and across restart',async()=>{
+ await restart(form().body.length);
+ f.ctx.db.exec("CREATE TRIGGER fail_touch BEFORE UPDATE ON records BEGIN SELECT RAISE(ABORT,'forced'); END");
+ expect((await upload()).statusCode).toBe(500);
+ f.ctx.db.exec('DROP TRIGGER fail_touch');
+ expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(0);
+ expect((await upload()).statusCode).toBe(507);
+ await restart(form().body.length);expect((await upload()).statusCode).toBe(507);
+});
+it('starts over-budget stores for reads and counts unmanaged retained files before accepting uploads',async()=>{
+ await f.ctx.app.close();await mkdir(f.ctx.config.filesDir,{recursive:true});await writeFile(join(f.ctx.config.filesDir,'retained-orphan'),Buffer.alloc(1000));
+ f.ctx.config={...f.ctx.config,filesStorageBudgetBytes:100,filesFreeReserveBytes:1};f.ctx.app=await buildApp({db:f.ctx.db,config:f.ctx.config});
+ expect((await get(f.ctx,f.cookie,recordUrl(f,id))).statusCode).toBe(200);
+ expect((await upload()).statusCode).toBe(507);
+});
+it('does not let actual bytes overrun a smaller Content-Length reservation',async()=>{
+ await restart(2000);const body=form();
+ const response=await f.ctx.app.inject({method:'POST',url:recordUrl(f,id,'/attachments'),headers:{cookie:f.cookie,origin:f.ctx.origin,'content-type':body.contentType,'content-length':'10'},payload:body.body});
+ expect(response.statusCode).toBe(413);expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+ expect((await upload()).statusCode).toBe(201);
+});
+it('fails closed after an actual temporary-file cleanup failure and never forgets leftover bytes',async()=>{
+ await restart(2000);
+ const invalid=multipart([{name:'file',filename:'a.pdf',data:PDF},{name:'metadata',data:'{bad'}]);
+ vi.spyOn(fs,'unlink').mockRejectedValue(new Error('private cleanup location'));
+ const rejected=await upload(f.cookie,undefined,invalid);
+ expect(rejected.statusCode).toBe(507);expect(rejected.json()).toEqual({error:'storage_capacity'});
+ vi.restoreAllMocks();expect((await upload()).statusCode).toBe(507);
+ expect((await readdir(join(f.ctx.config.filesDir,'.tmp'))).length).toBe(1);
+});
+it.each(['ENOSPC','EDQUOT'])('returns 507 for %s during staging and releases the cleaned reservation',async code=>{
+ await restart(2000);
+ const originalOpen=fs.open;
+ vi.spyOn(fs,'open').mockImplementation(async(...args:Parameters<typeof originalOpen>)=>{
+  const handle=await originalOpen(...args);
+  vi.spyOn(handle,'write').mockRejectedValueOnce(Object.assign(new Error('private disk details'),{code}));
+  return handle;
+ });
+ const res=await upload();expect(res.statusCode).toBe(507);expect(res.json()).toEqual({error:'storage_capacity'});
+ vi.restoreAllMocks();expect(await readdir(join(f.ctx.config.filesDir,'.tmp'))).toEqual([]);
+ expect((await upload()).statusCode).toBe(201);
+});
+``````
+
+#### File: `tests/server/storage-capacity.test.ts`
+
+<!-- replay task=16 phase=test sha256=356943facd45515a425cc4c238189f9da649fa7653e70d8b2f2dcc2d3684d722 -->
+
+``````ts
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { Readable } from 'node:stream';
+import { openStorageCapacity } from '../../src/server/files/capacity';
+import { stageFile, publishFile, discardStaged } from '../../src/server/files/storage';
+vi.mock('node:fs/promises', async original => ({...await original<typeof import('node:fs/promises')>()}));
+let dir: string;
+beforeEach(async()=>{dir=await fs.mkdtemp(join(tmpdir(),'bb-capacity-'));});
+afterEach(async()=>{vi.restoreAllMocks();await fs.rm(dir,{recursive:true,force:true});});
+const policy={budgetBytes:100,freeReserveBytes:1};
+const pdf=Buffer.concat([Buffer.from('%PDF-1.7\n'),Buffer.alloc(31)]);
+it('counts actual retained orphans and stale temporary bytes on every startup',async()=>{
+ await fs.mkdir(join(dir,'.tmp')); await fs.writeFile(join(dir,'.tmp','stale'),Buffer.alloc(10));
+ await fs.writeFile(join(dir,'orphan'),Buffer.alloc(30));
+ const capacity=await openStorageCapacity(dir,policy);
+ await expect(capacity.reserve('61')).rejects.toMatchObject({statusCode:507,code:'storage_capacity'});
+ const slot=await capacity.reserve('60');slot.release();
+});
+it('reserves concurrent requests before awaiting filesystem probes and releases admission failures',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);
+ const first=await capacity.reserve('60');
+ await expect(capacity.reserve('41')).rejects.toMatchObject({statusCode:507});
+ first.release();first.release();
+ const next=await capacity.reserve('100');next.release();
+ vi.spyOn(fs,'statfs').mockRejectedValueOnce(new Error('private disk path'));
+ await expect(capacity.reserve('100')).rejects.toMatchObject({statusCode:507,code:'storage_capacity'});
+ const afterFailure=await capacity.reserve('100');afterFailure.release();
+});
+it('protects the physical free-space reserve including pending uploads',async()=>{
+ const capacity=await openStorageCapacity(dir,{budgetBytes:1000,freeReserveBytes:100});
+ vi.spyOn(fs,'statfs').mockResolvedValue({bavail:200n,bsize:1n} as never);
+ const first=await capacity.reserve('60');
+ await expect(capacity.reserve('41')).rejects.toMatchObject({statusCode:507});
+ first.release();const next=await capacity.reserve('100');next.release();
+});
+it('charges a newly published orphan once across concurrent identical uploads',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);
+ const a=await capacity.reserve('50');const b=await capacity.reserve('50');
+ const fa=await stageFile(dir,Readable.from([pdf]),'a.pdf','attachment');
+ const fb=await stageFile(dir,Readable.from([pdf]),'b.pdf','attachment');
+ await Promise.all([publishFile(dir,fa,a.retained),publishFile(dir,fb,b.retained)]);
+ a.release();b.release();
+ await expect(capacity.reserve('61')).rejects.toMatchObject({statusCode:507});
+ const next=await capacity.reserve('60');next.release();
+ const restarted=await openStorageCapacity(dir,policy);
+ await expect(restarted.reserve('61')).rejects.toMatchObject({statusCode:507});
+});
+it('records the hardlink before a later publish cleanup failure and fails closed on unknown staging cleanup',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);const slot=await capacity.reserve('60');
+ const file=await stageFile(dir,Readable.from([pdf]),'a.pdf','attachment');
+ vi.spyOn(fs,'unlink').mockRejectedValueOnce(new Error('forced unlink failure'));
+ await expect(publishFile(dir,file,slot.retained)).rejects.toThrow('forced unlink');
+ await discardStaged(file);slot.release();
+ await expect(capacity.reserve('61')).rejects.toMatchObject({statusCode:507});
+ const second=await capacity.reserve('60');second.cleanupFailed();second.release();
+ await expect(capacity.reserve('1')).rejects.toMatchObject({statusCode:507});
+});
+it('distinguishes malformed and oversized envelopes from storage admission',async()=>{
+ const capacity=await openStorageCapacity(dir,{budgetBytes:200_000_000,freeReserveBytes:1});
+ await expect(capacity.reserve('100000001')).rejects.toMatchObject({statusCode:413});
+ await expect(capacity.reserve('-1')).rejects.toMatchObject({statusCode:400});
+ const chunked=await capacity.reserve(undefined);expect(chunked.maxBodyBytes).toBe(100_000_000);chunked.release();
+});
+it('prevents two admissions from spending capacity while the first statfs probe is pending',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);
+ let finish!:(value:never)=>void;
+ vi.spyOn(fs,'statfs').mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve as typeof finish;}) as never);
+ const firstPromise=capacity.reserve('60');
+ await expect(capacity.reserve('41')).rejects.toMatchObject({statusCode:507});
+ finish({bavail:1000n,bsize:1n} as never);
+ const first=await firstPromise;first.release();
+ const after=await capacity.reserve('100');after.release();
+});
+it('fails closed if staging cleanup becomes uncertain while another admission probes free space',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);const first=await capacity.reserve('40');
+ let finish!:(value:never)=>void;
+ vi.spyOn(fs,'statfs').mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve as typeof finish;}) as never);
+ const second=capacity.reserve('40');first.cleanupFailed();first.release();
+ finish({bavail:1000n,bsize:1n} as never);
+ await expect(second).rejects.toMatchObject({statusCode:507});
+});
+``````
+
+#### File: `tests/server/upload-http.test.ts`
+
+<!-- replay task=16 phase=test sha256=92c810ef2118b215ac7b5e3d0de9ede159db44d691cc8611a04b10837afb48b4 -->
+
+``````ts
+import { request as httpRequest } from 'node:http';
+import { Readable } from 'node:stream';
+import { readdir } from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
+import { join } from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+import { buildApp } from '../../src/server/app';
+
+vi.mock('node:fs/promises', async original => ({ ...await original<typeof import('node:fs/promises')>() }));
+
+let f: Fixture;
+let address: string;
+let id: number;
+const prefix = Buffer.from('--wire\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--wire\r\nContent-Disposition: form-data; name="file"; filename="wire.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.7\n');
+const suffix = Buffer.from('\r\n--wire--\r\n');
+
+beforeEach(async () => {
+  f = await makeFixture();
+  id = (await postRecord(f, { subtype: 'task' })).id;
+  address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
+});
+afterEach(async () => { await f.ctx.app.close(); await f.ctx.close(); });
+
+function body(total: number): Readable {
+  return Readable.from((function* () {
+    yield prefix;
+    const chunk = Buffer.alloc(64 * 1024);
+    let remaining = total - prefix.length - suffix.length;
+    while (remaining > 0) {
+      const size = Math.min(remaining, chunk.length);
+      yield chunk.subarray(0, size);
+      remaining -= size;
+    }
+    yield suffix;
+  })());
+}
+
+function headers(declared?: number) {
+  return { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=wire',
+    ...(declared === undefined ? {} : { 'content-length': String(declared) }) };
+}
+
+function upload(total: number, declared?: number): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const source = body(total);
+    const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
+      method: 'POST', headers: headers(declared), agent: false,
+    });
+    const timer = setTimeout(() => req.destroy(new Error('Loopback upload timed out')), 20_000);
+    req.on('error', reject);
+    req.once('close', () => { clearTimeout(timer); source.destroy(); });
+    source.on('error', error => req.destroy(error));
+    req.on('response', response => {
+      let responseBody = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { responseBody += chunk; });
+      response.on('error', reject);
+      response.on('end', () => {
+        resolve({ status: response.statusCode!, body: responseBody });
+        source.destroy();
+        req.destroy();
+      });
+    });
+    source.pipe(req);
+  });
+}
+
+async function stagedNames(): Promise<string[]> {
+  try { return await readdir(join(f.ctx.config.filesDir, '.tmp')); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
+function occurrenceCount(): number {
+  return f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get() as number;
+}
+
+it('accepts a normal Content-Length upload over a real HTTP socket', async () => {
+  const response = await upload(1024, 1024);
+  expect(response.status, response.body).toBe(201);
+  expect(JSON.parse(response.body).size).toBe(1024 - prefix.length - suffix.length + 9);
+  expect(occurrenceCount()).toBe(1);
+  expect(await stagedNames()).toEqual([]);
+});
+
+it('accepts an exactly 100 MB chunked request streamed over a real HTTP socket', async () => {
+  const response = await upload(100_000_000);
+  expect(response.status, response.body).toBe(201);
+  expect(JSON.parse(response.body).size).toBe(100_000_000 - prefix.length - suffix.length + 9);
+  expect(occurrenceCount()).toBe(1);
+  expect(await stagedNames()).toEqual([]);
+}, 30_000);
+
+it('returns a readable 413 over the socket for chunked overflow and removes staging', async () => {
+  const response = await upload(100_000_001);
+  expect(response.status).toBe(413);
+  expect(JSON.parse(response.body)).toEqual({ error: 'upload_too_large' });
+  expect(occurrenceCount()).toBe(0);
+  expect(await stagedNames()).toEqual([]);
+}, 30_000);
+
+it('returns 413 for declared oversize without requiring the client to send the declared body', async () => {
+  const response = await upload(1024, 100_000_001);
+  expect(response.status).toBe(413);
+  expect(JSON.parse(response.body)).toEqual({ error: 'upload_too_large' });
+  expect(occurrenceCount()).toBe(0);
+  expect(await stagedNames()).toEqual([]);
+});
+
+it('removes partial staging and releases the sole upload reservation after client disconnect', async () => {
+  await f.ctx.app.close();
+  f.ctx.config = { ...f.ctx.config, filesStorageBudgetBytes: 100_000_000, filesFreeReserveBytes: 1 };
+  f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db });
+  address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
+  const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
+    method: 'POST', headers: headers(), agent: false,
+  });
+  req.on('error', () => {}); // Deliberate local socket cancellation below.
+  try {
+    req.write(prefix);
+    req.write(Buffer.alloc(64 * 1024));
+    await vi.waitFor(async () => { expect((await stagedNames()).length).toBe(1); }, { timeout: 5000 });
+    req.destroy();
+    await vi.waitFor(async () => { expect(await stagedNames()).toEqual([]); }, { timeout: 5000 });
+    expect(occurrenceCount()).toBe(0);
+    // A leaked 100 MB reservation would reject this second chunked request.
+    const response = await upload(1024);
+    expect(response.status, response.body).toBe(201);
+  } finally { req.destroy(); }
+}, 15_000);
+
+it('releases capacity when the client disconnects during the pending free-space check', async () => {
+  await f.ctx.app.close();
+  f.ctx.config = { ...f.ctx.config, filesStorageBudgetBytes: 100_000_000, filesFreeReserveBytes: 1 };
+  f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db });
+  let observedAbort = false;
+  f.ctx.app.addHook('onRequest', async request => {
+    request.raw.once('aborted', () => { observedAbort = true; });
+  });
+  address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
+  const original = fsPromises.statfs;
+  let releaseProbe: (() => void) | undefined;
+  let waiting = false;
+  vi.spyOn(fsPromises, 'statfs').mockImplementationOnce(async (...args: Parameters<typeof original>) => {
+    const result = await original(...args);
+    waiting = true;
+    await new Promise<void>(resolve => { releaseProbe = resolve; });
+    return result;
+  });
+  const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
+    method: 'POST', headers: headers(), agent: false,
+  });
+  req.on('error', () => {});
+  try {
+    req.write(prefix);
+    await vi.waitFor(() => expect(waiting).toBe(true), { timeout: 3000 });
+    req.destroy();
+    await vi.waitFor(() => expect(observedAbort).toBe(true), { timeout: 3000 });
+    releaseProbe!();
+    // A new socket request follows the resumed admission microtask.
+    const response = await upload(1024);
+    expect(response.status, response.body).toBe(201);
+    expect(occurrenceCount()).toBe(1);
+    expect(await stagedNames()).toEqual([]);
+  } finally {
+    req.destroy();
+    releaseProbe?.();
+    vi.restoreAllMocks();
+  }
+}, 15_000);
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/storage-capacity.test.ts tests/server/storage-admission-api.test.ts tests/server/config.test.ts tests/server/share-logging.test.ts tests/server/upload-http.test.ts tests/server/files-api.test.ts tests/server/assigned-records.test.ts tests/server/file-storage.test.ts`.
+
+Expected: capacity module/configuration and admission assertions fail before implementation. Existing real-network behavior remains covered; the new held-disk-probe regression also reproduced a leaked reservation during authoring before the final guard.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `.env.example`
+
+<!-- replay task=16 phase=implementation sha256=8d12d83dec576e00be759865b9f4fe1f5c7e765ac4ec794d289326cc18c724cc -->
+
+``````text
+# Local development settings. Copy to .env (git-ignored); never commit .env.
+BUILTBASIS_DATA_DIR=./data
+PORT=3000
+PUBLIC_BASE_URL=http://localhost:3000
+# HTTP startup requires a dedicated random 32-byte key encoded as 64 hex characters.
+# Keep it outside the repository, data directory and backups. No default key exists.
+# SHARE_LINK_KEY=
+# Production only (set in konsoleH, not here):
+# PUBLIC_BASE_URL=https://builtbasis.ktimanet.com
+# BEHIND_CLOUDFLARE=1
+# HTTP startup also requires explicit positive byte counts chosen for the deployment.
+# Managed files include retained orphan/stale files. Reserve protects other filesystem use.
+# statfs cannot reveal shared-hosting account quotas; budget must fit the account allocation.
+# FILES_STORAGE_BUDGET_BYTES=
+# FILES_FREE_RESERVE_BYTES=
+``````
+
+#### File: `src/server/access/routes.ts`
+
+<!-- replay task=16 phase=implementation sha256=2f9f539e1ab64bbb032be7048af2f4675e6b9327a3b6f91ef5704535daadc9b7 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { LogEntryBody, PhotoVariantParam, type AttachmentMeta } from '../../domain';
+import type { AppConfig } from '../config';
+import { findSessionUser } from '../auth/sessions';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
+import { saveUpload } from '../files/occurrences';
+import { describeAttachment, resolveAttachmentView } from '../files/previews';
+import { withUpload } from '../files/admission';
+import type { StorageCapacity } from '../files/capacity';
+import { ItemParams } from '../http/params';
+import { SESSION_COOKIE } from '../http/guards';
+import { requireUserId } from '../http/user';
+import { recordActivity } from '../records/activity';
+import { addLogEntry } from '../records/log';
+import { requireRecord } from '../records/store';
+import { buildSharedRecord } from '../sharing/projection';
+import { requireContributorAccess } from './grants';
+
+const Id = z.coerce.number().int().positive();
+const AssignedParams = z.object({ id: Id });
+const FileParams = AssignedParams.extend({ itemId: Id });
+const GrantParams = ItemParams.extend({ userId: Id });
+const GrantBody = z.strictObject({ canUpload: z.boolean(), canAddLog: z.boolean() });
+const PublicLogBody = LogEntryBody.omit({ private: true });
+const contributorConfig = { contributor: true, privateResponse: true };
+
+export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppConfig, capacity: StorageCapacity): void {
+  app.get('/api/contributors', { config: { privateResponse: true } }, async () => {
+    const rows = db.prepare(`SELECT id, username, display_name AS displayName, is_active AS active
+      FROM users WHERE is_owner = 0 ORDER BY display_name, id`).all() as { id: number; username: string; displayName: string; active: number }[];
+    return rows.map(row => ({ ...row, active: row.active === 1 }));
+  });
+  const grantsUrl = '/api/projects/:projectId/records/:id/grants';
+  app.get(grantsUrl, { config: { privateResponse: true } }, async request => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    const rows = db.prepare(`SELECT user_id AS userId, can_upload AS canUpload, can_add_log AS canAddLog
+      FROM record_grants WHERE record_id = ? ORDER BY user_id`).all(id) as { userId: number; canUpload: number; canAddLog: number }[];
+    return rows.map(row => ({ ...row, canUpload: row.canUpload === 1, canAddLog: row.canAddLog === 1 }));
+  });
+  app.put(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    const body = GrantBody.parse(request.body);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      if (!db.prepare('SELECT id FROM users WHERE id = ? AND is_owner = 0 AND is_active = 1').get(userId)) {
+        throw new HttpError(404, 'contributor_not_found');
+      }
+      const old = db.prepare('SELECT can_upload, can_add_log FROM record_grants WHERE record_id = ? AND user_id = ?').get(id, userId) as { can_upload: number; can_add_log: number } | undefined;
+      db.prepare(`INSERT INTO record_grants VALUES (?,?,?,?) ON CONFLICT(record_id,user_id)
+        DO UPDATE SET can_upload=excluded.can_upload, can_add_log=excluded.can_add_log`)
+        .run(id, userId, Number(body.canUpload), Number(body.canAddLog));
+      if (!old || old.can_upload !== Number(body.canUpload) || old.can_add_log !== Number(body.canAddLog)) {
+        recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+          action: 'grant_changed', detail: { userId, ...body } });
+      }
+      return { userId, ...body };
+    })();
+  });
+  app.delete(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      const result = db.prepare('DELETE FROM record_grants WHERE record_id = ? AND user_id = ?').run(id, userId);
+      if (result.changes) recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+        action: 'grant_revoked', detail: { userId } });
+      return { ok: true };
+    })();
+  });
+
+  app.get('/api/assigned-records', { config: contributorConfig }, async request => db.prepare(`
+    SELECT r.id, r.human_id AS humanId, r.title FROM record_grants g
+    JOIN records r ON r.id = g.record_id JOIN users u ON u.id = g.user_id
+    WHERE g.user_id = ? AND u.is_active = 1 AND u.is_owner = 0 AND r.status <> 'draft'
+    ORDER BY r.id`).all(requireUserId(request)));
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const access = requireContributorAccess(db, requireUserId(request), id);
+      if (request.method === 'HEAD') return reply.send();
+      return { ...buildSharedRecord(db, access), permissions: { canUpload: access.canUpload, canAddLog: access.canAddLog } };
+    },
+  });
+  app.post('/api/assigned-records/:id/log', { config: contributorConfig }, async (request, reply) => {
+    const { id } = AssignedParams.parse(request.params);
+    const userId = requireUserId(request);
+    const body = PublicLogBody.parse(request.body);
+    const entry = db.transaction(() => {
+      const access = requireContributorAccess(db, userId, id, 'addLog');
+      return addLogEntry(db, access.projectId, id, userId, body);
+    })();
+    return reply.status(201).send({ id: entry.id, eventAt: entry.eventAt, text: entry.text, loggedBy: entry.loggedBy, attachmentIds: [] });
+  });
+  for (const kind of ['photos', 'attachments'] as const) {
+    app.post(`/api/assigned-records/:id/${kind}`, { config: { ...contributorConfig, multipart: true } }, async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const userId = requireUserId(request);
+      requireContributorAccess(db, userId, id, 'upload');
+      const result = await withUpload(request, config.filesDir, kind, capacity, envelope => db.transaction(() => {
+          const token = request.cookies[SESSION_COOKIE];
+          if (!token || findSessionUser(db, token)?.userId !== userId) throw new HttpError(401, 'unauthenticated');
+          const access = requireContributorAccess(db, userId, id, 'upload');
+          const logEntryId = kind === 'attachments' ? (envelope.metadata as AttachmentMeta).logEntryId : null;
+          if (logEntryId != null) {
+            if (!db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ? AND private = 0').get(logEntryId, id)) {
+              throw new HttpError(404, 'log_entry_not_found');
+            }
+          }
+          const occurrence = saveUpload(db, access.projectId, id, userId, kind, envelope);
+          return buildSharedRecord(db, access)[kind].find(item => item.id === occurrence.id);
+      })());
+      return reply.status(201).send(result);
+    });
+  }
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/photos/:itemId/:variant', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+      await sendFile(request, reply, config.filesDir, resolvePhotoFile(db, id, itemId, variant), variant === 'original' ? 'attachment' : 'inline');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/file', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'shared'), 'attachment');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/preview', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const descriptor = describeAttachment(db, id, itemId, 'shared');
+      if (request.method === 'HEAD') return reply.send();
+      return descriptor;
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/view', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'shared'), 'inline');
+    },
+  });
+}
+``````
+
+#### File: `src/server/app.ts`
+
+<!-- replay task=16 phase=implementation sha256=0cea62216d67298b34759e789ba2652af459b9fd8e01c16dbe65b41a650881c1 -->
+
+``````ts
+import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { ZodError } from 'zod';
+import { DEFAULT_LOGIN_LIMITS, LoginLimiter } from './auth/login-limiter';
+import type { AppConfig } from './config';
+import type { Db } from './db/connection';
+import { HttpError } from './errors';
+import { registerGuards } from './http/guards';
+import { registerProjectRoutes } from './lists/projects';
+import { registerPeopleRoutes } from './lists/people';
+import { registerTradeRoutes } from './lists/trades';
+import { registerZoneTypeRoutes } from './lists/zone-types';
+import { registerTagRoutes } from './lists/tags';
+import { registerLocationRoutes } from './lists/locations';
+import { registerRecordRoutes } from './records/routes';
+import { registerFileRoutes } from './files/routes';
+import { openStorageCapacity } from './files/capacity';
+import { requireShareKey } from './sharing/crypto';
+import { reconcileShareKey } from './sharing/links';
+import { registerSharingRoutes } from './sharing/routes';
+import { safeErrorDiagnostic, safeLogger } from './http/logging';
+import { registerAccessRoutes } from './access/routes';
+import { registerAuthRoutes } from './routes/auth';
+import { registerHealthRoutes } from './routes/health';
+
+export interface AppDeps {
+  config: AppConfig;
+  db: Db;
+  /** Tests may pass their own limiter; the server uses the defaults. */
+  limiter?: LoginLimiter;
+  logger?: FastifyServerOptions['logger'];
+}
+
+export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+  const { config, db } = deps;
+  requireShareKey(config.shareKey);
+  const capacity = await openStorageCapacity(config.filesDir, {
+    budgetBytes: config.filesStorageBudgetBytes ?? 0,
+    freeReserveBytes: config.filesFreeReserveBytes ?? 0,
+  });
+  const revokedLinks = reconcileShareKey(db, config.shareKey);
+  const app = Fastify({ logger: safeLogger(deps.logger), bodyLimit: 1024 * 1024 });
+  if (revokedLinks > 0) app.log.info({ event: 'share_key_changed', revokedLinks });
+  await app.register(cookie);
+  await app.register(multipart);
+  registerGuards(app, config, db);
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof HttpError) {
+      if (error.statusCode >= 500) {
+        const cause: unknown = Object.getOwnPropertyDescriptor(error, 'cause')?.value;
+        request.log.error({ event: 'internal_error', ...safeErrorDiagnostic(cause ?? error) });
+      }
+      return reply
+        .status(error.statusCode)
+        .send(error.details === undefined ? { error: error.code } : { error: error.code, details: error.details });
+    }
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        error: 'invalid_input',
+        details: error.issues.map((issue) => ({ path: issue.path.map(String).join('.'), message: issue.message })),
+      });
+    }
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      return reply.status(statusCode).send({ error: 'bad_request' });
+    }
+    request.log.error({ event: 'internal_error', ...safeErrorDiagnostic(error) });
+    return reply.status(500).send({ error: 'internal_error' });
+  });
+  app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));
+
+  registerHealthRoutes(app);
+  registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
+  registerProjectRoutes(app, db);
+  registerPeopleRoutes(app, db);
+  registerTradeRoutes(app, db);
+  registerZoneTypeRoutes(app, db);
+  registerTagRoutes(app, db);
+  registerLocationRoutes(app, db);
+  registerRecordRoutes(app, db);
+  registerFileRoutes(app, db, config, capacity);
+  registerSharingRoutes(app, db, config);
+  registerAccessRoutes(app, db, config, capacity);
+  return app;
+}
+``````
+
+#### File: `src/server/config.ts`
+
+<!-- replay task=16 phase=implementation sha256=c9e5b54715da7730775f0e4fd856fd1ce322da6d87e85a1cf521ebed22b5eeb9 -->
+
+``````ts
+import { join } from 'node:path';
+
+export interface AppConfig {
+  dataDir: string;
+  dbPath: string;
+  backupsDir: string;
+  filesDir: string;
+  shareKey: Buffer | null;
+  /** Explicit HTTP upload capacity settings; offline commands may omit them. */
+  filesStorageBudgetBytes: number | null;
+  filesFreeReserveBytes: number | null;
+  /** Scheme + host (+ port) that browsers send as Origin, e.g. https://builtbasis.ktimanet.com */
+  publicOrigin: string;
+  secureCookies: boolean;
+  /** Read the visitor IP from CF-Connecting-IP (design §11.6). */
+  behindCloudflare: boolean;
+  /** PORT: a port number or a socket path. null = listen like Hetzner's example (no arguments). */
+  port: string | null;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const dataDir = env.BUILTBASIS_DATA_DIR;
+  if (!dataDir) throw new Error('BUILTBASIS_DATA_DIR is not set');
+  const publicOrigin = new URL(env.PUBLIC_BASE_URL ?? 'http://localhost:3000').origin;
+  const encodedKey = env.SHARE_LINK_KEY;
+  if (encodedKey !== undefined && !/^[a-fA-F0-9]{64}$/.test(encodedKey)) {
+    throw new Error('SHARE_LINK_KEY must contain exactly 64 hexadecimal characters');
+  }
+  const positiveBytes = (key: string): number | null => {
+    const value = env[key];
+    if (value === undefined) return null;
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
+      throw new Error(`${key} must be a positive safe integer byte count`);
+    }
+    return Number(value);
+  };
+  return {
+    dataDir,
+    dbPath: join(dataDir, 'builtbasis.db'),
+    backupsDir: join(dataDir, 'backups'),
+    filesDir: join(dataDir, 'files'),
+    shareKey: encodedKey === undefined ? null : Buffer.from(encodedKey, 'hex'),
+    filesStorageBudgetBytes: positiveBytes('FILES_STORAGE_BUDGET_BYTES'),
+    filesFreeReserveBytes: positiveBytes('FILES_FREE_RESERVE_BYTES'),
+    publicOrigin,
+    secureCookies: publicOrigin.startsWith('https://'),
+    behindCloudflare: env.BEHIND_CLOUDFLARE === '1',
+    port: env.PORT ?? null,
+  };
+}
+``````
+
+#### File: `src/server/files/admission.ts`
+
+<!-- replay task=16 phase=implementation sha256=59f9a322b9e2566754cd3dcbbb88bfd84740debc70f10480f19584549012ea80 -->
+
+``````ts
+import type { FastifyRequest } from 'fastify';
+import { HttpError } from '../errors';
+import type { StorageCapacity, UploadReservation } from './capacity';
+import { discardStaged, publishFile } from './storage';
+import { parseUpload, type UploadEnvelope } from './uploads';
+
+/** Caller checks its owner/grant access before admission and rechecks mutable grants at commit. */
+export async function withUpload<T>(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments', capacity: StorageCapacity,
+  consume: (envelope: UploadEnvelope) => T | Promise<T>): Promise<T> {
+  let slot: UploadReservation;
+  try { slot = await capacity.reserve(request.headers['content-length']); }
+  catch (error) { request.raw.resume(); throw error; }
+  let envelope: UploadEnvelope | undefined;
+  let cleanupUncertain = false;
+  const cleanupFailed = () => { cleanupUncertain = true; slot.cleanupFailed(); };
+  try {
+    // Admission awaits the disk probe; an abort may precede multipart listeners.
+    if (request.raw.aborted || request.raw.destroyed) throw new HttpError(400, 'invalid_upload');
+    envelope = await parseUpload(request, filesDir, kind, { maxBodyBytes: slot.maxBodyBytes, cleanupFailed });
+    for (const file of Object.values(envelope.files)) await publishFile(filesDir, file, slot.retained);
+    return await consume(envelope);
+  } catch (error) {
+    if (['ENOSPC', 'EDQUOT'].includes((error as NodeJS.ErrnoException).code ?? '')) throw new HttpError(507, 'storage_capacity', undefined, { cause: error });
+    throw error;
+  } finally {
+    try {
+      if (envelope) await Promise.all(Object.values(envelope.files).map(file => discardStaged(file).catch(cleanupFailed)));
+    } finally {
+      slot.release();
+    }
+    if (cleanupUncertain) throw new HttpError(507, 'storage_capacity');
+  }
+}
+``````
+
+#### File: `src/server/files/capacity.ts`
+
+<!-- replay task=16 phase=implementation sha256=548787815781a008dd0b693841ecca5c85540fbdc95684fc8c9d501c3440f496 -->
+
+``````ts
+import { mkdir, readdir, stat, statfs } from 'node:fs/promises';
+import { join } from 'node:path';
+import { UPLOAD_REQUEST_LIMIT } from '../../domain';
+import { HttpError } from '../errors';
+import { blobPath, type StagedFile } from './storage';
+
+export interface StoragePolicy { budgetBytes: number; freeReserveBytes: number }
+export interface UploadReservation {
+  maxBodyBytes: number;
+  retained: (file: StagedFile) => void;
+  cleanupFailed: () => void;
+  release: () => void;
+}
+const denied = (cause?: unknown) => new HttpError(507, 'storage_capacity', undefined, { cause });
+
+/** One HTTP process owns this directory. Retained blobs are never deleted while it runs. */
+export async function openStorageCapacity(filesDir: string, policy: StoragePolicy) {
+  if (![policy.budgetBytes, policy.freeReserveBytes].every(value => Number.isSafeInteger(value) && value > 0)) {
+    throw new Error('storage_configuration_required');
+  }
+  const retainedPaths = new Map<string, bigint>();
+  const inodes = new Set<string>();
+  let retainedBytes = 0n;
+  let pendingBytes = 0n;
+  let healthy = true;
+  const budget = BigInt(policy.budgetBytes);
+  const reserve = BigInt(policy.freeReserveBytes);
+  async function inventory(dir: string): Promise<void> {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) await inventory(path);
+      else if (entry.isFile()) {
+        const info = await stat(path, { bigint: true });
+        retainedPaths.set(path, info.size);
+        // A crash can leave the temporary and published names for one hardlinked inode.
+        const key = `${info.dev}:${info.ino}`;
+        if (!inodes.has(key)) { inodes.add(key); retainedBytes += info.size; }
+      } else throw new Error('unsupported_storage_entry');
+    }
+  }
+  try { await mkdir(filesDir, { recursive: true }); await inventory(filesDir); }
+  catch { throw new Error('storage_inventory_failed'); }
+
+  return {
+    async reserve(contentLength: string | undefined): Promise<UploadReservation> {
+      if (contentLength !== undefined && !/^\d+$/.test(contentLength)) throw new HttpError(400, 'invalid_upload');
+      const amount = contentLength === undefined ? BigInt(UPLOAD_REQUEST_LIMIT) : BigInt(contentLength);
+      if (amount > BigInt(UPLOAD_REQUEST_LIMIT)) throw new HttpError(413, 'upload_too_large');
+      if (!healthy || retainedBytes + pendingBytes + amount > budget) throw denied();
+      // Reserve before the first await so concurrent admissions cannot spend the same headroom.
+      pendingBytes += amount;
+      try {
+        const space = await statfs(filesDir, { bigint: true });
+        if (!healthy || space.bavail * space.bsize - pendingBytes < reserve) throw denied();
+      } catch (error) {
+        pendingBytes -= amount;
+        throw denied(error);
+      }
+      let released = false;
+      return {
+        maxBodyBytes: Number(amount),
+        retained: (file: StagedFile): void => {
+          const path = blobPath(filesDir, file.hash);
+          const size = BigInt(file.size);
+          const existing = retainedPaths.get(path);
+          if (existing !== undefined) {
+            if (existing !== size) healthy = false;
+            return;
+          }
+          retainedPaths.set(path, size);
+          retainedBytes += size;
+        },
+        cleanupFailed: (): void => { healthy = false; },
+        release: (): void => {
+          if (!released) { pendingBytes -= amount; released = true; }
+        },
+      };
+    },
+  };
+}
+export type StorageCapacity = Awaited<ReturnType<typeof openStorageCapacity>>;
+``````
+
+#### File: `src/server/files/routes.ts`
+
+<!-- replay task=16 phase=implementation sha256=092cefe36e42b38fcf5f614a43881c3e7ee01e8906c60b63f003b3578d3de8d3 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { AttachmentPatch, PhotoPatch, PhotoVariantParam } from '../../domain';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { ItemParams, RecordItemParams } from '../http/params';
+import { requireUserId } from '../http/user';
+import { requireRecord } from '../records/store';
+import { deleteOccurrence, editOccurrence, listAttachments, listPhotos, saveUpload } from './occurrences';
+import { withUpload } from './admission';
+import type { StorageCapacity } from './capacity';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from './downloads';
+import { describeAttachment, resolveAttachmentView } from './previews';
+
+export function registerFileRoutes(app: FastifyInstance, db: Db, config: AppConfig, capacity: StorageCapacity): void {
+  app.get('/api/projects/:projectId/records/:id/attachments/:itemId/preview', { config: { privateResponse: true } }, async request => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    return describeAttachment(db, id, itemId, 'owner');
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/view', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'owner'), 'inline');
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/photos/:itemId/:variant', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+    requireRecord(db, projectId, id);
+    const target = resolvePhotoFile(db, id, itemId, variant);
+    await sendFile(request, reply, config.filesDir, target, variant === 'original' ? 'attachment' : 'inline');
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/file', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'owner'), 'attachment');
+  } });
+  for (const kind of ['photos', 'attachments'] as const) {
+    const url = `/api/projects/:projectId/records/:id/${kind}`;
+    app.post(url, { config: { multipart: true } }, async (request, reply) => {
+      const { projectId, id } = ItemParams.parse(request.params);
+      requireRecord(db, projectId, id);
+      const result = await withUpload(request, config.filesDir, kind, capacity, envelope =>
+        saveUpload(db, projectId, id, requireUserId(request), kind, envelope));
+      return reply.status(201).send(result);
+    });
+    app.get(url, async request => {
+      const { projectId, id } = ItemParams.parse(request.params);
+      requireRecord(db, projectId, id);
+      return kind === 'photos' ? listPhotos(db, id) : listAttachments(db, id);
+    });
+    app.patch(`${url}/:itemId`, async request => {
+      const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+      const patch = kind === 'photos' ? PhotoPatch.parse(request.body) : AttachmentPatch.parse(request.body);
+      return editOccurrence(db, projectId, id, itemId, requireUserId(request), kind, patch);
+    });
+    app.delete(`${url}/:itemId`, async request => {
+      const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+      deleteOccurrence(db, projectId, id, itemId, requireUserId(request), kind);
+      return { ok: true };
+    });
+  }
+}
+``````
+
+#### File: `src/server/files/storage.ts`
+
+<!-- replay task=16 phase=implementation sha256=ef1873d602bf5102c2cc9b96149be52aec481e95eff6a68838721789ed9e2f4a -->
+
+``````ts
+import { createHash, randomBytes } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { link, mkdir, open, stat, unlink, type FileHandle } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import type { Readable } from 'node:stream';
+import { FILE_LIMITS, Filename, type FilePurpose } from '../../domain';
+import { HttpError } from '../errors';
+import { detectFormat } from './formats';
+
+export interface StagedFile { path: string; hash: string; size: number; contentType: string }
+export function blobPath(filesDir: string, hash: string): string {
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('invalid_blob_hash');
+  return join(filesDir, hash.slice(0, 2), hash);
+}
+export async function discardStaged(staged: Pick<StagedFile, 'path'>): Promise<void> {
+  try { await unlink(staged.path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+}
+export async function stageFile(filesDir: string, source: Readable, filename: string, purpose: FilePurpose, onCleanupFailure?: () => void): Promise<StagedFile> {
+  let file: FileHandle | undefined;
+  let path: string | undefined;
+  try {
+    const name = Filename.parse(filename);
+    const tempDir = join(filesDir, '.tmp');
+    await mkdir(tempDir, { recursive: true });
+    const candidate = join(tempDir, randomBytes(24).toString('hex'));
+    file = await open(candidate, 'wx', 0o600);
+    path = candidate;
+    const hash = createHash('sha256');
+    let size = 0;
+    let prefix = Buffer.alloc(0);
+    for await (const chunk of source) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += bytes.length;
+      if (size > FILE_LIMITS[purpose]) throw new HttpError(413, 'upload_too_large');
+      if (prefix.length < 512) prefix = Buffer.concat([prefix, bytes.subarray(0, 512 - prefix.length)]);
+      hash.update(bytes);
+      for (let offset = 0; offset < bytes.length;) {
+        const result = await file.write(bytes, offset, bytes.length - offset);
+        if (result.bytesWritten === 0) throw new Error('file_write_incomplete');
+        offset += result.bytesWritten;
+      }
+    }
+    if ((source as Readable & { truncated?: boolean }).truncated) throw new HttpError(413, 'upload_too_large');
+    if (size === 0) throw new HttpError(415, 'unsupported_file_type');
+    const contentType = detectFormat(prefix, name, purpose);
+    await file.sync();
+    await file.close();
+    file = undefined;
+    return { path, hash: hash.digest('hex'), size, contentType };
+  } catch (error) {
+    source.destroy();
+    // Try both cleanup operations even if close itself fails; retain the original error.
+    if (file) await file.close().catch(() => onCleanupFailure?.());
+    if (path) await discardStaged({ path }).catch(() => onCleanupFailure?.());
+    throw error;
+  }
+}
+export async function publishFile(filesDir: string, staged: StagedFile, onRetained?: (file: StagedFile) => void): Promise<void> {
+  const destination = blobPath(filesDir, staged.hash);
+  const dir = dirname(destination);
+  await mkdir(dir, { recursive: true });
+  try { await link(staged.path, destination); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    if ((await stat(destination)).size !== staged.size) throw new Error('blob_collision');
+    const hash = createHash('sha256');
+    for await (const chunk of createReadStream(destination)) hash.update(chunk);
+    if (hash.digest('hex') !== staged.hash) throw new Error('blob_collision');
+  }
+  // Charge retained bytes before sync or cleanup can fail. Database rollback never removes this blob.
+  onRetained?.(staged);
+  if (process.platform !== 'win32') {
+    // Persist newly created directory entries as well as the published file entry.
+    for (const path of [dirname(filesDir), filesDir, dir]) {
+      const handle = await open(path, 'r');
+      try { await handle.sync(); } finally { await handle.close(); }
+    }
+  }
+  await discardStaged(staged);
+}
+``````
+
+#### File: `src/server/files/uploads.ts`
+
+<!-- replay task=16 phase=implementation sha256=5982358d7ec2add1b69be075269f1694b67762905ac71c106681cd0130965372 -->
+
+``````ts
+import type { FastifyRequest } from 'fastify';
+import type { Readable } from 'node:stream';
+import { ZodError } from 'zod';
+import { AttachmentUploadMeta, Filename, PhotoUploadMeta, UPLOAD_REQUEST_LIMIT, type AttachmentMeta, type PhotoMeta } from '../../domain';
+import { HttpError } from '../errors';
+import { discardStaged, stageFile, type StagedFile } from './storage';
+
+export interface UploadFile extends StagedFile { filename: string }
+export interface UploadEnvelope {
+  metadata: PhotoMeta | AttachmentMeta;
+  files: Record<string, UploadFile>;
+}
+export interface UploadControls {
+  maxBodyBytes?: number;
+  cleanupFailed?: () => void;
+}
+
+export async function parseUpload(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments', controls: UploadControls = {}): Promise<UploadEnvelope> {
+  if (!request.isMultipart()) throw new HttpError(415, 'unsupported_content_type');
+  // @fastify/multipart consumes request.raw directly, not Fastify's preParsing payload.
+  // Count that stream before starting its lazy parser, after the route's access check.
+  const declared = request.headers?.['content-length'];
+  if (declared !== undefined && Number(declared) > UPLOAD_REQUEST_LIMIT) {
+    request.raw.resume();
+    throw new HttpError(413, 'upload_too_large');
+  }
+  let bytes = 0;
+  let budgetError: HttpError | undefined;
+  const countBytes = (chunk: Buffer | string): void => {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > Math.min(UPLOAD_REQUEST_LIMIT, controls.maxBodyBytes ?? UPLOAD_REQUEST_LIMIT) && !budgetError) {
+      budgetError = new HttpError(413, 'upload_too_large');
+      // Tell the multipart parser to terminate its active file without destroying
+      // the HTTP socket, so the caller still receives the 413 response.
+      request.raw.emit('error', budgetError);
+    }
+  };
+  request.raw.on('data', countBytes);
+  const photo = kind === 'photos';
+  const expected = photo ? ['original', 'display', 'thumbnail'] : ['file'];
+  const files: Record<string, UploadFile> = {};
+  let metadata: unknown;
+  let hasMetadata = false;
+  let currentFile: Readable | undefined;
+  try {
+    for await (const part of request.parts({
+      limits: {
+        files: photo ? 3 : 1,
+        fields: 1,
+        parts: photo ? 4 : 2,
+        fileSize: UPLOAD_REQUEST_LIMIT,
+        fieldSize: 16_384,
+        fieldNameSize: 100,
+        headerPairs: 100,
+      },
+    })) {
+      if (part.type === 'file') {
+        currentFile = part.file;
+        if (!expected.includes(part.fieldname) || files[part.fieldname]) {
+          part.file.resume();
+          throw new HttpError(400, 'invalid_upload');
+        }
+        const filename = Filename.parse(part.filename);
+        const purpose = photo ? `photo-${part.fieldname}` as 'photo-original' | 'photo-display' | 'photo-thumbnail' : 'attachment';
+        const staged = await stageFile(filesDir, part.file, filename, purpose, controls.cleanupFailed);
+        files[part.fieldname] = { ...staged, filename };
+        currentFile = undefined;
+      } else {
+        if (part.fieldnameTruncated || part.valueTruncated) throw new HttpError(413, 'upload_too_large');
+        if (part.fieldname !== 'metadata' || hasMetadata) throw new HttpError(400, 'invalid_upload');
+        hasMetadata = true;
+        // Multipart parses application/json fields itself; text fields remain raw JSON strings.
+        metadata = typeof part.value === 'string' ? JSON.parse(part.value) : part.value;
+      }
+    }
+    if (budgetError) throw budgetError;
+    if (!hasMetadata || expected.some(name => !files[name])) throw new HttpError(400, 'invalid_upload');
+    return {
+      metadata: photo ? PhotoUploadMeta.parse(metadata) : AttachmentUploadMeta.parse(metadata),
+      files,
+    };
+  } catch (error) {
+    currentFile?.destroy();
+    // Stop the multipart parser and drain unread request bytes after an early rejection.
+    request.raw.unpipe();
+    request.raw.resume();
+    await Promise.all(Object.values(files).map(file => discardStaged(file).catch(() => controls.cleanupFailed?.())));
+    if (budgetError) throw budgetError;
+    if (error instanceof HttpError) throw error;
+    const code = (error as { code?: string }).code;
+    if (code && ['FST_REQ_FILE_TOO_LARGE', 'FST_FILES_LIMIT', 'FST_FIELDS_LIMIT', 'FST_PARTS_LIMIT'].includes(code)) {
+      throw new HttpError(413, 'upload_too_large');
+    }
+    const malformed = ['Multipart: Boundary not found', 'Unexpected end of multipart data', 'Premature close'];
+    if (error instanceof ZodError || error instanceof SyntaxError || code === 'FST_INVALID_JSON_FIELD_ERROR' || malformed.includes((error as Error).message)) {
+      throw new HttpError(400, 'invalid_upload');
+    }
+    throw error;
+  } finally {
+    request.raw.off('data', countBytes);
+  }
+}
+``````
+
+#### File: `src/server/http/logging.ts`
+
+<!-- replay task=16 phase=implementation sha256=de8f3d09fca624c5991403622ee0cb0c0ed239a026265244a7dbcc544e04b8ba -->
+
+``````ts
+import type { FastifyRequest, FastifyServerOptions } from 'fastify';
+
+const filesystemCodes = new Set(['ENOENT', 'EACCES', 'EPERM', 'ENOSPC', 'EDQUOT', 'EMFILE', 'ENFILE', 'EIO', 'EROFS', 'ENOTDIR', 'EISDIR', 'EEXIST', 'ENOTEMPTY']);
+const sqliteCodes = new Set(['SQLITE_BUSY', 'SQLITE_LOCKED', 'SQLITE_FULL', 'SQLITE_READONLY', 'SQLITE_CORRUPT', 'SQLITE_NOTADB', 'SQLITE_IOERR', 'SQLITE_CANTOPEN', 'SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT_UNIQUE', 'SQLITE_CONSTRAINT_FOREIGNKEY', 'SQLITE_CONSTRAINT_NOTNULL', 'SQLITE_CONSTRAINT_CHECK']);
+const systemCodes = new Set(['ENOMEM', 'ECONNRESET', 'ECONNABORTED', 'EPIPE', 'ETIMEDOUT', 'EADDRINUSE', 'ERR_STREAM_PREMATURE_CLOSE']);
+const applicationCodes = new Set(['file_unavailable', 'share_copy_failed', 'storage_capacity']);
+
+/** Never copy a name, message, stack, path or arbitrary code supplied by an error. */
+export function safeErrorDiagnostic(error: unknown): { type: string; code?: string } {
+  if (!(error instanceof Error)) return { type: 'internal_error' };
+  // A data property avoids invoking an untrusted getter during error handling.
+  const code: unknown = Object.getOwnPropertyDescriptor(error, 'code')?.value;
+  if (typeof code === 'string') {
+    if (filesystemCodes.has(code)) return { type: 'filesystem_error', code };
+    if (sqliteCodes.has(code)) return { type: 'sqlite_error', code };
+    if (systemCodes.has(code)) return { type: 'system_error', code };
+    if (applicationCodes.has(code)) return { type: 'application_error', code };
+  }
+  if (error instanceof TypeError) return { type: 'TypeError' };
+  if (error instanceof RangeError) return { type: 'RangeError' };
+  if (error instanceof SyntaxError) return { type: 'SyntaxError' };
+  return { type: 'internal_error' };
+}
+
+/** Request/response data is never a log payload. Only registered patterns identify routes. */
+export function safeLogger(logger: FastifyServerOptions['logger']): FastifyServerOptions['logger'] {
+  if (!logger) return false;
+  return {
+    ...(typeof logger === 'object' ? logger : {}),
+    redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+    hooks: {
+      logMethod(args, method) {
+        const first: unknown = args[0];
+        const error = first instanceof Error ? first
+          : first !== null && typeof first === 'object' ? Object.getOwnPropertyDescriptor(first, 'err')?.value : undefined;
+        if (error !== undefined) {
+          // Pino otherwise derives msg from the raw error before running serializers.
+          method.call(this, { err: error }, 'internal_error');
+          return;
+        }
+        method.apply(this, args);
+      },
+    },
+    serializers: {
+      req: (request: FastifyRequest) => ({ method: request.method, route: request.routeOptions?.url ?? '<unmatched>' }),
+      res: (response: { statusCode: number }) => ({ statusCode: response.statusCode }),
+      err: error => ({ ...safeErrorDiagnostic(error), message: 'internal_error', stack: '' }),
+    },
+  };
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/storage-capacity.test.ts tests/server/storage-admission-api.test.ts tests/server/config.test.ts tests/server/share-logging.test.ts tests/server/upload-http.test.ts tests/server/files-api.test.ts tests/server/assigned-records.test.ts tests/server/file-storage.test.ts`, then `npm run typecheck`. Expected: 92 tests in eight files pass and TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add '.env.example' 'src/server/access/routes.ts' 'src/server/app.ts' 'src/server/config.ts' 'src/server/files/admission.ts' 'src/server/files/capacity.ts' 'src/server/files/routes.ts' 'src/server/files/storage.ts' 'src/server/files/uploads.ts' 'src/server/http/logging.ts' 'tests/server/config.test.ts' 'tests/server/helpers.ts' 'tests/server/share-logging.test.ts' 'tests/server/storage-admission-api.test.ts' 'tests/server/storage-capacity.test.ts' 'tests/server/upload-http.test.ts'
+git commit -m "feat: enforce storage admission and release interrupted reservations"
+```
+
 ## Implementation closeout
 
 - [ ] Run the entire suite and TypeScript check after the final task. Record actual implementation commits and counts. Run `git diff --check`.
@@ -14256,21 +16234,38 @@ git commit -m "docs: reconcile accounts attachments and browser handoff"
 
 ## Preflight and execution checks
 
+**Mandatory dependency baseline check, before Task 1:** run the command below in the execution checkout. It compares normalized file contents, not timestamps. If either dependency file has changed, stop before writing any snapshot. Reconcile the plan against those changes and replay it again; never overwrite newer dependencies with the embedded lockfile. The lockfile is retained as exact replay evidence, rather than resolving new transitive versions during execution.
+
+```powershell
+node -e "const fs=require('node:fs'),c=require('node:crypto'),expected={'package.json':'33ddbd8e6057f36dd0afe1d62c25eafa9aa644d289c9c68e816d9d0323b9768f','package-lock.json':'98dd880c8295cce6283ed53de5bbde3393b26af27714539e39e2160ee90d0631'};for(const [p,h]of Object.entries(expected)){if(c.createHash('sha256').update(fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n')).digest('hex')!==h)throw Error(p+' changed since the replay; stop and reconcile the plan before execution');}console.log('Dependency baseline matches the replay');"
+if ($LASTEXITCODE -ne 0) { throw "Dependency baseline changed; do not execute this plan" }
+```
+
+
 Before Task 1, verify the final revised scratch-replay evidence and read the revised approved design. Tasks 1–8 establish the already-tested foundation; the subsequent revision tasks replace its narrower type/size and single-user assumptions. Do not deploy an intermediate task as the completed Plan 4. Inspect clean status and read the approved design plus this plan. Create the execution worktree at that time. Confirm `main` includes `8324b2e`, or assess later changes by interface rather than assuming an old line number. Baseline `npm test` is 237 tests/29 files and `npm run typecheck` passes on that commit. Installation uses the documented `npm ci --ignore-scripts` / `npm rebuild esbuild` sequence. Do not run the server against the real local database just to test migrations.
 
 Current named integration checks: `getRecordDetail`, `listOptions`, `listMeasurementSets`, `listVerifications`, `listLog`, `listActivity`; the multipart route-config flag; Log deletion's transaction; migration registration; config consumers in owner/seed scripts. Changes to authentication apply globally: rerun the original auth suite after Tasks 5–7.
 
 ## Replay and review evidence
 
-On 2026-10-03 the complete code was extracted from the Markdown file blocks into a separate disposable checkout. Tasks 1–8 retain the previously replayed foundation. The revised Tasks 9–13 each failed as expected before their implementation blocks, then passed their focused tests and TypeScript check. Task 14 changes documentation only. Every task's exact staging paths and commit commands were exercised.
+On 2026-10-03 the complete code blocks were replayed incrementally in a separate disposable checkout. The earlier Tasks 1–14 passed 365 tests in 47 files. The external-review follow-up added Tasks 15–16 and corrected the Task 14 handoff. Each changed runtime task failed its new assertions before implementation, then passed its focused tests and TypeScript check. The real-network tests initially passed against the existing parser; no artificial parser failure was introduced.
 
-Final independent code replay at `bf840ae` passed `npm test -- --reporter=dot`: **365 tests in 47 files**. `npm run typecheck` passed. The replay's final source, tests, scripts, dependency files and handoff documents match the authoring checkpoint `8d656bc`, ignoring line endings. This is planning evidence; the product on main remains the Plan 3 baseline.
+**Final independent replay:** checkpoint `52b24cb` passed `npm test -- --reporter=dot`: **393 tests in 50 files**. `npm run typecheck` passed. Final source, tests, scripts, configuration and handoff documents match authoring checkpoint `4d2c0b1`, ignoring line endings. Every task's exact staging paths and commit commands were checked. Code-block SHA-256 values are verified against the final replay files. This is planning evidence; the product on main remains the Plan 3 baseline.
 
-The browser email-parser probe also passed its pinned browser-target build and isolated synthetic EML/MSG assertions, with zero attempted network requests. Its source and reproducible commands are retained in [the research fixture](../research/fixtures/2026-10-03-email-viewer-probe). This proves parser feasibility, not completed browser UI or reliable 100 MB email decoding on every phone.
+Review follow-up dispositions:
 
-Independent security review found no remaining actionable issue in the account foundation, record grants, media routes or contributor integration. It checked default-deny routing, public projections, occurrence-level privacy, session/grant rechecks after streaming, independent permissions, canonical MIME, SVG restrictions, ranges, HEAD and whole-request accounting. The review identified a restore consequence of named accounts: Task 14 and design §11.7 now require disabling non-owner accounts, clearing grants and resetting passwords before re-enabling access. The final documentation correction was replayed at `c51c292`; runtime code is unchanged from the tested `bf840ae`.
+- The owner chose a configurable total managed-file budget and free-space reserve, with no per-user quota and no deletion of published blobs. Task 16 counts retained orphan/stale files and concurrent reservations. Production values remain a Plan 6 deployment decision against the actual account allowance; there are no defaults.
+- Diagnostic logging exposes only static allowlisted categories/codes, never arbitrary error names, messages, paths or stacks. Tests reproduced and fixed Pino's raw-message fallback and preserved wrapped filesystem diagnostics.
+- Six real loopback HTTP cases cover normal and exactly-100-MB uploads, streamed overflow with readable 413, declared oversize, interrupted staging and disconnect while the disk-space check is pending. Independent review reproduced a reservation leak in that last timing window; the permanent regression failed with 507 before the fix and passed afterwards. A final test correction explicitly closes replacement listeners.
+- The embedded dependency snapshots remain exact replay evidence. A mandatory SHA-256 baseline guard runs before Task 1 and again before Task 3 writes either dependency file. It passed on the unchanged baseline and rejected a modified lockfile. Any drift requires reconciliation and replay; the executor must not overwrite newer dependencies. Locked `npm ci --ignore-scripts` plus the explicit esbuild rebuild remains required.
+- The browser handoff forbids original-upload Blob navigation/document embedding, protects shared SVG via rasterisation, and requires a reviewed PDF rendering path. Office macros and archives remain download-only under the approved format policy. Optional task restructuring was deferred; the corrected execution order remains explicit.
+- The design document now uses consistent LF line endings. Restore rules disable contributors, clear grants and require deliberate password reset before enabling restored access.
 
-Remaining execution checks: browser viewers/HEIC/cancellation and language UI in Plan 5; hosting upload/proxy limits, memory behavior, Linux directory durability, PDF, restore drill and specification closeout in Plan 6. No real project files, credentials or production data were used for the replay.
+Independent security review found no remaining actionable issue after the fixes. It checked owner-default authorization, public projections, occurrence-level privacy, session/grant rechecks, safe diagnostics, native MIME/SVG/ranges/HEAD, whole-request limits and storage reservation lifecycle. No further code or test changes were requested.
+
+The browser email-parser probe passed its pinned browser-target build and isolated synthetic EML/MSG assertions with zero attempted network requests. Source and reproducible commands remain in [the research fixture](../research/fixtures/2026-10-03-email-viewer-probe). This establishes parser feasibility, not completed browser UI or guaranteed 100 MB email decoding on every phone.
+
+Remaining execution checks: browser viewers/HEIC/cancellation, Blob navigation protection and language UI in Plan 5; hosting/account capacity values, proxy limits, production memory, Linux directory durability, PDF, restore drill and specification closeout in Plan 6. No real project files, credentials or production data were used for replay.
 
 ## Technical references checked while planning
 
@@ -14279,3 +16274,7 @@ Remaining execution checks: browser viewers/HEIC/cancellation and language UI in
 - [Node crypto](https://nodejs.org/api/crypto.html): built-in random bytes, SHA-256 and authenticated AES-GCM.
 - [Node 24 filesystem APIs](https://nodejs.org/docs/latest-v24.x/api/fs.html): stream temporary bytes and publish using same-filesystem links without replacing an existing file.
 - [Attachment formats and viewer research](../research/2026-10-03-attachment-formats-and-viewers.md): exact 145-extension policy, vendor provenance and browser email parser probe. Download-only CAD is not gated on a drawing version.
+
+
+
+- [MDN Blob URLs](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/blob) and [SVG image restrictions](https://developer.mozilla.org/en-US/docs/Web/SVG/Guides/SVG_as_an_image): Blob URLs carry the creator origin, and SVG image-context restrictions do not apply to direct document navigation.
