@@ -199,7 +199,7 @@ The record shows photos grouped by phase. The original file is always kept uncha
 
 ### 5.9 Attachments
 
-Documents and drawings (PDF, images, office documents): file + title (optional) + original filename + upload date. Any number per record. Storage and access rules in §11.4.
+Documents and drawings (PDF, images, office documents, DWG): file + title (optional) + original filename + upload date. Any number per record. DWG is download-only; no drawing viewer or conversion is included. DWG support was approved by the owner on 2026-10-03 during Plan 4 review. Storage and access rules in §11.4.
 
 Attachments are added in two ways: **directly** to the record, or **through a log entry** (§5.11). The **Attachments pane lists all of the record's attachments**; those added through a log entry also show that entry's date and text (e.g. "Plans.pdf · 2026-05-01 · Architect sent plans"). Attachments of private log entries are private.
 
@@ -578,7 +578,7 @@ All database access is confined to `src/server` data-access modules, so a later 
 - **Photos** reference three blobs: original, display copy and thumbnail. The browser produces the display copy and thumbnail at upload, so the server needs no image-processing module.
 - **Originals are never modified or overwritten.** Corrections add new files.
 - **Access:** files are served only through an authorised application route, addressed by **occurrence**, never by blob. The owner's session can fetch any occurrence. A share-token request must name a **non-private occurrence belonging to the linked record** (not attached to a private log entry); authorisation and the returned metadata (filename, title, log entry) come from that occurrence only. A private occurrence stays inaccessible even if another, public occurrence references the same blob. This applies to originals, display copies and thumbnails. Knowing a content hash grants no access.
-- Limits: photos up to 25 MB, attachments up to 50 MB. Accepted: images (JPEG, PNG, HEIC), PDF, common office documents.
+- Limits: photos up to 25 MB, attachments up to 50 MB. Accepted: images (JPEG, PNG, HEIC), PDF, common office documents and DWG (download-only).
 
 ### 11.5 Authentication and sharing
 
