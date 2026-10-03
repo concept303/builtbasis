@@ -2,7 +2,18 @@
 
 Lightweight construction-control application: quality issues, detail clarifications and tasks — with measurements, decisions, photos and read-only sharing — in English and Greek.
 
-**Status:** design approved for v1; implementation planned (see roadmap), not started.
+**Status:** Plans 0–2 are complete. The server foundation runs locally; Plan 3 (records) is next. Plan 2 is merged to `main` (see roadmap).
+
+## Local dependency installation
+
+Use the locked dependencies and shipped SQLite binary:
+
+```sh
+npm ci --ignore-scripts
+npm rebuild esbuild
+```
+
+On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrectly attempted a SQLite source build despite the package declaring `gypfile: false`. The commands above were verified with all 155 tests and typechecking. Reassess install scripts when dependencies change.
 
 ## Documentation
 

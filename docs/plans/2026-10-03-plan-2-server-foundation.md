@@ -1,20 +1,22 @@
 # Plan 2 — Server Foundation Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Approved
-> **Retention:** Active until executed; historical afterwards.
+> **Status:** Completed
+> **Retention:** Historical — do not execute.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §3 (bilingual managed-list names), §9 (managed lists), §11.1–11.3 (stack, layout, data), §11.5 (owner login, sessions, request rules), §11.6 (hosting facts from the trial), §11.7 (backup function, pre-migration backup), §15 (seed data).
 > **Depends on:** Plan 0 (GO, 2026-10-03), Plan 1 (merged, `2f5f860`).
-> **Implemented by:** Not implemented
-> **Verified:** Not verified
+> **Implemented by:** `d0e80fa..352b9bc` (first through last implementation commit, inclusive; documentation closeout follows).
+> **Verified:** 2026-10-03 — `npm test`: 155 tests passed in 18 files; `npm run typecheck`: exit 0, no TypeScript diagnostics.
+> **Merged to main:** 2026-10-03, in the merge commit containing this update.
+> **Checklist note:** Preserved execution history. The checked steps record completion; historical snippets and expected failures are not current instructions.
 > **Plan check:** 2026-10-03 — every file in this plan was materialised into a scratch clone of `main` with the Task 1 dependencies: `npm run typecheck` clean; `npm test` 18 files, 136 tests passed; every `git add` path stages without an ignore error; local server answered as in Task 10; the real seed produced the Task 11 output, and a second run refused with exit code 1. The clone and its seeded database were deleted.
 > **Review:** 2026-10-03, second agent, on `6e259c3` — three findings, all reproduced and fixed: (1) the owner command now enforces the login form's username and password limits before writing anything, with the limits shared between both (Tasks 3, 5, 10); (2) `verifyPassword` accepts only hashes in exactly the stored format, so a malformed or altered hash never verifies (Task 3); (3) `.gitignore` un-ignores `.env.example` (Task 10 Step 5).
 >
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
+> **Historical execution instructions (do not execute):** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
 
 **Goal:** A running Fastify/TypeScript server on SQLite with owner login, the managed-list APIs (projects, people, trades, zone types, tags, location tree) and a seed for Gennadi 822A — all test-first, runnable locally.
 
-**Architecture:** `src/server` holds the HTTP app (`app.ts`), configuration, database access (better-sqlite3, migrations as TypeScript strings), owner authentication (scrypt passwords, hashed session tokens, login limiter) and one focused module per managed list (repository functions + routes). The managed-list input schemas (Zod) live in `src/domain/lists.ts`, so the browser can reuse them (design §11.2). Global hooks enforce the design's request rules: every state-changing request needs a matching `Origin` and a JSON body (multipart only where a route allows it), every `/api` route except health/login/logout needs a session, and GET handlers never write. Tests drive the app in-process with Fastify `inject` against a temporary SQLite file.
+**Architecture:** `src/server` holds the HTTP app (`app.ts`), configuration, database access (better-sqlite3, migrations as TypeScript strings), owner authentication (scrypt passwords, hashed session tokens, login limiter) and one focused module per managed list (repository functions + routes). The managed-list input schemas (Zod) live in `src/domain/lists.ts`, so the browser can reuse them (design §11.2). Global hooks enforce the design's request rules: every state-changing request needs a matching `Origin` and a JSON body (multipart only where a route allows it), every `/api` route except health/login needs a session, and GET handlers never write. Tests drive the app in-process with Fastify `inject` against a temporary SQLite file.
 
 **Tech Stack:** Node.js 24, TypeScript 5 (strict, ESM), Fastify 5, @fastify/cookie 11, better-sqlite3 13.0.3, Zod 4, Vitest 3, tsx 4 (dev runner), exceljs 4 (seed only).
 
@@ -25,16 +27,34 @@
 - npm on the server runs install scripts only for packages listed in `allowScripts`; there is no C++ compiler. better-sqlite3 13 ships prebuilt binaries. Pin it exactly (`13.0.3`) to match the `allowScripts` key.
 - Restart = stop the Node process; it restarts on the next request. `main.ts` handles `SIGTERM` by closing the server and the database.
 
-**Decisions and deviations** (the design is updated in Task 12 where it changes):
+**Closeout (2026-10-03):** No separate maintained Specification is warranted at this intermediate plan boundary. The roadmap assigns consolidated v1 specifications and Architecture reconciliation to Plan 6. The approved design remains the active implementation baseline through v1 delivery and reconciliation. Delivered behavior is evidenced by `src/server/`, `src/domain/lists.ts` and their tests; code and tests are not a normative Specification.
+
+Task 10 verified local startup, health, request guards and SIGINT shutdown. Task 11 verified the real local seed: 19 people, 34 trades, 13 zone types, 25 tags and 93 locations; a repeat import refused with exit 1. No owner password was supplied. Production deployment remains Plan 6 work.
+
+Final whole-branch review found no Critical or Important issues and judged the branch ready to merge. The controller independently confirmed 155 passing tests in 18 files, a clean typecheck and a CRLF-aware branch diff check. The branch remains unmerged.
+
+**Nonblocking follow-ups from final review:**
+
+- Before scheduled backups in Plan 6, make backup handle closing and temporary-file cleanup exception-safe. Add failure tests for backup verification and migration rollback.
+- Optional test improvements cover exact configuration paths, blank tag names and final sigma through the API, and retired descendants and Greek names in location copies.
+- Polish owner CLI cancellation so Ctrl+C at the password prompt exits without an uncaught `Cancelled` stack. Raw mode is already restored.
+- Fix the CSV parser's dropped final single empty quoted field before reusing it beyond the known import sources. The specified multi-column inputs are unaffected.
+
+The Task 1 audit reported four moderate development-dependency vulnerabilities across the Vitest/mocker and ExcelJS/uuid chains. They remain retained after review. The affected browser tooling is unused by these Node-only tests; ExcelJS uses uuid v4 without an output buffer, outside the affected v3/v5/v6 buffer paths. Reassess browser tooling in Plan 5. No dependency remediation is claimed.
+
+**Decisions and deviations** (design §9.3 and §11.6 reconciled in Task 12):
 
 1. **Input schemas live in `src/domain/lists.ts`** (design §11.2: shared Zod schemas). The server parses every request body with them.
-2. **Tag names match ignoring accents and final sigma, as well as letter case.** Design §9.3 says "ignoring letter case", but Greek capitals drop their accents, so «ΠΕΤΡΑ» must match «Πέτρα». *Assumption — the owner may overrule.* Design §9.3 is updated in Task 12.
-3. **`CF-Connecting-IP` cannot be checked against Cloudflare's addresses inside the app**, because Hetzner's web server is the app's direct peer. The header is trusted when `BEHIND_CLOUDFLARE=1`, and the login limiter adds a global cap. Design §11.6 is updated in Task 12; restricting the origin to Cloudflare's address ranges is left to Plan 6.
+2. **Tag names match ignoring accents and final sigma, as well as letter case.** Greek capitals drop their accents, so «ΠΕΤΡΑ» must match «Πέτρα». *Assumption — the owner may overrule.* Design §9.3 now records this rule.
+3. **`CF-Connecting-IP` cannot be checked against Cloudflare's addresses inside the app**, because Hetzner's web server is the app's direct peer. The header is trusted when `BEHIND_CLOUDFLARE=1`, and the login limiter adds a global cap. Design §11.6 now records this behavior; restricting the origin to Cloudflare's address ranges is left to Plan 6.
 4. **Projects are created only by seed scripts**, because §10 has no project screen.
 5. **The location tree has a project root node** («Γεννάδι 822Α»), as §15 implies ("ticking the project root").
 6. **A zone type can be deleted only while no location node uses it.** The design is silent on this.
 7. **Greek names of zone types, villas, levels and spaces are proposals**, because the source sheets are English only. The owner can rename them in Lists (Plan 5). *Assumption.*
 8. **Records arrive in Plan 3.** Until then, tag merge/delete and location delete have no record links to move or check; Plan 3 extends them (see "Hand-over to later plans").
+9. **Owner creation/reset uses an immediate transaction.** Lookup, count and write are serialized across connections to preserve the approved one-owner invariant. Password hashing happens before the lock. This corrects the original Task 3 snippet's race.
+10. **Content type uses exact normalized media-type comparison.** The guard rejects `application/json-extra`; the original prefix comparison accepted it. This enforces the design's JSON requirement.
+11. **Logout requires a valid session.** The original Task 5 snippet exempted logout. Missing, invalid or expired sessions now return 401, consistent with design §11.5. Only login is exempt from the session rule for state-changing requests.
 
 ---
 
@@ -90,7 +110,7 @@
 - Create: `src/server/config.ts`
 - Test: `tests/server/config.test.ts`
 
-- [ ] **Step 1: Install dependencies**
+- [x] **Step 1: Install dependencies**
 
 Run (repository root):
 
@@ -102,7 +122,7 @@ npm install -D tsx@4 @types/better-sqlite3@7 exceljs@4
 
 Expected: each command ends with `added N packages`; `package.json` lists `"better-sqlite3": "13.0.3"` (no caret).
 
-- [ ] **Step 2: Add scripts and allowScripts to package.json**
+- [x] **Step 2: Add scripts and allowScripts to package.json**
 
 Add these entries to the existing `scripts` object, and add the top-level `allowScripts` object (keep everything else npm wrote):
 
@@ -120,7 +140,7 @@ Add these entries to the existing `scripts` object, and add the top-level `allow
 }
 ```
 
-- [ ] **Step 3: Replace `tsconfig.json`**
+- [x] **Step 3: Replace `tsconfig.json`**
 
 ```json
 {
@@ -143,7 +163,7 @@ Add these entries to the existing `scripts` object, and add the top-level `allow
 }
 ```
 
-- [ ] **Step 4: Write the failing test `tests/server/config.test.ts`**
+- [x] **Step 4: Write the failing test `tests/server/config.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -179,12 +199,12 @@ describe('loadConfig (design §11.6)', () => {
 });
 ```
 
-- [ ] **Step 5: Run to verify it fails**
+- [x] **Step 5: Run to verify it fails**
 
 Run: `npx vitest run tests/server/config.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/config"`.
 
-- [ ] **Step 6: Create `src/server/config.ts`**
+- [x] **Step 6: Create `src/server/config.ts`**
 
 ```ts
 import { join } from 'node:path';
@@ -218,11 +238,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 }
 ```
 
-- [ ] **Step 7: Run to verify it passes**
+- [x] **Step 7: Run to verify it passes**
 
 Run: `npx vitest run tests/server/config.test.ts` → PASS (3 tests). Then `npm run typecheck` → no output.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add package.json package-lock.json tsconfig.json src/server/config.ts tests/server/config.test.ts
@@ -236,7 +256,7 @@ git commit -m "feat(server): dependencies and configuration"
 - Create: `src/server/db/connection.ts`, `src/server/db/migrations.ts`, `src/server/db/migrate.ts`, `src/server/db/backup.ts`, `src/server/db/update.ts`, `src/server/db/sqlite-errors.ts`
 - Test: `tests/server/db.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/server/db.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/db.test.ts`**
 
 ```ts
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -321,12 +341,12 @@ describe('database (design §11.3, §11.7)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/db.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/db/backup"`.
 
-- [ ] **Step 3: Create `src/server/db/connection.ts`**
+- [x] **Step 3: Create `src/server/db/connection.ts`**
 
 ```ts
 import Database from 'better-sqlite3';
@@ -345,7 +365,7 @@ export function openDatabase(path: string): Db {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/db/migrations.ts`**
+- [x] **Step 4: Create `src/server/db/migrations.ts`**
 
 ```ts
 export interface Migration {
@@ -445,7 +465,7 @@ export const MIGRATIONS: readonly Migration[] = [
 ];
 ```
 
-- [ ] **Step 5: Create `src/server/db/backup.ts`**
+- [x] **Step 5: Create `src/server/db/backup.ts`**
 
 ```ts
 import Database from 'better-sqlite3';
@@ -475,7 +495,7 @@ export function backupDatabase(db: Db, backupsDir: string, label: string, now: D
 }
 ```
 
-- [ ] **Step 6: Create `src/server/db/migrate.ts`**
+- [x] **Step 6: Create `src/server/db/migrate.ts`**
 
 ```ts
 import { backupDatabase } from './backup';
@@ -516,7 +536,7 @@ export function migrate(db: Db, options: MigrateOptions): string[] {
 }
 ```
 
-- [ ] **Step 7: Create `src/server/db/update.ts`**
+- [x] **Step 7: Create `src/server/db/update.ts`**
 
 ```ts
 import type { Db } from './connection';
@@ -543,7 +563,7 @@ export function updateColumns(
 }
 ```
 
-- [ ] **Step 8: Create `src/server/db/sqlite-errors.ts`**
+- [x] **Step 8: Create `src/server/db/sqlite-errors.ts`**
 
 ```ts
 export function isUniqueViolation(error: unknown): boolean {
@@ -553,11 +573,11 @@ export function isUniqueViolation(error: unknown): boolean {
 }
 ```
 
-- [ ] **Step 9: Run to verify it passes**
+- [x] **Step 9: Run to verify it passes**
 
 Run: `npx vitest run tests/server/db.test.ts` → PASS (4 tests). Then `npm run typecheck` → no output.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/server/db tests/server/db.test.ts
@@ -571,7 +591,7 @@ git commit -m "feat(server): SQLite connection, migrations and verified backups"
 - Create: `src/server/auth/passwords.ts`, `src/server/auth/sessions.ts`, `src/server/auth/users.ts`
 - Test: `tests/server/passwords.test.ts`, `tests/server/sessions.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/server/passwords.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/passwords.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -616,7 +636,7 @@ describe('passwords (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Write the failing test `tests/server/sessions.test.ts`**
+- [x] **Step 2: Write the failing test `tests/server/sessions.test.ts`**
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -696,12 +716,12 @@ describe('sessions and the owner account (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 3: Run to verify they fail**
+- [x] **Step 3: Run to verify they fail**
 
 Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/auth/passwords"` (and `sessions`).
 
-- [ ] **Step 4: Create `src/server/auth/passwords.ts`**
+- [x] **Step 4: Create `src/server/auth/passwords.ts`**
 
 ```ts
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -747,7 +767,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 ```
 
-- [ ] **Step 5: Create `src/server/auth/sessions.ts`**
+- [x] **Step 5: Create `src/server/auth/sessions.ts`**
 
 ```ts
 import { createHash, randomBytes } from 'node:crypto';
@@ -802,7 +822,7 @@ export function deleteExpiredSessions(db: Db, now: Date = new Date()): number {
 }
 ```
 
-- [ ] **Step 6: Create `src/server/auth/users.ts`**
+- [x] **Step 6: Create `src/server/auth/users.ts`**
 
 ```ts
 import type { Db } from '../db/connection';
@@ -840,31 +860,34 @@ export function setOwnerPassword(
     throw new RangeError(`Username must be 1 to ${MAX_USERNAME_LENGTH} characters`);
   }
   const passwordHash = hashPassword(password);
-  const existing = findUserByUsername(db, username);
-  if (existing) {
-    return db.transaction(() => {
+  // Reserve the write lock before checking ownership, including on first creation.
+  return db.transaction(() => {
+    const existing = findUserByUsername(db, username);
+    if (existing) {
       db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(
         passwordHash,
         now.toISOString(),
         existing.id,
       );
       return { userId: existing.id, created: false, sessionsRemoved: deleteUserSessions(db, existing.id) };
-    })();
-  }
-  const users = db.prepare('SELECT COUNT(*) FROM users').pluck().get() as number;
-  if (users > 0) throw new Error('An owner account already exists; v1 supports exactly one account');
-  const info = db
-    .prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)')
-    .run(username, passwordHash, now.toISOString(), now.toISOString());
-  return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+    }
+    const users = db.prepare('SELECT COUNT(*) FROM users').pluck().get() as number;
+    if (users > 0) throw new Error('An owner account already exists; v1 supports exactly one account');
+    const info = db
+      .prepare('INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)')
+      .run(username, passwordHash, now.toISOString(), now.toISOString());
+    return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+  }).immediate();
 }
 ```
 
-- [ ] **Step 7: Run to verify they pass**
+Review correction: Hash before acquiring the lock, then perform owner lookup, count, creation or reset in one immediate transaction. Tests also cover deterministic competing creation through two SQLite connections, expired-session cleanup and reset rollback.
 
-Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (4 + 8 tests). Then `npm run typecheck`.
+- [x] **Step 7: Run to verify they pass**
 
-- [ ] **Step 8: Commit**
+Run: `npx vitest run tests/server/passwords.test.ts tests/server/sessions.test.ts` → PASS (4 + 11 tests). Then `npm run typecheck`.
+
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/server/auth tests/server/passwords.test.ts tests/server/sessions.test.ts
@@ -878,7 +901,7 @@ git commit -m "feat(server): scrypt passwords, hashed sessions and the owner acc
 - Create: `src/server/auth/login-limiter.ts`, `src/server/http/client-ip.ts`
 - Test: `tests/server/login-limiter.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/server/login-limiter.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/login-limiter.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -921,12 +944,12 @@ describe('login limiter (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/login-limiter.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/auth/login-limiter"`.
 
-- [ ] **Step 3: Create `src/server/auth/login-limiter.ts`**
+- [x] **Step 3: Create `src/server/auth/login-limiter.ts`**
 
 ```ts
 export interface LoginLimits {
@@ -972,7 +995,7 @@ export class LoginLimiter {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/http/client-ip.ts`**
+- [x] **Step 4: Create `src/server/http/client-ip.ts`**
 
 ```ts
 import type { FastifyRequest } from 'fastify';
@@ -991,11 +1014,11 @@ export function clientIp(request: FastifyRequest, config: Pick<AppConfig, 'behin
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/login-limiter.test.ts` → PASS (4 tests). Then `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/auth/login-limiter.ts src/server/http/client-ip.ts tests/server/login-limiter.test.ts
@@ -1004,13 +1027,15 @@ git commit -m "feat(server): login limiter and Cloudflare-aware visitor IP"
 
 ### Task 5: HTTP app, request rules and authentication API
 
+Implementation refinement: logout requires a valid session, consistent with design §11.5. Only health and login are public. Content types are compared as exact normalized media types after removing parameters, so prefixes such as application/json-extra are rejected.
+
 **Files:**
 
 - Create: `src/server/errors.ts`, `src/server/http/params.ts`, `src/server/http/guards.ts`, `src/server/routes/health.ts`, `src/server/routes/auth.ts`, `src/server/lists/projects.ts`, `src/server/app.ts`
 - Create: `tests/server/helpers.ts`
 - Test: `tests/server/auth-api.test.ts`
 
-- [ ] **Step 1: Create the test helpers `tests/server/helpers.ts`**
+- [x] **Step 1: Create the test helpers `tests/server/helpers.ts`**
 
 ```ts
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -1084,7 +1109,7 @@ export function get(ctx: TestContext, cookie: string, url: string) {
 }
 ```
 
-- [ ] **Step 2: Write the failing test `tests/server/auth-api.test.ts`**
+- [x] **Step 2: Write the failing test `tests/server/auth-api.test.ts`**
 
 ```ts
 import { afterEach, describe, expect, it } from 'vitest';
@@ -1233,12 +1258,12 @@ describe('authentication and request rules (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 Run: `npx vitest run tests/server/auth-api.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/app"`.
 
-- [ ] **Step 4: Create `src/server/errors.ts`**
+- [x] **Step 4: Create `src/server/errors.ts`**
 
 ```ts
 /** An error with an HTTP status and a stable, machine-readable code; sent as { error: code, details? }. */
@@ -1254,7 +1279,7 @@ export class HttpError extends Error {
 }
 ```
 
-- [ ] **Step 5: Create `src/server/http/params.ts`**
+- [x] **Step 5: Create `src/server/http/params.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -1266,7 +1291,7 @@ export const ItemParams = z.object({
 });
 ```
 
-- [ ] **Step 6: Create `src/server/http/guards.ts`**
+- [x] **Step 6: Create `src/server/http/guards.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1277,7 +1302,7 @@ import { HttpError } from '../errors';
 
 export const SESSION_COOKIE = 'bb_session';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login', '/api/auth/logout']);
+const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login']);
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -1293,7 +1318,7 @@ declare module 'fastify' {
  * Request rules (design §11.5):
  * - every state-changing request needs Origin = the public origin and a JSON body
  *   (multipart only on routes that allow it);
- * - every /api route except health, login and logout needs a valid session;
+ * - every /api route except health and login needs a valid session;
  * - session lookup is read-only, so GET requests never write.
  */
 export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {
@@ -1302,10 +1327,10 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
   app.addHook('onRequest', async (request) => {
     if (SAFE_METHODS.has(request.method)) return;
     if (request.headers.origin !== config.publicOrigin) throw new HttpError(403, 'origin_rejected');
-    const contentType = request.headers['content-type'] ?? '';
-    const isJson = contentType.startsWith('application/json');
+    const contentType = (request.headers['content-type']?.split(';', 1)[0] ?? '').trim().toLowerCase();
+    const isJson = contentType === 'application/json';
     const isAllowedMultipart =
-      contentType.startsWith('multipart/form-data') && request.routeOptions.config?.multipart === true;
+      contentType === 'multipart/form-data' && request.routeOptions.config?.multipart === true;
     if (!isJson && !isAllowedMultipart) throw new HttpError(415, 'unsupported_content_type');
   });
 
@@ -1319,7 +1344,7 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
 }
 ```
 
-- [ ] **Step 7: Create `src/server/routes/health.ts`**
+- [x] **Step 7: Create `src/server/routes/health.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1330,7 +1355,7 @@ export function registerHealthRoutes(app: FastifyInstance): void {
 }
 ```
 
-- [ ] **Step 8: Create `src/server/routes/auth.ts`**
+- [x] **Step 8: Create `src/server/routes/auth.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1397,7 +1422,7 @@ export function registerAuthRoutes(
 }
 ```
 
-- [ ] **Step 9: Create `src/server/lists/projects.ts`**
+- [x] **Step 9: Create `src/server/lists/projects.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1444,7 +1469,7 @@ export function registerProjectRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 10: Create `src/server/app.ts`**
+- [x] **Step 10: Create `src/server/app.ts`**
 
 ```ts
 import cookie from '@fastify/cookie';
@@ -1501,12 +1526,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 }
 ```
 
-- [ ] **Step 11: Run to verify it passes**
+- [x] **Step 11: Run to verify it passes**
 
 Run: `npx vitest run tests/server/auth-api.test.ts`
 Expected: PASS (12 tests). Then `npm test` → all files pass, and `npm run typecheck` → no output.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add src/server/errors.ts src/server/http src/server/routes src/server/lists/projects.ts src/server/app.ts tests/server/helpers.ts tests/server/auth-api.test.ts
@@ -1521,7 +1546,7 @@ git commit -m "feat(server): Fastify app with Origin/JSON/session rules and owne
 - Modify: `src/domain/index.ts`
 - Test: `tests/domain/lists.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/lists.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/lists.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -1568,12 +1593,12 @@ describe('managed-list input schemas', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/lists.test.ts`
 Expected: FAIL — the new exports (`hasAName`, `tagKey`, schemas) do not exist yet.
 
-- [ ] **Step 3: Create `src/domain/lists.ts`**
+- [x] **Step 3: Create `src/domain/lists.ts`**
 
 Note: Zod 4 applies a `.default()` even inside an optional field, so these schemas use **no defaults** — a PATCH must never fill in values that were not sent. The server applies defaults when it creates a row.
 
@@ -1666,7 +1691,7 @@ export type LocationPatchInput = z.output<typeof LocationPatch>;
 export type LocationCopyInput = z.output<typeof LocationCopy>;
 ```
 
-- [ ] **Step 4: Export it from `src/domain/index.ts`**
+- [x] **Step 4: Export it from `src/domain/index.ts`**
 
 Add this line at the end of `src/domain/index.ts`:
 
@@ -1674,11 +1699,11 @@ Add this line at the end of `src/domain/index.ts`:
 export * from './lists';
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/domain` → PASS (8 files: Plan 1's 7 + `lists.test.ts` with 5 tests). Then `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/domain/lists.ts src/domain/index.ts tests/domain/lists.test.ts
@@ -1696,7 +1721,7 @@ git commit -m "feat(domain): managed-list input schemas, name rule and tag match
 
 All list routes live under `/api/projects/:projectId/...`, return camelCase JSON, answer `201` on create, and `404 <list>_not_found` for an item of another project.
 
-- [ ] **Step 1: Write the failing test `tests/server/lists-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/lists-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1836,12 +1861,12 @@ describe('zone types (design §9.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/lists-api.test.ts`
 Expected: FAIL — the project test passes; the people, trades and zone-type tests fail with `404` (`not_found`), because those routes do not exist yet.
 
-- [ ] **Step 3: Replace `src/server/db/sqlite-errors.ts`**
+- [x] **Step 3: Replace `src/server/db/sqlite-errors.ts`**
 
 ```ts
 import { HttpError } from '../errors';
@@ -1859,7 +1884,7 @@ export function rethrowUnique(error: unknown, code: string): never {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/lists/names.ts`**
+- [x] **Step 4: Create `src/server/lists/names.ts`**
 
 ```ts
 import { hasAName } from '../../domain';
@@ -1871,7 +1896,7 @@ export function assertHasAName(names: { nameEn: string; nameEl: string }): void 
 }
 ```
 
-- [ ] **Step 5: Create `src/server/lists/people.ts`**
+- [x] **Step 5: Create `src/server/lists/people.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1970,7 +1995,7 @@ export function registerPeopleRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 6: Create `src/server/lists/trades.ts`**
+- [x] **Step 6: Create `src/server/lists/trades.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2071,7 +2096,7 @@ export function registerTradeRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 7: Create `src/server/lists/zone-types.ts`**
+- [x] **Step 7: Create `src/server/lists/zone-types.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2156,7 +2181,7 @@ export function registerZoneTypeRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 8: Register the routes in `src/server/app.ts`**
+- [x] **Step 8: Register the routes in `src/server/app.ts`**
 
 Add these imports below `import { registerProjectRoutes } from './lists/projects';`:
 
@@ -2174,11 +2199,11 @@ and these lines directly after `registerProjectRoutes(app, db);`:
   registerZoneTypeRoutes(app, db);
 ```
 
-- [ ] **Step 9: Run to verify it passes**
+- [x] **Step 9: Run to verify it passes**
 
 Run: `npx vitest run tests/server/lists-api.test.ts` → PASS (8 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/server/db/sqlite-errors.ts src/server/lists src/server/app.ts tests/server/lists-api.test.ts
@@ -2195,7 +2220,7 @@ git commit -m "feat(server): people, trades and zone types API"
 
 Rules (design §9.3): names are unique per language (matching key from `tagKey`). Creating or renaming into **one** existing tag's name answers `409 tag_name_taken` with `details.existingTagId` — the browser then offers to use that tag (create) or to merge into it (rename). A rename whose names hit **two different** tags answers `409 tag_names_conflict`.
 
-- [ ] **Step 1: Write the failing test `tests/server/tags-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/tags-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2275,12 +2300,12 @@ describe('tags (design §9.3)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/tags-api.test.ts`
 Expected: FAIL — `404 not_found` (no tag routes yet).
 
-- [ ] **Step 3: Create `src/server/lists/tags.ts`**
+- [x] **Step 3: Create `src/server/lists/tags.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2401,15 +2426,15 @@ export function registerTagRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Register the routes in `src/server/app.ts`**
+- [x] **Step 4: Register the routes in `src/server/app.ts`**
 
 Add `import { registerTagRoutes } from './lists/tags';` below the other `./lists/...` imports, and `registerTagRoutes(app, db);` after `registerZoneTypeRoutes(app, db);`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/tags-api.test.ts` → PASS (6 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/lists/tags.ts src/server/app.ts tests/server/tags-api.test.ts
@@ -2426,7 +2451,7 @@ git commit -m "feat(server): tags API with rename, merge and delete rules"
 
 The API returns the tree as a **flat list** ordered by `sortOrder`, then `id`; the browser builds the tree from `parentId`. A new node without `sortOrder` goes last among its siblings.
 
-- [ ] **Step 1: Write the failing test `tests/server/locations-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/locations-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2564,12 +2589,12 @@ describe('location tree (design §9.4)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/locations-api.test.ts`
 Expected: FAIL — `expected 404 to be 201` (no location routes yet).
 
-- [ ] **Step 3: Create `src/server/lists/locations.ts`**
+- [x] **Step 3: Create `src/server/lists/locations.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2798,15 +2823,15 @@ export function registerLocationRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Register the routes in `src/server/app.ts`**
+- [x] **Step 4: Register the routes in `src/server/app.ts`**
 
 Add `import { registerLocationRoutes } from './lists/locations';` below the other `./lists/...` imports, and `registerLocationRoutes(app, db);` after `registerTagRoutes(app, db);`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/locations-api.test.ts` → PASS (7 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/lists/locations.ts src/server/app.ts tests/server/locations-api.test.ts
@@ -2820,7 +2845,7 @@ git commit -m "feat(server): location tree API with move, retire, delete and cop
 - Create: `src/server/bootstrap.ts`, `src/server/main.ts`, `scripts/owner.ts`, `.env.example`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Create `src/server/bootstrap.ts`**
+- [x] **Step 1: Create `src/server/bootstrap.ts`**
 
 ```ts
 import { existsSync } from 'node:fs';
@@ -2840,7 +2865,7 @@ export function openMigratedDatabase(config: AppConfig): { db: Db; applied: stri
 }
 ```
 
-- [ ] **Step 2: Create `src/server/main.ts`**
+- [x] **Step 2: Create `src/server/main.ts`**
 
 ```ts
 import { buildApp } from './app';
@@ -2880,7 +2905,7 @@ if (config.port !== null) {
 }
 ```
 
-- [ ] **Step 3: Create `scripts/owner.ts`**
+- [x] **Step 3: Create `scripts/owner.ts`**
 
 ```ts
 import { stdin, stdout } from 'node:process';
@@ -2958,7 +2983,7 @@ try {
 }
 ```
 
-- [ ] **Step 4: Create `.env.example`**
+- [x] **Step 4: Create `.env.example`**
 
 ```bash
 # Local development settings. Copy to .env (git-ignored); never commit .env.
@@ -2970,7 +2995,7 @@ PUBLIC_BASE_URL=http://localhost:3000
 # BEHIND_CLOUDFLARE=1
 ```
 
-- [ ] **Step 5: Let git track `.env.example`**
+- [x] **Step 5: Let git track `.env.example`**
 
 The existing `.env.*` rule in `.gitignore` also matches `.env.example`. Directly below the line `.env.*`, add:
 
@@ -2980,13 +3005,13 @@ The existing `.env.*` rule in `.gitignore` also matches `.env.example`. Directly
 
 Check: `git check-ignore .env.example` prints nothing (exit code 1), and `git check-ignore .env` still prints `.env`.
 
-- [ ] **Step 6: Typecheck and check the owner command refuses piped input**
+- [x] **Step 6: Typecheck and check the owner command refuses piped input**
 
 Run: `npm run typecheck` → no output.
 Run: `npm run owner -- owner < /dev/null` (PowerShell: `$null | npm run owner -- owner`)
 Expected: `Run this command in an interactive terminal: …`, exit code 2, and no database change.
 
-- [ ] **Step 7: Run the server locally**
+- [x] **Step 7: Run the server locally**
 
 Run: `cp .env.example .env` (PowerShell: `Copy-Item .env.example .env`), then `npm start`.
 Expected log lines include `Server listening at http://127.0.0.1:3000`; `data/builtbasis.db` now exists.
@@ -3004,7 +3029,7 @@ curl -s http://127.0.0.1:3000/api/projects
 
 Stop the server with Ctrl+C. Expected log line: `SIGINT received, closing`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add .gitignore src/server/bootstrap.ts src/server/main.ts scripts/owner.ts .env.example
@@ -3026,7 +3051,7 @@ Source layouts (checked 2026-10-03):
 
 **Contact details never enter the repository** (design §15): the tests use made-up names and `example.com` addresses; the real files are read only when the seed command runs.
 
-- [ ] **Step 1: Write the failing test `tests/server/seed.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/seed.test.ts`**
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -3164,12 +3189,12 @@ describe('seedGennadi (design §15)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/seed.test.ts`
 Expected: FAIL — `Failed to resolve import "../../src/server/seed/csv"`.
 
-- [ ] **Step 3: Create `src/server/seed/csv.ts`**
+- [x] **Step 3: Create `src/server/seed/csv.ts`**
 
 ```ts
 /** Parses RFC 4180 CSV: quoted fields, doubled quotes, CRLF or LF line ends, an optional byte-order mark. */
@@ -3207,7 +3232,7 @@ export function parseCsv(text: string): string[][] {
 }
 ```
 
-- [ ] **Step 4: Create `src/server/seed/gennadi-data.ts`**
+- [x] **Step 4: Create `src/server/seed/gennadi-data.ts`**
 
 ```ts
 /**
@@ -3349,7 +3374,7 @@ export const TRADE_OVERRIDES: Readonly<Record<string, { nameEl?: string }>> = {
 };
 ```
 
-- [ ] **Step 5: Create `src/server/seed/gennadi.ts`**
+- [x] **Step 5: Create `src/server/seed/gennadi.ts`**
 
 ```ts
 import type { PersonRole } from '../../domain';
@@ -3537,11 +3562,11 @@ export function seedGennadi(
 }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run tests/server/seed.test.ts` → PASS (6 tests). Then `npm run typecheck`.
 
-- [ ] **Step 7: Create `scripts/seed-gennadi.ts`**
+- [x] **Step 7: Create `scripts/seed-gennadi.ts`**
 
 ```ts
 import { readFileSync } from 'node:fs';
@@ -3598,7 +3623,7 @@ try {
 }
 ```
 
-- [ ] **Step 8: Seed the local development database from the real files**
+- [x] **Step 8: Seed the local development database from the real files**
 
 The local database lives in the git-ignored `data/` folder; contact details stay out of the repository. Run (one line):
 
@@ -3615,7 +3640,7 @@ Set the role by hand (owner / owner's representative) for: KAN, KAN2, MAN, RG, G
 
 Running it a second time must print `Project cbg2401 already exists; the seed runs only once` and exit with code 1. Then run `git status --short` and confirm nothing under `data/` or `.env` is listed.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/server/seed scripts/seed-gennadi.ts tests/server/seed.test.ts
@@ -3629,13 +3654,13 @@ git commit -m "feat(server): seed import for Gennadi 822A"
 - Modify: `docs/designs/2026-10-02-v1-records-design.md` (§9.3, §11.6)
 - Modify: `docs/plans/2026-10-03-plan-2-server-foundation.md` (metadata), `docs/plans/2026-10-02-v1-roadmap.md` (Plan 2 status)
 
-- [ ] **Step 1: Run the full suite and the type check**
+- [x] **Step 1: Run the full suite and the type check**
 
 Run: `npm test`
-Expected: `Test Files  18 passed (18)` and `Tests  136 passed (136)` (Plan 1: 69; Plan 2: config 3, db 4, passwords 4, sessions 8, login limiter 4, auth API 12, domain lists 5, lists API 8, tags 6, locations 7, seed 6).
-Run: `npm run typecheck` → no output.
+Verified at closeout: `Test Files  18 passed (18)` and `Tests  155 passed (155)` (Plan 1: 69; Plan 2: config 3, db 4, passwords 4, sessions 11, login limiter 10, auth API 16, domain lists 5, lists API 14, tags 6, locations 7, seed 6). The original 136-test forecast was superseded by added regression coverage; the preflight result above remains historical.
+Verified: `npm run typecheck` exited 0 with no TypeScript diagnostics.
 
-- [ ] **Step 2: Update design §9.3 (tag matching, Decision 2)**
+- [x] **Step 2: Update design §9.3 (tag matching, Decision 2)**
 
 Replace:
 
@@ -3649,7 +3674,7 @@ with:
 Fields: **name EL**, **name EN**. At least one name is required. Names are **unique within each language** after trimming and ignoring letter case — and, because Greek capitals drop their accents, ignoring accents and final sigma too («ΠΕΤΡΑ» = «Πέτρα»).
 ```
 
-- [ ] **Step 3: Update design §11.6 (visitor IP, Decision 3)**
+- [x] **Step 3: Update design §11.6 (visitor IP, Decision 3)**
 
 Replace:
 
@@ -3663,15 +3688,15 @@ with:
 The server takes the visitor IP from `CF-Connecting-IP` when `BEHIND_CLOUDFLARE=1` (login rate limiting, logs). The application cannot check that a request really came through Cloudflare — Hetzner's web server is its direct peer — so the login limiter also caps failed logins globally. Restricting the origin to Cloudflare's address ranges is decided in Plan 6.
 ```
 
-- [ ] **Step 4: Update this plan's metadata**
+- [x] **Step 4: Update this plan's metadata**
 
 Set `> **Status:** Completed`, `> **Retention:** Historical — do not execute.`, `> **Implemented by:**` the Plan 2 commit range (first..last hash), and `> **Verified:**` with the date and the two results of Step 1.
 
-- [ ] **Step 5: Update the roadmap**
+- [x] **Step 5: Update the roadmap**
 
 In `docs/plans/2026-10-02-v1-roadmap.md`, change the Plan 2 row's status from `Written` to `Completed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/designs/2026-10-02-v1-records-design.md docs/plans/2026-10-03-plan-2-server-foundation.md docs/plans/2026-10-02-v1-roadmap.md
