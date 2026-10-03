@@ -1,3 +1,5 @@
+import { MIGRATION_0002_RECORDS } from './migration-0002-records';
+
 export interface Migration {
   id: string;
   sql: string;
@@ -92,4 +94,5 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX location_nodes_parent ON location_nodes(project_id, parent_id);
     `,
   },
+  MIGRATION_0002_RECORDS,
 ];

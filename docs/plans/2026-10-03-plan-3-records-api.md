@@ -486,7 +486,7 @@ git commit -m "feat(domain): record input schemas, subtype fields and shared tex
 
 Money is stored as whole cents (`estimated_cost_cents`) so that sums are exact. Problem types are a JSON list of codes on the record (design §11.3). Join tables hold trades, tags, locations and must-be-done-before links.
 
-- [ ] **Step 1: Write the failing test `tests/server/records-db.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/records-db.test.ts`**
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -542,12 +542,12 @@ describe('record tables (migration 0002)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/records-db.test.ts`
 Expected: FAIL — all 3 tests fail: the record tables do not exist (`no such table: records`) and SQL has no `bb_fold` (`no such function: bb_fold`).
 
-- [ ] **Step 3: Create `src/server/db/migration-0002-records.ts`**
+- [x] **Step 3: Create `src/server/db/migration-0002-records.ts`**
 
 ```ts
 import type { Migration } from './migrations';
@@ -713,7 +713,7 @@ export const MIGRATION_0002_RECORDS: Migration = {
 };
 ```
 
-- [ ] **Step 4: Modify `src/server/db/migrations.ts`**
+- [x] **Step 4: Modify `src/server/db/migrations.ts`**
 
 Add the import as the first line of the file:
 
@@ -748,7 +748,7 @@ with:
 
 (The import is type-only in the other direction, so there is no circular import at run time.)
 
-- [ ] **Step 5: Replace `src/server/db/connection.ts`**
+- [x] **Step 5: Replace `src/server/db/connection.ts`**
 
 ```ts
 import Database from 'better-sqlite3';
@@ -772,11 +772,11 @@ export function openDatabase(path: string): Db {
 }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run tests/server/records-db.test.ts` → PASS (3). Then `npm test` → all pass (Plan 2's database test now applies both migrations), and `npm run typecheck`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/server/db/migration-0002-records.ts src/server/db/migrations.ts src/server/db/connection.ts tests/server/records-db.test.ts
