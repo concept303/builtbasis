@@ -12,6 +12,7 @@
     "start": "tsx src/server/main.ts",
     "owner": "tsx scripts/owner.ts",
     "seed:gennadi": "tsx scripts/seed-gennadi.ts",
+    "shares:revoke-all": "tsx scripts/revoke-share-links.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

@@ -15,6 +15,8 @@ import { registerTagRoutes } from './lists/tags';
 import { registerLocationRoutes } from './lists/locations';
 import { registerRecordRoutes } from './records/routes';
 import { registerFileRoutes } from './files/routes';
+import { requireShareKey } from './sharing/crypto';
+import { reconcileShareKey } from './sharing/links';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 
@@ -28,7 +30,10 @@ export interface AppDeps {
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, db } = deps;
+  requireShareKey(config.shareKey);
+  const revokedLinks = reconcileShareKey(db, config.shareKey);
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: 1024 * 1024 });
+  if (revokedLinks > 0) app.log.info({ event: 'share_key_changed', revokedLinks });
   await app.register(cookie);
   await app.register(multipart);
   registerGuards(app, config, db);

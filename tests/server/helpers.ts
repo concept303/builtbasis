@@ -26,6 +26,7 @@ export async function makeContext(
   const dataDir = mkdtempSync(join(tmpdir(), 'builtbasis-test-'));
   const config = loadConfig({
     BUILTBASIS_DATA_DIR: dataDir,
+    SHARE_LINK_KEY: '07'.repeat(32),
     PUBLIC_BASE_URL: options.publicBaseUrl ?? 'http://localhost:3000',
     ...(options.behindCloudflare ? { BEHIND_CLOUDFLARE: '1' } : {}),
   });

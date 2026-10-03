@@ -27,3 +27,8 @@ On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrect
 | [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research (non-authoritative input) |
 
 Documentation follows `X:\1976KN\Dev\Code\DOCS-STANDARD.md` (v1.4).
+# Share-link key setup
+
+HTTP startup requires `SHARE_LINK_KEY`, a dedicated random 32-byte key encoded as 64 hexadecimal characters. Store it in server configuration outside the repository, data directory and backups. Preserve it across deployments. Offline owner, seed and share-revocation commands do not require an absent key.
+
+After key loss or replacement, stop the application and run `npm run shares:revoke-all` against the intended data directory. Install a newly generated key in private configuration, restart, and issue replacement links. Startup also revokes unrevoked links when the key fingerprint changes. Never publish a key or put it in command logs.

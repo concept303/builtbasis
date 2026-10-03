@@ -15,6 +15,15 @@ describe('loadConfig (design §11.6)', () => {
     expect(config.secureCookies).toBe(false);
     expect(config.behindCloudflare).toBe(false);
     expect(config.port).toBeNull();
+    expect(config.shareKey).toBeNull();
+  });
+
+  it('accepts exactly 32 bytes of hex key and rejects malformed keys', () => {
+    const env = { BUILTBASIS_DATA_DIR: '/data' };
+    expect(loadConfig({ ...env, SHARE_LINK_KEY: 'ab'.repeat(32) }).shareKey).toEqual(Buffer.alloc(32, 0xab));
+    for (const value of ['', 'ab', 'zz'.repeat(32), 'a'.repeat(65)]) {
+      expect(() => loadConfig({ ...env, SHARE_LINK_KEY: value })).toThrow('SHARE_LINK_KEY');
+    }
   });
 
   it('uses the public origin, secure cookies and Cloudflare mode in production', () => {
