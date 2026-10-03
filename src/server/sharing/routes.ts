@@ -9,6 +9,7 @@ import { authorizeShare, createShareLink, listShareLinks, revokeShareLink } from
 import { buildSharedRecord } from './projection';
 import { HttpError } from '../errors';
 import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
+import { describeAttachment, resolveAttachmentView } from '../files/previews';
 
 export function registerSharingRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
   const url = '/api/projects/:projectId/records/:id/share-links';
@@ -43,6 +44,24 @@ export function registerSharingRoutes(app: FastifyInstance, db: Db, config: AppC
     if (error instanceof ZodError || (error instanceof HttpError && error.statusCode === 404)) throw new HttpError(404, 'not_available');
     throw error;
   };
+  app.get('/api/shared/attachments/:itemId/preview', publicFileOptions, async request => {
+    try {
+      const access = authorizeShare(db, request.headers.authorization);
+      const { itemId } = fileParams.parse(request.params);
+      return describeAttachment(db, access.recordId, itemId, 'shared');
+    } catch (error) {
+      unavailable(error);
+    }
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/shared/attachments/:itemId/view', ...publicFileOptions, handler: async (request, reply) => {
+    try {
+      const access = authorizeShare(db, request.headers.authorization);
+      const { itemId } = fileParams.parse(request.params);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, access.recordId, itemId, 'shared'), 'inline');
+    } catch (error) {
+      unavailable(error);
+    }
+  } });
   app.route({ method: ['GET', 'HEAD'], url: '/api/shared/photos/:itemId/:variant', ...publicFileOptions, handler: async (request, reply) => {
     try {
       const access = authorizeShare(db, request.headers.authorization);

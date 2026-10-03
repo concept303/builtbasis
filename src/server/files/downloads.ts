@@ -52,18 +52,50 @@ export async function sendFile(request: FastifyRequest, reply: FastifyReply, fil
     throw new HttpError(500, 'file_unavailable');
   }
   if (!info.isFile() || info.size !== target.size) throw new HttpError(500, 'file_unavailable');
+  let range: { start: number; end: number } | undefined;
+  if (request.method === 'GET' && request.headers.range && !request.headers['if-range']) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range);
+    const failRange = (): never => {
+      shareHeaders(reply);
+      reply.header('Content-Range', `bytes */${info.size}`);
+      throw new HttpError(416, 'range_not_satisfiable');
+    };
+    if (!match || (!match[1] && !match[2])) failRange();
+    const first = match![1]!;
+    const last = match![2]!;
+    let start: number;
+    let end: number;
+    if (first === '') {
+      const length = Number(last);
+      if (!Number.isSafeInteger(length) || length < 1) failRange();
+      start = Math.max(0, info.size - length);
+      end = info.size - 1;
+    } else {
+      start = Number(first);
+      end = last === '' ? info.size - 1 : Number(last);
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) failRange();
+      end = Math.min(end, info.size - 1);
+    }
+    if (start >= info.size || end < start) failRange();
+    range = { start, end };
+  }
   const filename = safeFilename(target.filename);
   const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
   const encoded = encodeURIComponent(filename).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
   shareHeaders(reply);
   reply.header('X-Content-Type-Options', 'nosniff');
-  reply.header('Content-Security-Policy', 'sandbox');
+  reply.header('Content-Security-Policy', target.contentType === 'image/svg+xml' ? "sandbox; default-src 'none'; style-src 'unsafe-inline'" : 'sandbox');
   reply.header('Content-Type', target.contentType);
-  reply.header('Content-Length', info.size);
+  reply.header('Accept-Ranges', 'bytes');
+  reply.header('Content-Length', range ? range.end - range.start + 1 : info.size);
+  if (range) {
+    reply.status(206);
+    reply.header('Content-Range', `bytes ${range.start}-${range.end}/${info.size}`);
+  }
   reply.header('Content-Disposition', `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`);
   if (request.method === 'HEAD') {
     reply.status(200).send();
     return;
   }
-  await reply.send(createReadStream(path));
+  await reply.send(createReadStream(path, range));
 }

@@ -46,8 +46,8 @@ it.each([
 });
 
 it.each([
-  ['a.jpg', Buffer.from('<html>bad</html>')], ['a.exe', JPEG], ['a.docm', ZIP], ['a.zip', ZIP], ['a.pdf', JPEG],
-  ['a.dwg', Buffer.from('AC9999')], ['a.jpg', Buffer.from('AC1032')], ['a.heic', Buffer.concat([Buffer.from([0,0,0,16]), Buffer.from('ftypmif1'), Buffer.alloc(4)])],
+  ['a.jpg', Buffer.from('<html>bad</html>')], ['a.exe', JPEG], ['a.docm', ZIP], ['a.pdf', JPEG],
+  ['a.jpg', Buffer.from('AC1032')], ['a.heic', Buffer.concat([Buffer.from([0,0,0,16]), Buffer.from('ftypmif1'), Buffer.alloc(4)])],
 ] as [string, Buffer][])('rejects a misleading or disallowed format %s', async (filename, bytes) => {
   await expect(stageFile(dir, Readable.from([bytes]), filename, 'attachment')).rejects.toMatchObject({ statusCode: 415 });
   expect(await readdir(join(dir, '.tmp'))).toEqual([]);

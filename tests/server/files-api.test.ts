@@ -1,4 +1,4 @@
-﻿import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -215,4 +215,3 @@ it('rejects an oversized attachment by actual streamed bytes without a Content-L
   expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
   expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
 });
-

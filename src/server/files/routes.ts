@@ -9,8 +9,19 @@ import { deleteOccurrence, editOccurrence, listAttachments, listPhotos, saveUplo
 import { discardStaged, publishFile } from './storage';
 import { parseUpload } from './uploads';
 import { resolveAttachmentFile, resolvePhotoFile, sendFile } from './downloads';
+import { describeAttachment, resolveAttachmentView } from './previews';
 
 export function registerFileRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
+  app.get('/api/projects/:projectId/records/:id/attachments/:itemId/preview', { config: { privateResponse: true } }, async request => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    return describeAttachment(db, id, itemId, 'owner');
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/view', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'owner'), 'inline');
+  } });
   app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/photos/:itemId/:variant', config: { privateResponse: true }, handler: async (request, reply) => {
     const { projectId, id, itemId } = RecordItemParams.parse(request.params);
     const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);

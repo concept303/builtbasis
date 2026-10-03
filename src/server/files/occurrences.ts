@@ -1,3 +1,4 @@
+import { attachmentCapabilities } from './formats';
 import type { AttachmentMeta, AttachmentOut, AttachmentPatchInput, PhotoMeta, PhotoOut, PhotoPatchInput } from '../../domain';
 import type { Db } from '../db/connection';
 import { HttpError } from '../errors';
@@ -27,6 +28,7 @@ export function listAttachments(db: Db, recordId: number): AttachmentOut[] {
     title: row.title,
     size: row.size,
     contentType: row.contentType,
+    capabilities: attachmentCapabilities(row.originalFilename, row.contentType),
     uploadedBy: row.uploadedBy,
     uploadedAt: row.uploadedAt,
     logEntry: row.logId === null ? null : { id: row.logId, eventAt: row.eventAt, text: row.text, private: row.private === 1 },

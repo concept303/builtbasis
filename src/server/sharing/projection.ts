@@ -114,6 +114,7 @@ export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' 
   }));
   const attachments = listAttachments(db, recordId).filter(item => !item.logEntry?.private).map(item => ({
     id: item.id, originalFilename: item.originalFilename, title: item.title, size: item.size, contentType: item.contentType, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
+    capabilities: item.capabilities,
     logEntry: item.logEntry === null ? null : { id: item.logEntry.id, eventAt: item.logEntry.eventAt, text: item.logEntry.text },
   }));
   const log = listLog(db, recordId).filter(item => !item.private).map(item => ({

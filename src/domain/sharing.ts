@@ -1,3 +1,4 @@
+import type { AttachmentCapabilities } from './files';
 import { z } from 'zod';
 import { FileTimestamp } from './files';
 import type { PhotoPhase, Subtype, Status, Severity, Priority, ProblemType, Stage, Disposition, Route, MeasurementPhase, Unit, VerificationMethod, VerificationOutcome } from './vocab';
@@ -71,6 +72,7 @@ export interface SharedRecord {
   verifications: { id: number; checkedById: number; date: string; method: VerificationMethod; outcome: VerificationOutcome; note: string | null; createdAt: string }[];
   photos: { id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string }[];
   attachments: {
+    capabilities: AttachmentCapabilities;
     id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
     logEntry: { id: number; eventAt: string; text: string } | null;
   }[];
