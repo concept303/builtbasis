@@ -40,3 +40,12 @@ export function disableContributor(db: Db, username: string): number {
     return deleteUserSessions(db, id);
   }).immediate();
 }
+
+export function enableContributor(db: Db, username: string): number {
+  return db.transaction(() => {
+    const id = contributorId(db, username);
+    db.prepare('UPDATE users SET is_active = 1, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+    // Enabling always requires a fresh login, including after a repeated enable command.
+    return deleteUserSessions(db, id);
+  }).immediate();
+}

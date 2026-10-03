@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import { createContributor, disableContributor, resetContributorPassword } from '../../src/server/auth/contributors';
+import { createContributor, disableContributor, enableContributor, resetContributorPassword } from '../../src/server/auth/contributors';
 import { createSession, findSessionUser } from '../../src/server/auth/sessions';
 import { setOwnerPassword } from '../../src/server/auth/users';
 import { loginAsOwner, makeContext, OWNER, type TestContext } from './helpers';
@@ -44,10 +44,27 @@ it('allows contributor session endpoints but fails closed on owner and unmarked 
   await loginAsOwner(ctx);
   const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
   const cookie = `bb_session=${createSession(ctx.db, id).token}`;
-  expect((await ctx.app.inject({ url: '/api/auth/me', headers: { cookie } })).statusCode).toBe(200);
-  for (const url of ['/api/projects', '/api/assigned-records/unregistered']) {
+  expect((await ctx.app.inject({ url: '/api/auth/me', headers: { cookie } })).json())
+    .toEqual({ username: 'alex', displayName: 'Alex', isOwner: false });
+  for (const url of ['/api/projects', '/api/assigned-records/unregistered/unknown']) {
     expect((await ctx.app.inject({ url, headers: { cookie } })).statusCode).toBe(403);
   }
   expect((await ctx.app.inject({ method: 'POST', url: '/api/auth/logout',
     headers: { cookie, origin: ctx.origin }, payload: {} })).statusCode).toBe(200);
+});
+
+it('explicitly enables a disabled contributor without reviving sessions or changing the owner', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  const session = createSession(ctx.db, id);
+  disableContributor(ctx.db, 'alex');
+  resetContributorPassword(ctx.db, 'alex', OWNER.password);
+  expect(ctx.db.prepare('SELECT is_active FROM users WHERE id = ?').pluck().get(id)).toBe(0);
+  enableContributor(ctx.db, 'alex');
+  expect(findSessionUser(ctx.db, session.token)).toBeNull();
+  expect(() => enableContributor(ctx.db, 'owner')).toThrow('owner');
+  const response = await ctx.app.inject({ method: 'POST', url: '/api/auth/login',
+    headers: { origin: ctx.origin }, payload: { username: 'alex', password: OWNER.password } });
+  expect(response.statusCode).toBe(200);
 });

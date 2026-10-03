@@ -42,6 +42,7 @@ export const RecordPatch = z.strictObject({
   description: optionalText(20_000).optional(),
   reference: optionalText(2_000).optional(),
   notes: optionalText(20_000).optional(),
+  publicNotes: optionalText(20_000).optional(),
   ballInCourtId: id.nullable().optional(),
   responsibleId: id.nullable().optional(),
   tradeIds: ids.optional(),

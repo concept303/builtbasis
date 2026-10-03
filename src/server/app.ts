@@ -19,6 +19,7 @@ import { requireShareKey } from './sharing/crypto';
 import { reconcileShareKey } from './sharing/links';
 import { registerSharingRoutes } from './sharing/routes';
 import { safeLogger } from './http/logging';
+import { registerAccessRoutes } from './access/routes';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 
@@ -72,5 +73,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerRecordRoutes(app, db);
   registerFileRoutes(app, db, config);
   registerSharingRoutes(app, db, config);
+  registerAccessRoutes(app, db, config);
   return app;
 }

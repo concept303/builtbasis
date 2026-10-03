@@ -78,7 +78,7 @@ describe('authentication and request rules (design §11.5)', () => {
   it('a valid login needs no existing session; logout ends the session', async () => {
     ctx = await makeContext();
     const cookie = await loginAsOwner(ctx);
-    expect((await get(ctx, cookie, '/api/auth/me')).json()).toEqual({ username: 'owner' });
+    expect((await get(ctx, cookie, '/api/auth/me')).json()).toEqual({ username: 'owner', displayName: 'Owner', isOwner: true });
     const out = await ctx.app.inject({
       method: 'POST',
       url: '/api/auth/logout',

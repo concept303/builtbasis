@@ -27,6 +27,7 @@ export interface RecordRow {
   description: string | null;
   reference: string | null;
   notes: string | null;
+  publicNotes: string | null;
   ballInCourtId: number | null;
   responsibleId: number | null;
   severity: Severity | null;
@@ -69,6 +70,7 @@ export const RECORD_COLUMNS = {
   description: 'description',
   reference: 'reference',
   notes: 'notes',
+  publicNotes: 'public_notes',
   ballInCourtId: 'ball_in_court_id',
   responsibleId: 'responsible_id',
   severity: 'severity',

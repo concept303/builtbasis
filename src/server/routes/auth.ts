@@ -57,6 +57,7 @@ export function registerAuthRoutes(
 
   app.get('/api/auth/me', { config: { sessionOnly: true } }, async (request) => {
     if (request.user === null) throw new HttpError(401, 'unauthenticated');
-    return { username: request.user.username };
+    const user = findUserByUsername(db, request.user.username)!;
+    return { username: user.username, displayName: user.displayName, isOwner: user.isOwner === 1 };
   });
 }

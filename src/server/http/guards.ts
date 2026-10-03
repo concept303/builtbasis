@@ -27,7 +27,9 @@ declare module 'fastify' {
  * Request rules (design §11.5):
  * - every state-changing request needs Origin = the public origin and a JSON body
  *   (multipart only on routes that allow it);
- * - owner /api routes except health and login need a valid session;
+ * - protected /api routes require an active owner unless explicitly configured for
+ *   contributor access or the account's own session endpoints;
+ * - contributor handlers check the current record grant and each requested capability;
  * - only explicitly marked shared GET/HEAD routes bypass that session requirement,
  *   and their handlers independently require a valid bearer share token;
  * - session lookup and file reads are read-only. Only a successful shared record GET

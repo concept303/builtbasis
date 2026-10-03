@@ -4,7 +4,7 @@ import { ItemParams } from '../http/params';
 import { requireProject } from '../lists/projects';
 import { requireRecord } from './store';
 
-export type ActivityAction = 'created' | 'field_changed' | 'status_changed' | 'share_created' | 'share_revoked';
+export type ActivityAction = 'created' | 'field_changed' | 'status_changed' | 'share_created' | 'share_revoked' | 'grant_changed' | 'grant_revoked';
 
 export interface ActivityInput {
   recordId: number;
@@ -51,14 +51,14 @@ export function recordActivity(db: Db, entry: ActivityInput): void {
 export function listActivity(db: Db, recordId: number): ActivityEntry[] {
   const rows = db
     .prepare(
-      `SELECT a.id, a.at, u.username, a.action, a.field, a.old_value AS oldValue, a.new_value AS newValue, a.detail
+      `SELECT a.id, a.at, u.display_name AS displayName, a.action, a.field, a.old_value AS oldValue, a.new_value AS newValue, a.detail
        FROM activity a JOIN users u ON u.id = a.user_id
        WHERE a.record_id = ? ORDER BY a.at DESC, a.id DESC`,
     )
     .all(recordId) as {
     id: number;
     at: string;
-    username: string;
+    displayName: string;
     action: ActivityAction;
     field: string | null;
     oldValue: string | null;
@@ -68,7 +68,7 @@ export function listActivity(db: Db, recordId: number): ActivityEntry[] {
   return rows.map((row) => ({
     id: row.id,
     at: row.at,
-    by: row.username,
+    by: row.displayName,
     action: row.action,
     field: row.field,
     from: fromJson(row.oldValue),

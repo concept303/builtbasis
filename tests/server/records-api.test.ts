@@ -176,17 +176,17 @@ describe('activity log (design §5.12)', () => {
     expect(
       activity.map(({ action, field, from, to, by }: Record<string, unknown>) => ({ action, field, from, to, by })),
     ).toEqual([
-      { action: 'field_changed', field: 'instructionText', from: 'Use 3 cm stone', to: 'Use 2 cm stone', by: 'owner' },
-      { action: 'field_changed', field: 'instructionText', from: null, to: 'Use 3 cm stone', by: 'owner' },
+      { action: 'field_changed', field: 'instructionText', from: 'Use 3 cm stone', to: 'Use 2 cm stone', by: 'Owner' },
+      { action: 'field_changed', field: 'instructionText', from: null, to: 'Use 3 cm stone', by: 'Owner' },
       {
         action: 'field_changed',
         field: 'ballInCourtId',
         from: f.people.architect,
         to: f.people.contractor,
-        by: 'owner',
+        by: 'Owner',
       },
-      { action: 'field_changed', field: 'ballInCourtId', from: null, to: f.people.architect, by: 'owner' },
-      { action: 'created', field: null, from: null, to: 'draft', by: 'owner' },
+      { action: 'field_changed', field: 'ballInCourtId', from: null, to: f.people.architect, by: 'Owner' },
+      { action: 'created', field: null, from: null, to: 'draft', by: 'Owner' },
     ]);
   });
 

@@ -19,7 +19,7 @@ export interface LogEntry {
 }
 
 type LogRow = Omit<LogEntry, 'private'> & { private: number };
-const SELECT = `SELECT l.id, l.event_at AS eventAt, l.text, l.private, u.username AS loggedBy,
+const SELECT = `SELECT l.id, l.event_at AS eventAt, l.text, l.private, u.display_name AS loggedBy,
   l.logged_at AS loggedAt, l.edited_at AS editedAt
   FROM log_entries l JOIN users u ON u.id = l.logged_by`;
 const toEntry = (row: LogRow): LogEntry => ({ ...row, private: row.private === 1 });

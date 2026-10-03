@@ -15,6 +15,7 @@ export interface SharedRecordFields {
   statusReason: { code: string | null; note: string | null } | null;
   title: string | null;
   description: string | null;
+  publicNotes: string | null;
   reference: string | null;
   ballInCourtId: number | null;
   responsibleId: number | null;
@@ -68,12 +69,12 @@ export interface SharedRecord {
     rows: { item: string; quantity: string; value: number; unit: Unit; note: string | null }[];
   }[];
   verifications: { id: number; checkedById: number; date: string; method: VerificationMethod; outcome: VerificationOutcome; note: string | null; createdAt: string }[];
-  photos: { id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedAt: string }[];
+  photos: { id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string }[];
   attachments: {
-    id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedAt: string;
+    id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
     logEntry: { id: number; eventAt: string; text: string } | null;
   }[];
-  log: { id: number; eventAt: string; text: string; attachmentIds: number[] }[];
+  log: { id: number; eventAt: string; text: string; loggedBy: string; attachmentIds: number[] }[];
   activity: SharedActivity[];
   labels: {
     people: { id: number; code: string; name: string; role: string }[];

@@ -63,7 +63,7 @@ function publicActivity(entry: ActivityEntry): SharedActivity | null {
 }
 
 /** Every public property is copied deliberately; future owner fields are private by default. */
-export function buildSharedRecord(db: Db, access: ShareAccess): SharedRecord {
+export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' | 'recordId'>): SharedRecord {
   const { projectId, recordId } = access;
   const r = getRecordDetail(db, projectId, recordId);
   const record: SharedRecord['record'] = {
@@ -73,6 +73,7 @@ export function buildSharedRecord(db: Db, access: ShareAccess): SharedRecord {
     statusReason: r.statusReason === null ? null : { code: r.statusReason.code, note: r.statusReason.note },
     title: r.title,
     description: r.description,
+    publicNotes: r.publicNotes,
     reference: r.reference,
     ballInCourtId: r.ballInCourtId,
     responsibleId: r.responsibleId,
@@ -109,14 +110,14 @@ export function buildSharedRecord(db: Db, access: ShareAccess): SharedRecord {
     id: item.id, checkedById: item.checkedById, date: item.date, method: item.method, outcome: item.outcome, note: item.note, createdAt: item.createdAt,
   }));
   const photos = listPhotos(db, recordId).map(item => ({
-    id: item.id, originalFilename: item.originalFilename, phase: item.phase, caption: item.caption, takenAt: item.takenAt, uploadedAt: item.uploadedAt,
+    id: item.id, originalFilename: item.originalFilename, phase: item.phase, caption: item.caption, takenAt: item.takenAt, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
   }));
   const attachments = listAttachments(db, recordId).filter(item => !item.logEntry?.private).map(item => ({
-    id: item.id, originalFilename: item.originalFilename, title: item.title, size: item.size, contentType: item.contentType, uploadedAt: item.uploadedAt,
+    id: item.id, originalFilename: item.originalFilename, title: item.title, size: item.size, contentType: item.contentType, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
     logEntry: item.logEntry === null ? null : { id: item.logEntry.id, eventAt: item.logEntry.eventAt, text: item.logEntry.text },
   }));
   const log = listLog(db, recordId).filter(item => !item.private).map(item => ({
-    id: item.id, eventAt: item.eventAt, text: item.text,
+    id: item.id, eventAt: item.eventAt, text: item.text, loggedBy: item.loggedBy,
     attachmentIds: attachments.filter(file => file.logEntry?.id === item.id).map(file => file.id),
   }));
   const activity = listActivity(db, recordId).map(publicActivity).filter((item): item is SharedActivity => item !== null);

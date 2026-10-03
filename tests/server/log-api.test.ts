@@ -25,7 +25,7 @@ describe('Log (design §5.11)', () => {
       eventAt: '2026-05-01T06:30:00.000Z',
       text: 'Architect sent plans',
       private: false,
-      loggedBy: 'owner',
+      loggedBy: 'Owner',
       loggedAt: expect.any(String),
       editedAt: null,
     });

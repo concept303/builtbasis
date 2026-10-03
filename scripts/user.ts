@@ -1,17 +1,17 @@
 import { stdin } from 'node:process';
-import { createContributor, disableContributor, resetContributorPassword } from '../src/server/auth/contributors';
+import { createContributor, disableContributor, enableContributor, resetContributorPassword } from '../src/server/auth/contributors';
 import { loadEnvFile, openMigratedDatabase } from '../src/server/bootstrap';
 import { loadConfig } from '../src/server/config';
 import { readHidden } from './hidden-input';
 
 const [action, username, displayName, extra] = process.argv.slice(2);
-if (!username || extra || !['create', 'reset', 'disable'].includes(action ?? '') ||
+if (!username || extra || !['create', 'reset', 'disable', 'enable'].includes(action ?? '') ||
     (action === 'create' ? !displayName : displayName !== undefined)) {
-  console.error('Usage: npm run user -- create <username> <displayName> | reset <username> | disable <username>');
+  console.error('Usage: npm run user -- create <username> <displayName> | reset <username> | disable <username> | enable <username>');
   process.exit(2);
 }
 let password = '';
-if (action !== 'disable') {
+if (action === 'create' || action === 'reset') {
   if (!stdin.isTTY) {
     console.error('Run in an interactive terminal. Passwords are never arguments or piped input.');
     process.exit(2);
@@ -31,8 +31,8 @@ try {
   } else {
     const sessions = action === 'reset'
       ? resetContributorPassword(db, username, password)
-      : disableContributor(db, username);
-    console.log(`Contributor ${action === 'reset' ? 'password reset' : 'disabled'}; ${sessions} session(s) ended.`);
+      : action === 'enable' ? enableContributor(db, username) : disableContributor(db, username);
+    console.log(`Contributor ${action === 'reset' ? 'password reset' : action === 'enable' ? 'enabled' : 'disabled'}; ${sessions} session(s) ended.`);
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

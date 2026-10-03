@@ -6,7 +6,7 @@ import type { StagedFile } from './storage';
 import type { UploadEnvelope } from './uploads';
 
 const PHOTO_SELECT = `SELECT p.id, p.original_filename AS originalFilename, p.phase, p.caption, p.taken_at AS takenAt,
-  u.username AS uploadedBy, p.uploaded_at AS uploadedAt FROM photos p JOIN users u ON u.id = p.uploaded_by`;
+  u.display_name AS uploadedBy, p.uploaded_at AS uploadedAt FROM photos p JOIN users u ON u.id = p.uploaded_by`;
 
 export function listPhotos(db: Db, recordId: number): PhotoOut[] {
   return db.prepare(`${PHOTO_SELECT} WHERE p.record_id = ?
@@ -15,7 +15,7 @@ export function listPhotos(db: Db, recordId: number): PhotoOut[] {
 
 export function listAttachments(db: Db, recordId: number): AttachmentOut[] {
   const rows = db.prepare(`SELECT a.id, a.original_filename AS originalFilename, a.title, b.size, b.content_type AS contentType,
-    u.username AS uploadedBy, a.uploaded_at AS uploadedAt, l.id AS logId, l.event_at AS eventAt, l.text, l.private
+    u.display_name AS uploadedBy, a.uploaded_at AS uploadedAt, l.id AS logId, l.event_at AS eventAt, l.text, l.private
     FROM attachments a JOIN blobs b ON b.hash = a.blob_hash JOIN users u ON u.id = a.uploaded_by
     LEFT JOIN log_entries l ON l.id = a.log_entry_id AND l.record_id = a.record_id
     WHERE a.record_id = ? ORDER BY a.uploaded_at DESC, a.id DESC`).all(recordId) as (Omit<AttachmentOut, 'logEntry'> & {
