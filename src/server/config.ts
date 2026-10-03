@@ -4,6 +4,7 @@ export interface AppConfig {
   dataDir: string;
   dbPath: string;
   backupsDir: string;
+  filesDir: string;
   /** Scheme + host (+ port) that browsers send as Origin, e.g. https://builtbasis.ktimanet.com */
   publicOrigin: string;
   secureCookies: boolean;
@@ -21,6 +22,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     dataDir,
     dbPath: join(dataDir, 'builtbasis.db'),
     backupsDir: join(dataDir, 'backups'),
+    filesDir: join(dataDir, 'files'),
     publicOrigin,
     secureCookies: publicOrigin.startsWith('https://'),
     behindCloudflare: env.BEHIND_CLOUDFLARE === '1',

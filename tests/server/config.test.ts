@@ -10,6 +10,7 @@ describe('loadConfig (design §11.6)', () => {
     const config = loadConfig({ BUILTBASIS_DATA_DIR: '/data' });
     expect(config.dbPath).toMatch(/builtbasis\.db$/);
     expect(config.backupsDir).toMatch(/backups$/);
+    expect(config.filesDir).toMatch(/files$/);
     expect(config.publicOrigin).toBe('http://localhost:3000');
     expect(config.secureCookies).toBe(false);
     expect(config.behindCloudflare).toBe(false);
