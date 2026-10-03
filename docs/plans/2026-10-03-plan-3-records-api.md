@@ -802,7 +802,7 @@ How a save works (`applyPatch` in `records.ts`), all inside one transaction:
 
 Any failure throws, and the transaction rolls everything back.
 
-- [ ] **Step 1: Create the test helpers `tests/server/record-fixture.ts`**
+- [x] **Step 1: Create the test helpers `tests/server/record-fixture.ts`**
 
 ```ts
 import type { RecordDetail } from '../../src/server/records/records';
@@ -903,7 +903,7 @@ export function forceStatus(f: Fixture, id: number, status: string): void {
 }
 ```
 
-- [ ] **Step 2: Write the failing test `tests/server/records-api.test.ts`**
+- [x] **Step 2: Write the failing test `tests/server/records-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1108,7 +1108,7 @@ describe('activity log (design §5.12)', () => {
 });
 ```
 
-- [ ] **Step 3: Write the failing test `tests/server/record-links.test.ts`**
+- [x] **Step 3: Write the failing test `tests/server/record-links.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1196,12 +1196,12 @@ describe('must be done before (design §4.3)', () => {
 });
 ```
 
-- [ ] **Step 4: Run to verify they fail**
+- [x] **Step 4: Run to verify they fail**
 
 Run: `npx vitest run tests/server/records-api.test.ts tests/server/record-links.test.ts`
 Expected: FAIL — all 18 tests fail with `create failed: 404 {"error":"not_found"}`: there are no records routes yet.
 
-- [ ] **Step 5: Create `src/server/http/user.ts`**
+- [x] **Step 5: Create `src/server/http/user.ts`**
 
 ```ts
 import type { FastifyRequest } from 'fastify';
@@ -1214,7 +1214,7 @@ export function requireUserId(request: FastifyRequest): number {
 }
 ```
 
-- [ ] **Step 6: Create `src/server/records/store.ts`**
+- [x] **Step 6: Create `src/server/records/store.ts`**
 
 ```ts
 import type {
@@ -1349,7 +1349,7 @@ export function touchRecord(db: Db, recordId: number, userId: number, at: string
 }
 ```
 
-- [ ] **Step 7: Create `src/server/records/activity.ts`**
+- [x] **Step 7: Create `src/server/records/activity.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1441,7 +1441,7 @@ export function registerActivityRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 8: Create `src/server/records/references.ts`**
+- [x] **Step 8: Create `src/server/records/references.ts`**
 
 ```ts
 import type { Db } from '../db/connection';
@@ -1498,7 +1498,7 @@ export function checkOption(db: Db, recordId: number, optionId: number | null | 
 }
 ```
 
-- [ ] **Step 9: Create `src/server/records/links.ts`**
+- [x] **Step 9: Create `src/server/records/links.ts`**
 
 ```ts
 import type { Status } from '../../domain';
@@ -1591,7 +1591,7 @@ export function replaceMustBeDoneBefore(db: Db, projectId: number, recordId: num
 }
 ```
 
-- [ ] **Step 10: Create `src/server/records/records.ts`**
+- [x] **Step 10: Create `src/server/records/records.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1896,7 +1896,7 @@ export function registerRecordCoreRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 11: Create `src/server/records/routes.ts`**
+- [x] **Step 11: Create `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -1911,7 +1911,7 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 12: Modify `src/server/app.ts`**
+- [x] **Step 12: Modify `src/server/app.ts`**
 
 Replace:
 
@@ -1939,11 +1939,11 @@ with:
   registerRecordRoutes(app, db);
 ```
 
-- [ ] **Step 13: Run to verify they pass**
+- [x] **Step 13: Run to verify they pass**
 
 Run: `npx vitest run tests/server/records-api.test.ts tests/server/record-links.test.ts` → PASS (12 + 6 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 14: Commit**
+- [x] **Step 14: Commit**
 
 ```bash
 git add src/server/http/user.ts src/server/records src/server/app.ts tests/server/record-fixture.ts tests/server/records-api.test.ts tests/server/record-links.test.ts
