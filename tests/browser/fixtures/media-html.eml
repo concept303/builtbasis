@@ -1,0 +1,19 @@
+From: Sender <sender@example.test>
+To: Reader <reader@example.test>
+Subject: =?UTF-8?B?U3ludGhldGljIOKckw==?=
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=outer
+
+--outer
+Content-Type: text/html; charset=utf-8
+
+<p>Hello &amp; safe</p><img src="https://tracker.invalid/pixel"><script>fetch('https://tracker.invalid/script')</script><iframe src="https://tracker.invalid/frame"></iframe><p>Visible body</p>
+--outer
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename="nested.eml"
+
+Subject: Nested synthetic
+Content-Type: text/plain
+
+Nested original body
+--outer--
