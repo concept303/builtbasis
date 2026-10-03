@@ -12,9 +12,9 @@
 > **Checklist note:** Unchecked steps are future implementation work.
 > **For agentic workers:** Use `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Preserve the owner's selected method and Astra Medium model preference. Follow the checkboxes task by task.
 
-**Goal:** The owner can upload and manage record evidence, create/copy/revoke single-record share links, and serve a read-only record and its permitted files without exposing private content.
+**Goal:** The owner can manage evidence and sharing, grant named users per-record upload and Add Log permissions, and maintain separate Public/Private Notes. Authorised readers can fetch broad attachment formats for the approved viewing/playback and download capabilities without receiving private content.
 
-**Architecture:** Keep immutable, content-addressed files outside the application directory. SQLite holds separate photo and attachment occurrences, and hashed/encrypted share tokens. Owner routes use the existing session and Origin guards; three explicitly registered public read routes use a bearer share token and a server-built public projection.
+**Architecture:** Keep immutable, content-addressed files outside the application directory. SQLite holds separate photo and attachment occurrences, and hashed/encrypted share tokens. Owner routes require an owner session. Explicit contributor routes check a current per-record grant; anonymous share routes use a bearer token. Both reader paths use a server-built public projection.
 
 **Tech stack:** Existing TypeScript, Fastify 5, SQLite and Vitest. Add only `@fastify/multipart` 9.3.0 as a runtime dependency. Use Node crypto, streams and filesystem APIs. No server image conversion, browser UI, PDF, background queue or storage abstraction.
 
@@ -28,7 +28,7 @@
 - “Originals are never modified or overwritten. Corrections add new files.”
 - “Photos reference three blobs: original, display copy and thumbnail.” The browser prepares the latter two in Plan 5.
 - “Raw tokens appear only in owner-authorised link management and in the chosen PDF QR code. They are never written to activity entries or logs.” Presenting the token to the public API is authentication, not permission to echo it in a response.
-- Single owner, local-disk SQLite, integer IDs, English/Greek fixed codes, no soft deletes or record deletion. File occurrence IDs must never be reused.
+- One owner plus explicitly provisioned named users; local-disk SQLite, integer IDs, English/Greek fixed codes, no soft deletes or record deletion. File occurrence IDs must never be reused.
 - Never use real project files, the root development database, live credentials or production for tests. Use temporary directories and synthetic fixtures.
 
 ## Planning decisions
@@ -37,18 +37,22 @@ These fill implementation details left open by the design. They are proposals fo
 
 1. **Share URL:** `${publicOrigin}/share#${token}`. Plan 5 reads the fragment and sends `Authorization: Bearer <token>` to the public API. No tokens in query strings, route parameters, image URLs or redirects. Shared images/downloads use authenticated fetch and browser object URLs. This keeps the token out of ordinary proxy request URLs. The `/share` page itself arrives in Plan 5; Plan 4 delivers its API.
 2. **Upload unit:** one attachment, or one photo bundle, per request. A photo bundle contains exactly `original`, `display` and `thumbnail`. No batch protocol or replacement of bytes. Metadata can be edited separately.
-3. **Limits:** interpret MB as decimal bytes. Original photo ≤25,000,000; display JPEG ≤5,000,000; thumbnail JPEG ≤500,000; attachment ≤50,000,000. Empty files are rejected. Metadata JSON ≤16,384 bytes. Limits apply to actual streamed bytes, regardless of Content-Length. No limit on the number of saved occurrences.
-4. **Types:** originals accept JPEG, PNG and HEIC/HEIF still images; derived copies are JPEG. Attachments also accept PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, ODT/ODS/ODP, RTF and DWG (download only). SVG, HTML, archives uploaded as archives, executables and macro-specific extensions are rejected. Office files are downloads, never rendered by the server. Byte signatures and extension families must agree; client MIME is not trusted. This is format screening, not malware scanning or a full document validator.
+3. **Limits:** 100,000,000 bytes for the complete multipart request, including boundaries, metadata and all files. Original photos and attachments are bounded by that envelope. Generated JPEG display/thumbnail copies remain bounded at 5,000,000/500,000 bytes. Metadata JSON is at most 16,384 bytes. Streamed counts enforce the ceiling with or without Content-Length. The browser must account for envelope overhead; a 100 MB original plus metadata does not fit the 100 MB request ceiling.
+4. **Types and capabilities:** the revised explicit extension policy is defined in the attachment task below, using the combined documented vendor-supported formats. Images, PDFs, EML/MSG email, video and audio support upload, viewing/playback and download. Office documents, CAD/BIM and archives support upload/download. Bytes remain immutable; MIME and filenames are screened, not trusted. Format screening is not malware scanning. Email parsing and native media rendering are Plan 5 browser work, backed by Plan 4 authorised original/view APIs and a tested reader handoff. No server transcoder or CAD/Office viewer.
 5. **Dates:** photo `takenAt` is nullable, accepts an ISO timestamp with an explicit offset and is normalised to UTC. The browser reads metadata in Plan 5. Missing or ambiguous metadata stays null until the owner edits it; the server does not substitute upload time.
 6. **Links:** label is required nonblank text, max 200 characters; optional expiry must be a future ISO timestamp on creation. Links may be created for Draft records, but remain unavailable while Draft. Create a new link to change label/expiry; no link editing or physical link deletion. Revocation is idempotent. The owner can copy a stored link, including an inactive one; the returned state tells the UI whether it is usable.
 7. **Key changes:** a valid 32-byte key is required before the HTTP app starts. Missing/malformed keys stop startup. A changed key revokes all unrevoked links before routes become available. It does not silently re-encrypt links. A stored SHA-256 key fingerprint identifies a change; it is not the key. A server command handles deliberate revocation without needing the lost key.
 8. **Public activity:** expose existing record activity through an explicit allowlist. Share-management activity is owner-only because labels identify recipients. Never publish share IDs, labels, counters, ciphertext or tokens. Unknown future activity actions/fields are omitted until explicitly reviewed.
 9. **Views:** one successful GET of the public record API counts as one view. HEAD and file reads do not count. A failed projection or failed token check does not count. Counts are requests, not unique people.
 10. **HTTP caching:** shared responses and owner link-management responses use `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and `X-Robots-Tag: noindex, nofollow`. File responses also use `X-Content-Type-Options: nosniff`. No conditional 304 shortcut, CDN caching, or direct static mount of the data directory.
-11. **Public actor identities — proposed design clarification:** omit the login username from all public responses, including created/updated users, uploaders, Log authors and activity actors. Keep these values in owner responses and storage. With one editing account, publishing its login identifier adds no useful distinction. This narrows design §5.1/§5.11's public actor information; reconcile the approved design when this plan is approved, before execution. People selected as responsible, decision-maker, measurer or verifier remain public business references, not login accounts.
-12. **Administrative revocations — proposed design exception:** key-change/global administrative revocation updates share-link rows without appending per-record owner activity. No owner request performed the change, and the existing activity table requires an owner user ID. The command/startup emits only a safe reason code and revoked-link count. This is an explicit exception to design §5.12's universal revocation logging rule; reconcile the approved design when this plan is approved, before execution. Owner-requested revocations still append activity atomically.
+11. **Actor identities:** login usernames are not published. Named-user evidence and Log entries use separate display names for human attribution; storage retains the real user ID. Owner account administration can set a human display name. This replaces the earlier single-owner assumption that all automatic author fields could be omitted.
+12. **Administrative revocations:** key-change/global revocation emits a safe system reason and affected count, without fabricating an owner actor. Owner-requested revocation still appends per-record activity. The revised design records this operational exception explicitly.
+13. **Accounts and record grants:** one owner retains all existing powers. A named-user grant gives read access to one non-Draft record and two independent booleans, Upload and Add Log. Both false means read-only; deleting the grant removes authenticated access. Login alone authorises no record or project-wide directory. Grant/account changes take effect on every request; uploads recheck permission before committing evidence. Anonymous share links remain independent and read-only.
+14. **Notes:** preserve the existing notes column as Private Notes. Add Public Notes with an empty/null initial value. Only owner record saves may change either; public projections include only Public Notes. Existing A3 Notes exclusions stay unchanged until Plan 6 layout review.
+15. **Account administration:** owner-controlled server commands provision/reset/disable/enable named users. Passwords use the existing limits/hashing and hidden prompts. Reset/disable ends that user's sessions; enabling requires a fresh login. The contributor command cannot replace/reset/disable the owner. The owner manages record grants through protected APIs; Plan 5 adds the controls. There is no self-signup or email-reset service. Plan 6 restore must disable all non-owner accounts and clear grants, followed by deliberate password resets, enable and regrant; deleting sessions alone cannot invalidate restored passwords.
+16. **New contributions:** contributors may upload new evidence and/or create public Log entries according to their grants. They cannot edit/delete existing content, change record fields/status, touch either Notes field or access private entries. Upload alone may append a new attachment to an accessible public Log entry on the granted record. Add Log is required to create new entry text; creating a new entry with files requires both grants. Existing text and attachments remain owner-editable only.
 
-The owner selected a full-code plan with scratch replay and approved download-only DWG attachments on 2026-10-03. The complete file blocks below implement those choices in a disposable scratch checkout. Astra Medium is an explicit owner instruction from this conversation and remains the execution preference.
+The owner selected a full-code plan with scratch replay, then approved the broader attachment capabilities, 100 MB request ceiling, named-user grants and two owner-edited Notes fields. The complete file blocks below implement the backend of that revised scope in a disposable scratch checkout. Astra Medium is an explicit owner instruction from this conversation and remains the execution preference.
 
 ## Review focus
 
@@ -79,9 +83,13 @@ Each item has a regression test in the named task.
 | `src/server/http/logging.ts` | Safe request/error serializers with credential redaction |
 | `src/server/http/privacy.ts` | Shared privacy-response headers |
 | `scripts/revoke-share-links.ts` | Offline administrative revocation after key loss or restore |
+| `src/server/files/previews.ts` | Per-occurrence preview descriptors and native view resolution |
+| `src/server/access/routes.ts` | Owner grants and contributor record/evidence routes |
+| `src/server/auth/contributors.ts`, `scripts/user.ts` | Named-account administration |
+| `src/server/db/migration-0004-contributors.ts` | Additive owner/account flags, grants and public Notes |
 | `tests/server/file-fixture.ts` | Synthetic file bytes, multipart builder and successful-upload helpers |
 
-Existing integration points: `app.ts` registers routes; `http/guards.ts` already supports `config.multipart`; `records/log.ts` has the Plan 4 attachment-deletion marker; `records/activity.ts` owns append-only events; `config.ts` and `bootstrap.ts` own configuration/startup. Append migration 0003; do not alter 0001 or 0002.
+Existing integration points: `app.ts` registers routes; `http/guards.ts` already supports `config.multipart`; `records/log.ts` has the Plan 4 attachment-deletion marker; `records/activity.ts` owns append-only events; `config.ts` and `bootstrap.ts` own configuration/startup. Append migrations 0003 and 0004; do not alter 0001 or 0002.
 
 Use existing `Db`, `requireRecord(db, projectId, recordId)`, `touchRecord(db, recordId, userId, at)`, `recordActivity(db, entry)`, `requireUserId(request)` and parameter schemas. Existing `makeFixture`, `postRecord`, `recordUrl`, `get`, `send` and `forceStatus` are in `tests/server/record-fixture.ts` and `tests/server/helpers.ts`.
 
@@ -7988,43 +7996,6281 @@ git add 'README.md' 'docs/guides/share-key-management.md' 'docs/plans/2026-10-02
 git commit -m "docs: document share key operations and browser handoff"
 ```
 
+## Task 9: Provision named users and protect owner APIs
+
+**Scratch checkpoint:** `5298436`. **Depends on:** Task 8.
+
+**Deliverable:** Additive account/grant/Notes schema, named-user commands, disabled-session checks and an owner-only default API boundary.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/contributors-db.test.ts`
+
+<!-- replay task=9 phase=test sha256=5848279e7f70cb28dc5c786cce4a590e5e10faa7865595717cfff1adc8e89983 -->
+
+``````ts
+import { expect, it } from 'vitest';
+import { openDatabase } from '../../src/server/db/connection';
+import { MIGRATIONS } from '../../src/server/db/migrations';
+
+it('upgrades the legacy owner and preserves existing Notes as private', () => {
+  const db = openDatabase(':memory:');
+  try {
+    for (const migration of MIGRATIONS.slice(0, 3)) db.exec(migration.sql);
+    db.exec(`INSERT INTO users VALUES (1,'legacy','hash','t','t');
+      INSERT INTO projects VALUES (1,'p','Project','t');
+      INSERT INTO records (id,project_id,subtype,sequence,human_id,status,notes,created_at,created_by,updated_at,updated_by)
+      VALUES (1,1,'task',1,'T-1','draft','private legacy text','t',1,'t',1);`);
+    for (const migration of MIGRATIONS.slice(3)) db.exec(migration.sql);
+    expect(db.prepare('SELECT is_owner, is_active, display_name FROM users').get())
+      .toEqual({ is_owner: 1, is_active: 1, display_name: 'Owner' });
+    expect(db.prepare('SELECT notes, public_notes FROM records').get())
+      .toEqual({ notes: 'private legacy text', public_notes: null });
+    db.exec("INSERT INTO users (id,username,password_hash,created_at,updated_at) VALUES (2,'alex','hash','t','t')");
+    db.exec('INSERT INTO record_grants VALUES (1,2,0,0)');
+    expect(() => db.exec('INSERT INTO record_grants VALUES (1,2,1,1)')).toThrow();
+    expect(() => db.exec('UPDATE record_grants SET can_upload = 2')).toThrow();
+    expect(() => db.exec('UPDATE users SET is_owner = 1 WHERE id = 2')).toThrow();
+  } finally { db.close(); }
+});
+``````
+
+#### File: `tests/server/contributors.test.ts`
+
+<!-- replay task=9 phase=test sha256=93f92ffeeff06422b843797560545d290700b821b824c867f99b797767d98699 -->
+
+``````ts
+import { afterEach, expect, it } from 'vitest';
+import { createContributor, disableContributor, resetContributorPassword } from '../../src/server/auth/contributors';
+import { createSession, findSessionUser } from '../../src/server/auth/sessions';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { loginAsOwner, makeContext, OWNER, type TestContext } from './helpers';
+
+let ctx: TestContext;
+afterEach(async () => { if (ctx) await ctx.close(); });
+
+it('provisions a named contributor without changing the owner and refuses owner operations', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex-login', 'Alex Builder', OWNER.password);
+  expect(ctx.db.prepare('SELECT display_name, is_owner, is_active FROM users WHERE id = ?').get(id))
+    .toEqual({ display_name: 'Alex Builder', is_owner: 0, is_active: 1 });
+  expect(() => resetContributorPassword(ctx.db, 'owner', OWNER.password)).toThrow('owner');
+  expect(() => disableContributor(ctx.db, 'owner')).toThrow('owner');
+  expect(() => setOwnerPassword(ctx.db, 'alex-login', OWNER.password)).toThrow('contributor');
+  expect(() => createContributor(ctx.db, 'bad', ' ', OWNER.password)).toThrow('Display name');
+});
+
+it('resets only the selected contributor sessions and disables login and stale sessions', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  const other = createContributor(ctx.db, 'sam', 'Sam', OWNER.password);
+  const session = createSession(ctx.db, id);
+  const otherSession = createSession(ctx.db, other);
+  expect(resetContributorPassword(ctx.db, 'alex', 'another long password')).toBe(1);
+  expect(findSessionUser(ctx.db, session.token)).toBeNull();
+  expect(findSessionUser(ctx.db, otherSession.token)?.userId).toBe(other);
+  const next = createSession(ctx.db, id);
+  expect(disableContributor(ctx.db, 'alex')).toBe(1);
+  expect(findSessionUser(ctx.db, next.token)).toBeNull();
+  const stale = createSession(ctx.db, id);
+  expect(findSessionUser(ctx.db, stale.token)).toBeNull();
+  const response = await ctx.app.inject({ method: 'POST', url: '/api/auth/login',
+    headers: { origin: ctx.origin }, payload: { username: 'alex', password: 'another long password' } });
+  expect(response.statusCode).toBe(401);
+});
+
+it('allows contributor session endpoints but fails closed on owner and unmarked routes', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  const cookie = `bb_session=${createSession(ctx.db, id).token}`;
+  expect((await ctx.app.inject({ url: '/api/auth/me', headers: { cookie } })).statusCode).toBe(200);
+  for (const url of ['/api/projects', '/api/assigned-records/unregistered']) {
+    expect((await ctx.app.inject({ url, headers: { cookie } })).statusCode).toBe(403);
+  }
+  expect((await ctx.app.inject({ method: 'POST', url: '/api/auth/logout',
+    headers: { cookie, origin: ctx.origin }, payload: {} })).statusCode).toBe(200);
+});
+``````
+
+#### File: `tests/server/files-db.test.ts`
+
+<!-- replay task=9 phase=test sha256=0783e464aefd6847281e8855de5ca1047e668e35bc036ec3000e91de789ca048 -->
+
+``````ts
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { expect, it } from 'vitest';
+import { openDatabase, type Db } from '../../src/server/db/connection';
+import { migrate } from '../../src/server/db/migrate';
+import { MIGRATIONS } from '../../src/server/db/migrations';
+
+function seed(db: Db) {
+  db.exec("INSERT INTO users (id,username,password_hash,created_at,updated_at) VALUES (1,'u','h','t','t'); INSERT INTO projects VALUES (1,'p','P','t')");
+  for (const n of [1, 2]) db.prepare("INSERT INTO records (project_id,subtype,sequence,human_id,status,created_at,created_by,updated_at,updated_by) VALUES (1,'task',?,?,'draft','t',1,'t',1)").run(n, `T-${n}`);
+}
+
+it('enforces occurrence ownership, cascade, retained blobs, nonreused ids and unique tokens', () => {
+  const db = openDatabase(':memory:');
+  try {
+    migrate(db, { backupsDir: 'unused' }); seed(db);
+    const hash = 'a'.repeat(64);
+    expect(() => db.prepare('INSERT INTO blobs VALUES (NULL,1,?)').run('image/jpeg')).toThrow();
+    db.prepare('INSERT INTO blobs VALUES (?,1,?)').run(hash, 'image/jpeg');
+    db.exec("INSERT INTO log_entries (id,record_id,event_at,text,private,logged_by,logged_at) VALUES (1,1,'t','a',0,1,'t'),(2,2,'t','b',1,1,'t')");
+    const insert = db.prepare("INSERT INTO attachments (record_id,blob_hash,original_filename,log_entry_id,uploaded_by,uploaded_at) VALUES (1,?,'a.jpg',?,1,'t')");
+    expect(() => insert.run(hash, 2)).toThrow();
+    const id = Number(insert.run(hash, 1).lastInsertRowid);
+    db.exec('DELETE FROM log_entries WHERE id=1');
+    expect(db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+    expect(db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+    expect(Number(insert.run(hash, null).lastInsertRowid)).toBeGreaterThan(id);
+    const photo = db.prepare("INSERT INTO photos(record_id,original_hash,display_hash,thumbnail_hash,original_filename,phase,uploaded_by,uploaded_at) VALUES (1,?,?,?,'a.jpg','before',1,'t')");
+    const photoId = Number(photo.run(hash, hash, hash).lastInsertRowid);
+    db.prepare('DELETE FROM photos WHERE id=?').run(photoId);
+    expect(Number(photo.run(hash, hash, hash).lastInsertRowid)).toBeGreaterThan(photoId);
+    const share = db.prepare("INSERT INTO share_links(record_id,label,token_hash,key_fingerprint,token_ciphertext,token_nonce,token_tag,created_by,created_at) VALUES (1,'x',?,'k',?,?,?,1,'t')");
+    share.run(hash, Buffer.alloc(1), Buffer.alloc(12), Buffer.alloc(16));
+    expect(() => share.run(hash, Buffer.alloc(1), Buffer.alloc(12), Buffer.alloc(16))).toThrow();
+  } finally { db.close(); }
+});
+
+it('upgrades a populated Plan 3 database with a backup and is idempotent', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bb-files-db-'));
+  const db = openDatabase(join(dir, 'test.db'));
+  try {
+    migrate(db, { backupsDir: join(dir, 'backups'), migrations: MIGRATIONS.slice(0, 2) }); seed(db);
+    migrate(db, { backupsDir: join(dir, 'backups') });
+    expect(db.prepare('SELECT count(*) FROM records').pluck().get()).toBe(2);
+    expect(db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(0);
+    expect(readdirSync(join(dir, 'backups')).length).toBeGreaterThan(0);
+    const before = db.prepare('SELECT total_changes()').pluck().get();
+    migrate(db, { backupsDir: join(dir, 'backups') });
+    expect(db.prepare('SELECT total_changes()').pluck().get()).toBe(before);
+  } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/contributors.test.ts tests/server/contributors-db.test.ts tests/server/sessions.test.ts tests/server/auth-api.test.ts tests/server/files-db.test.ts`.
+
+Expected: new account/schema tests fail because the contributor module and new columns do not exist.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `package.json`
+
+<!-- replay task=9 phase=implementation sha256=b898c94a82849b63a50852dbd29608ad6f3a9875681ba2dbf605998bb0fe5b01 -->
+
+``````json
+{
+  "name": "builtbasis",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server/main.ts",
+    "start": "tsx src/server/main.ts",
+    "owner": "tsx scripts/owner.ts",
+    "user": "tsx scripts/user.ts",
+    "seed:gennadi": "tsx scripts/seed-gennadi.ts",
+    "shares:revoke-all": "tsx scripts/revoke-share-links.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "vocabulary:extract": "node scripts/extract-vocabulary.mjs"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.20.5",
+    "exceljs": "^4.4.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/multipart": "9.3.0",
+    "better-sqlite3": "13.0.3",
+    "fastify": "^5.12.5",
+    "zod": "^4.6.5"
+  }
+}
+``````
+
+#### File: `scripts/hidden-input.ts`
+
+<!-- replay task=9 phase=implementation sha256=85e9bdc7c6b26aa51c3dfaab00d729bb9fc30ae84df80e49962e48da8e14e218 -->
+
+``````ts
+import { stdin, stdout } from 'node:process';
+
+/** Reads a line from the terminal without echoing it. */
+export function readHidden(prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let value = '';
+    const finish = (): void => {
+      stdin.off('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdout.write('\n');
+    };
+    const onData = (chunk: string): void => {
+      for (const char of chunk) {
+        if (char === '\r' || char === '\n') {
+          finish();
+          resolve(value);
+          return;
+        }
+        if (char === '\u0003') {
+          finish();
+          reject(new Error('Cancelled'));
+          return;
+        }
+        if (char === '\u007f' || char === '\b') value = value.slice(0, -1);
+        else value += char;
+      }
+    };
+    stdout.write(prompt);
+    stdin.setEncoding('utf8');
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.on('data', onData);
+  });
+}
+
+``````
+
+#### File: `scripts/owner.ts`
+
+<!-- replay task=9 phase=implementation sha256=56f2332c53543d401e2b3611bd23744991826b3169d79d0d9a47ad5e8e2d1038 -->
+
+``````ts
+import { readHidden } from './hidden-input';
+import { stdin } from 'node:process';
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../src/server/auth/passwords';
+import { setOwnerPassword } from '../src/server/auth/users';
+import { loadEnvFile, openMigratedDatabase } from '../src/server/bootstrap';
+import { loadConfig } from '../src/server/config';
+
+const username = process.argv[2];
+if (!username || process.argv.length > 4) {
+  console.error('Usage: npm run owner -- <username> [displayName]');
+  process.exit(2);
+}
+if (!stdin.isTTY) {
+  console.error('Run this command in an interactive terminal: the password is typed, never piped or passed as an argument.');
+  process.exit(2);
+}
+
+const password = await readHidden(
+  `New password for "${username}" (${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters): `,
+);
+if ((await readHidden('Repeat the password: ')) !== password) {
+  console.error('The passwords differ. Nothing was changed.');
+  process.exit(1);
+}
+
+loadEnvFile();
+const { db } = openMigratedDatabase(loadConfig());
+try {
+  const result = setOwnerPassword(db, username, password, new Date(), process.argv[3]);
+  console.log(
+    result.created
+      ? `Owner account "${username}" created.`
+      : `Password for "${username}" reset; ${result.sessionsRemoved} session(s) ended.`,
+  );
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+} finally {
+  db.close();
+}
+``````
+
+#### File: `scripts/user.ts`
+
+<!-- replay task=9 phase=implementation sha256=ca76eeed969eb9cef7b67bdf201921825b61d85f05ee56a621ee303671c783b5 -->
+
+``````ts
+import { stdin } from 'node:process';
+import { createContributor, disableContributor, resetContributorPassword } from '../src/server/auth/contributors';
+import { loadEnvFile, openMigratedDatabase } from '../src/server/bootstrap';
+import { loadConfig } from '../src/server/config';
+import { readHidden } from './hidden-input';
+
+const [action, username, displayName, extra] = process.argv.slice(2);
+if (!username || extra || !['create', 'reset', 'disable'].includes(action ?? '') ||
+    (action === 'create' ? !displayName : displayName !== undefined)) {
+  console.error('Usage: npm run user -- create <username> <displayName> | reset <username> | disable <username>');
+  process.exit(2);
+}
+let password = '';
+if (action !== 'disable') {
+  if (!stdin.isTTY) {
+    console.error('Run in an interactive terminal. Passwords are never arguments or piped input.');
+    process.exit(2);
+  }
+  password = await readHidden('New password: ');
+  if (await readHidden('Repeat the password: ') !== password) {
+    console.error('The passwords differ. Nothing was changed.');
+    process.exit(1);
+  }
+}
+loadEnvFile();
+const { db } = openMigratedDatabase(loadConfig());
+try {
+  if (action === 'create') {
+    const id = createContributor(db, username, displayName!, password);
+    console.log(`Contributor ${id} created.`);
+  } else {
+    const sessions = action === 'reset'
+      ? resetContributorPassword(db, username, password)
+      : disableContributor(db, username);
+    console.log(`Contributor ${action === 'reset' ? 'password reset' : 'disabled'}; ${sessions} session(s) ended.`);
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+} finally {
+  db.close();
+}
+``````
+
+#### File: `src/server/auth/contributors.ts`
+
+<!-- replay task=9 phase=implementation sha256=3049f3d72b9ab3b0fc955029abc8f9f1e6af2e6606db5344ffb863519ee4e349 -->
+
+``````ts
+import type { Db } from '../db/connection';
+import { hashPassword } from './passwords';
+import { deleteUserSessions } from './sessions';
+import { findUserByUsername, MAX_USERNAME_LENGTH, validateDisplayName } from './users';
+
+export function createContributor(db: Db, username: string, displayName: string, password: string): number {
+  if (username.length === 0 || username.length > MAX_USERNAME_LENGTH) throw new RangeError('Invalid username');
+  validateDisplayName(displayName);
+  const hash = hashPassword(password);
+  return db.transaction(() => {
+    if (findUserByUsername(db, username)) throw new Error('Account already exists');
+    const now = new Date().toISOString();
+    const result = db.prepare(`INSERT INTO users (username,password_hash,display_name,created_at,updated_at)
+      VALUES (?,?,?,?,?)`).run(username, hash, displayName, now, now);
+    return Number(result.lastInsertRowid);
+  }).immediate();
+}
+
+function contributorId(db: Db, username: string): number {
+  const user = findUserByUsername(db, username);
+  if (!user) throw new Error('Contributor does not exist');
+  if (user.isOwner) throw new Error('The contributor command cannot change the owner');
+  return user.id;
+}
+
+export function resetContributorPassword(db: Db, username: string, password: string): number {
+  const hash = hashPassword(password);
+  return db.transaction(() => {
+    const id = contributorId(db, username);
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(hash, new Date().toISOString(), id);
+    return deleteUserSessions(db, id);
+  }).immediate();
+}
+
+export function disableContributor(db: Db, username: string): number {
+  return db.transaction(() => {
+    const id = contributorId(db, username);
+    db.prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+    return deleteUserSessions(db, id);
+  }).immediate();
+}
+``````
+
+#### File: `src/server/auth/sessions.ts`
+
+<!-- replay task=9 phase=implementation sha256=11671d33a400c90b38a068f6109bfc6f57689acd0518c704c62bacbc3b05c740 -->
+
+``````ts
+import { createHash, randomBytes } from 'node:crypto';
+import type { Db } from '../db/connection';
+
+/** Absolute expiry: 30 days after login (design §11.5). */
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface SessionUser {
+  userId: number;
+  username: string;
+}
+
+/** Only this hash is stored, so a database or backup never contains a usable session. */
+const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
+
+export function createSession(db: Db, userId: number, now: Date = new Date()): { token: string; expiresAt: Date } {
+  const token = randomBytes(32).toString('base64url');
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(
+    hashToken(token),
+    userId,
+    now.toISOString(),
+    expiresAt.toISOString(),
+  );
+  return { token, expiresAt };
+}
+
+/** Read-only: used on every request, including GET, which must never write. */
+export function findSessionUser(db: Db, token: string, now: Date = new Date()): SessionUser | null {
+  const row = db
+    .prepare(
+      `SELECT u.id AS userId, u.username AS username, s.expires_at AS expiresAt
+       FROM sessions s JOIN users u ON u.id = s.user_id
+       WHERE s.token_hash = ? AND u.is_active = 1`,
+    )
+    .get(hashToken(token)) as { userId: number; username: string; expiresAt: string } | undefined;
+  if (!row || row.expiresAt <= now.toISOString()) return null;
+  return { userId: row.userId, username: row.username };
+}
+
+export function deleteSession(db: Db, token: string): void {
+  db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
+}
+
+export function deleteUserSessions(db: Db, userId: number): number {
+  return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes;
+}
+
+export function deleteExpiredSessions(db: Db, now: Date = new Date()): number {
+  return db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now.toISOString()).changes;
+}
+``````
+
+#### File: `src/server/auth/users.ts`
+
+<!-- replay task=9 phase=implementation sha256=95233d76fe60c38261655d747070e67a0cc3eb24c354bcd9482533a6219b0344 -->
+
+``````ts
+import type { Db } from '../db/connection';
+import { hashPassword } from './passwords';
+import { deleteUserSessions } from './sessions';
+
+/** Also the login form's limit, so every account the owner command creates can log in. */
+export const MAX_USERNAME_LENGTH = 100;
+
+export interface StoredUser {
+  id: number;
+  username: string;
+  passwordHash: string;
+  isOwner: number;
+  isActive: number;
+  displayName: string;
+}
+
+export function findUserByUsername(db: Db, username: string): StoredUser | null {
+  const row = db
+    .prepare(`SELECT id, username, password_hash AS passwordHash, is_owner AS isOwner,
+      is_active AS isActive, display_name AS displayName FROM users WHERE username = ?`)
+    .get(username) as StoredUser | undefined;
+  return row ?? null;
+}
+
+/**
+ * Creates the single owner account, or resets its password. A reset ends every session (design §11.5).
+ * Used only by the server-side command `npm run owner` — there is no sign-up or reset screen.
+ */
+export function setOwnerPassword(
+  db: Db,
+  username: string,
+  password: string,
+  now: Date = new Date(),
+  displayName?: string,
+): { userId: number; created: boolean; sessionsRemoved: number } {
+  // Both checks run before anything is written, so a rejected reset changes nothing.
+  if (username.length === 0 || username.length > MAX_USERNAME_LENGTH) {
+    throw new RangeError(`Username must be 1 to ${MAX_USERNAME_LENGTH} characters`);
+  }
+  const passwordHash = hashPassword(password);
+  if (displayName !== undefined) validateDisplayName(displayName);
+  // Reserve the write lock before checking ownership, including on first creation.
+  return db.transaction(() => {
+    const existing = findUserByUsername(db, username);
+    if (existing) {
+      if (!existing.isOwner) throw new Error('This account is a contributor, not the owner');
+      db.prepare('UPDATE users SET password_hash = ?, updated_at = ?, display_name = ? WHERE id = ?').run(
+        passwordHash,
+        now.toISOString(),
+        displayName ?? existing.displayName,
+        existing.id,
+      );
+      return { userId: existing.id, created: false, sessionsRemoved: deleteUserSessions(db, existing.id) };
+    }
+    const users = db.prepare('SELECT COUNT(*) FROM users WHERE is_owner = 1').pluck().get() as number;
+    if (users > 0) throw new Error('Only one account may be the owner');
+    const info = db
+      .prepare(`INSERT INTO users (username, password_hash, created_at, updated_at, is_owner, display_name)
+        VALUES (?, ?, ?, ?, 1, ?)`)
+      .run(username, passwordHash, now.toISOString(), now.toISOString(), displayName ?? 'Owner');
+    return { userId: Number(info.lastInsertRowid), created: true, sessionsRemoved: 0 };
+  }).immediate();
+}
+
+export function validateDisplayName(value: string): void {
+  if (value.trim().length === 0 || value.length > 200) throw new RangeError('Display name must be 1 to 200 characters');
+}
+``````
+
+#### File: `src/server/db/migration-0004-contributors.ts`
+
+<!-- replay task=9 phase=implementation sha256=6b776a2706458242b8212ec157835d77b2b9b052ed5b03aff94ed331f28032b8 -->
+
+``````ts
+import type { Migration } from './migrations';
+
+export const MIGRATION_0004_CONTRIBUTORS: Migration = {
+  id: '0004_contributors',
+  sql: `
+    ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0 CHECK (is_owner IN (0,1));
+    ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1));
+    ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT 'Contributor';
+    UPDATE users SET is_owner = 1, display_name = 'Owner' WHERE id = (SELECT MIN(id) FROM users);
+    CREATE UNIQUE INDEX single_owner ON users(is_owner) WHERE is_owner = 1;
+    ALTER TABLE records ADD COLUMN public_notes TEXT;
+    CREATE TABLE record_grants (
+      record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      can_upload INTEGER NOT NULL CHECK (can_upload IN (0,1)),
+      can_add_log INTEGER NOT NULL CHECK (can_add_log IN (0,1)),
+      PRIMARY KEY (record_id, user_id)
+    );
+  `,
+};
+``````
+
+#### File: `src/server/db/migrations.ts`
+
+<!-- replay task=9 phase=implementation sha256=6b19c6b1694c6a07165c16cd0f9bab26b4d89d279be9cdecc809c2be0fc47bd2 -->
+
+``````ts
+import { MIGRATION_0002_RECORDS } from './migration-0002-records';
+import { MIGRATION_0003_FILES_SHARING } from './migration-0003-files-sharing';
+import { MIGRATION_0004_CONTRIBUTORS } from './migration-0004-contributors';
+
+export interface Migration {
+  id: string;
+  sql: string;
+}
+
+/** Forward-only migrations, applied in order (design §11.3). Never edit an applied migration; add a new one. */
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    id: '0001_init',
+    sql: `
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+      CREATE INDEX sessions_user ON sessions(user_id);
+
+      CREATE TABLE projects (
+        id INTEGER PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE people (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id),
+        code TEXT NOT NULL,
+        name TEXT NOT NULL,
+        company TEXT,
+        role TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        UNIQUE (project_id, code)
+      );
+
+      CREATE TABLE trades (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id),
+        code TEXT NOT NULL,
+        name_en TEXT NOT NULL DEFAULT '',
+        name_el TEXT NOT NULL DEFAULT '',
+        def_en TEXT NOT NULL DEFAULT '',
+        def_el TEXT NOT NULL DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        UNIQUE (project_id, code),
+        CHECK (name_en <> '' OR name_el <> '')
+      );
+
+      CREATE TABLE zone_types (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id),
+        name_en TEXT NOT NULL DEFAULT '',
+        name_el TEXT NOT NULL DEFAULT '',
+        CHECK (name_en <> '' OR name_el <> '')
+      );
+
+      CREATE TABLE tags (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id),
+        name_el TEXT NOT NULL DEFAULT '',
+        name_en TEXT NOT NULL DEFAULT '',
+        name_el_key TEXT,
+        name_en_key TEXT,
+        CHECK (name_el <> '' OR name_en <> '')
+      );
+      CREATE UNIQUE INDEX tags_el_unique ON tags(project_id, name_el_key) WHERE name_el_key IS NOT NULL;
+      CREATE UNIQUE INDEX tags_en_unique ON tags(project_id, name_en_key) WHERE name_en_key IS NOT NULL;
+
+      CREATE TABLE location_nodes (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id),
+        parent_id INTEGER REFERENCES location_nodes(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        zone_type_id INTEGER REFERENCES zone_types(id),
+        name_en TEXT NOT NULL DEFAULT '',
+        name_el TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        CHECK (name_en <> '' OR name_el <> '')
+      );
+      CREATE INDEX location_nodes_parent ON location_nodes(project_id, parent_id);
+    `,
+  },
+  MIGRATION_0002_RECORDS,
+  MIGRATION_0003_FILES_SHARING,
+  MIGRATION_0004_CONTRIBUTORS,
+];
+``````
+
+#### File: `src/server/http/guards.ts`
+
+<!-- replay task=9 phase=implementation sha256=509533400b5cb8f3f0b8a2144551492d2a16a6ed52317d5d57e574792040f818 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { findSessionUser, type SessionUser } from '../auth/sessions';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { shareHeaders } from './privacy';
+
+export const SESSION_COOKIE = 'bb_session';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login']);
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user: SessionUser | null;
+  }
+  interface FastifyContextConfig {
+    /** Set on upload routes (Plan 4) to accept multipart/form-data instead of JSON. */
+    multipart?: boolean;
+    shareRead?: boolean;
+    privateResponse?: boolean;
+    sessionOnly?: boolean;
+    contributor?: boolean;
+  }
+}
+
+/**
+ * Request rules (design §11.5):
+ * - every state-changing request needs Origin = the public origin and a JSON body
+ *   (multipart only on routes that allow it);
+ * - owner /api routes except health and login need a valid session;
+ * - only explicitly marked shared GET/HEAD routes bypass that session requirement,
+ *   and their handlers independently require a valid bearer share token;
+ * - session lookup and file reads are read-only. Only a successful shared record GET
+ *   updates its link's view counter; HEAD changes nothing.
+ */
+export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {
+  app.decorateRequest('user', null);
+
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.routeOptions.config.privateResponse) shareHeaders(reply);
+    if (SAFE_METHODS.has(request.method)) return;
+    if (request.headers.origin !== config.publicOrigin) throw new HttpError(403, 'origin_rejected');
+    const contentType = (request.headers['content-type']?.split(';', 1)[0] ?? '').trim().toLowerCase();
+    const isJson = contentType === 'application/json';
+    const isAllowedMultipart =
+      contentType === 'multipart/form-data' && request.routeOptions.config?.multipart === true;
+    if (!isJson && !isAllowedMultipart) throw new HttpError(415, 'unsupported_content_type');
+  });
+
+  app.addHook('preHandler', async (request) => {
+    if (request.routeOptions.config.shareRead === true && (request.method === 'GET' || request.method === 'HEAD')) return;
+    const token = request.cookies[SESSION_COOKIE];
+    request.user = token ? findSessionUser(db, token) : null;
+    const route = request.routeOptions.url ?? request.url;
+    if (!route.startsWith('/api/') || PUBLIC_API_ROUTES.has(route)) return;
+    if (request.user === null) throw new HttpError(401, 'unauthenticated');
+    if (request.routeOptions.config.sessionOnly || request.routeOptions.config.contributor) return;
+    const owner = db.prepare('SELECT is_owner FROM users WHERE id = ?').pluck().get(request.user.userId);
+    if (owner !== 1) throw new HttpError(403, 'owner_required');
+  });
+}
+``````
+
+#### File: `src/server/routes/auth.ts`
+
+<!-- replay task=9 phase=implementation sha256=8fc2195e5907dabbfe9df00f1393b2bc09f3969944541521ba09f5e65d2a561f -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import type { LoginLimiter } from '../auth/login-limiter';
+import { hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from '../auth/passwords';
+import { createSession, deleteExpiredSessions, deleteSession } from '../auth/sessions';
+import { findUserByUsername, MAX_USERNAME_LENGTH } from '../auth/users';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { clientIp } from '../http/client-ip';
+import { SESSION_COOKIE } from '../http/guards';
+
+/** The same limits as the owner command, so every account it creates can log in. */
+const LoginBody = z.strictObject({
+  username: z.string().min(1).max(MAX_USERNAME_LENGTH),
+  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+});
+
+export function registerAuthRoutes(
+  app: FastifyInstance,
+  deps: { config: AppConfig; db: Db; limiter: LoginLimiter },
+): void {
+  const { config, db, limiter } = deps;
+  // Verifying unknown users against a dummy hash keeps both failure cases equally slow.
+  const dummyHash = hashPassword('builtbasis-dummy-password');
+
+  app.post('/api/auth/login', async (request, reply) => {
+    const ip = clientIp(request, config);
+    const now = Date.now();
+    if (limiter.isBlocked(ip, now)) throw new HttpError(429, 'too_many_attempts');
+    const body = LoginBody.parse(request.body);
+    const user = findUserByUsername(db, body.username);
+    const passwordOk = verifyPassword(body.password, user?.passwordHash ?? dummyHash);
+    if (user === null || !user.isActive || !passwordOk) {
+      limiter.recordFailure(ip, now);
+      throw new HttpError(401, 'invalid_credentials');
+    }
+    limiter.recordSuccess(ip);
+    deleteExpiredSessions(db);
+    const session = createSession(db, user.id);
+    reply.setCookie(SESSION_COOKIE, session.token, {
+      path: '/',
+      httpOnly: true,
+      secure: config.secureCookies,
+      sameSite: 'lax',
+      expires: session.expiresAt,
+    });
+    return { username: user.username };
+  });
+
+  app.post('/api/auth/logout', { config: { sessionOnly: true } }, async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) deleteSession(db, token);
+    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return { ok: true };
+  });
+
+  app.get('/api/auth/me', { config: { sessionOnly: true } }, async (request) => {
+    if (request.user === null) throw new HttpError(401, 'unauthenticated');
+    return { username: request.user.username };
+  });
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/contributors.test.ts tests/server/contributors-db.test.ts tests/server/sessions.test.ts tests/server/auth-api.test.ts tests/server/files-db.test.ts`, then `npm run typecheck`. Expected: 33 tests in five files pass; TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'package.json' 'scripts/hidden-input.ts' 'scripts/owner.ts' 'scripts/user.ts' 'src/server/auth/contributors.ts' 'src/server/auth/sessions.ts' 'src/server/auth/users.ts' 'src/server/db/migration-0004-contributors.ts' 'src/server/db/migrations.ts' 'src/server/http/guards.ts' 'src/server/routes/auth.ts' 'tests/server/contributors-db.test.ts' 'tests/server/contributors.test.ts' 'tests/server/files-db.test.ts'
+git commit -m "feat: provision named users with owner-only API defaults"
+```
+
+## Task 10: Grant record access and accept named contributions
+
+**Scratch checkpoint:** `08eadb3`. **Depends on:** Task 9.
+
+**Deliverable:** Independent record grants, contributor reads and writes, owner-only Public/Private Notes, human attribution and enable/self-profile support.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/assigned-records.test.ts`
+
+<!-- replay task=10 phase=test sha256=6a40f7f79802538b6c0637b868aa564fa43e449bb08526bbbff08a9066f094f7 -->
+
+``````ts
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createContributor, disableContributor } from '../../src/server/auth/contributors';
+import { createSession, deleteUserSessions } from '../../src/server/auth/sessions';
+import * as storage from '../../src/server/files/storage';
+import { addAttachment, JPEG, multipart, PDF } from './file-fixture';
+import { get, OWNER, send } from './helpers';
+import { forceStatus, makeFixture, patchRecord, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+let userId: number;
+let cookie: string;
+beforeEach(async () => {
+  f = await makeFixture();
+  userId = createContributor(f.ctx.db, 'PRIVATE_LOGIN', 'Alex Builder', OWNER.password);
+  cookie = `bb_session=${createSession(f.ctx.db, userId).token}`;
+});
+afterEach(async () => { vi.restoreAllMocks(); await f.ctx.close(); });
+const assigned = (id: number, suffix = '') => `/api/assigned-records/${id}${suffix}`;
+async function grant(id: number, canUpload = false, canAddLog = false) {
+  const response = await f.ctx.app.inject({ method: 'PUT', url: recordUrl(f, id, `/grants/${userId}`),
+    headers: { cookie: f.cookie, origin: f.ctx.origin }, payload: { canUpload, canAddLog } });
+  expect(response.statusCode, response.body).toBe(200);
+}
+function upload(id: number, metadata: object = {}, photos = false) {
+  const form = multipart([
+    { name: 'metadata', data: JSON.stringify(photos ? { phase: 'before' } : metadata) },
+    ...(photos ? ['original', 'display', 'thumbnail'].map(name => ({ name, filename: 'photo.jpg', data: JPEG }))
+      : [{ name: 'file', filename: 'plan.pdf', data: PDF }]),
+  ]);
+  return f.ctx.app.inject({ method: 'POST', url: assigned(id, photos ? '/photos' : '/attachments'),
+    headers: { cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body });
+}
+
+it('lists only granted non-Draft records and reads public Notes without private content or directory access', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'Assigned', notes: 'PRIVATE_NOTES' });
+  const draft = await postRecord(f, { subtype: 'task', title: 'PRIVATE_DRAFT' });
+  await postRecord(f, { subtype: 'task', title: 'PRIVATE_UNASSIGNED' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id);
+  await grant(draft.id);
+  expect((await patchRecord(f, record.id, { publicNotes: 'Public instructions' })).statusCode).toBe(200);
+  const index = await get(f.ctx, cookie, '/api/assigned-records');
+  expect(index.statusCode).toBe(200);
+  expect(index.json()).toEqual([{ id: record.id, humanId: record.humanId, title: 'Assigned' }]);
+  const response = await get(f.ctx, cookie, assigned(record.id));
+  expect(response.statusCode).toBe(200);
+  expect(response.json().record.publicNotes).toBe('Public instructions');
+  expect(response.body).not.toContain('PRIVATE_');
+  expect(response.json().permissions).toEqual({ canUpload: false, canAddLog: false });
+  expect((await get(f.ctx, cookie, assigned(draft.id))).statusCode).toBe(404);
+  expect((await get(f.ctx, cookie, '/api/contributors')).statusCode).toBe(403);
+  expect((await get(f.ctx, f.cookie, '/api/contributors')).json()).toEqual([
+    { id: userId, username: 'PRIVATE_LOGIN', displayName: 'Alex Builder', active: true },
+  ]);
+  expect((await send(f.ctx, cookie, 'PATCH', recordUrl(f, record.id), { notes: 'bad', publicNotes: 'bad' })).statusCode).toBe(403);
+  expect((await upload(record.id)).statusCode).toBe(403);
+  expect((await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'bad' })).statusCode).toBe(403);
+  const share = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/share-links'), { label: 'Reader' });
+  const token = share.json().url.split('#')[1];
+  const shared = await f.ctx.app.inject({ url: '/api/shared/record', headers: { authorization: `Bearer ${token}` } });
+  expect(shared.json().record.publicNotes).toBe('Public instructions');
+  expect(shared.body).not.toContain('PRIVATE_NOTES');
+});
+
+it('permits only public Log creation for addLog-only users and preserves genuine attribution', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id, false, true);
+  const response = await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'Installed' });
+  expect(response.statusCode).toBe(201);
+  expect(response.json().loggedBy).toBe('Alex Builder');
+  expect(f.ctx.db.prepare('SELECT logged_by FROM log_entries WHERE id = ?').pluck().get(response.json().id)).toBe(userId);
+  expect((await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'secret', private: true })).statusCode).toBe(400);
+  expect((await upload(record.id)).statusCode).toBe(403);
+  for (const method of ['PATCH', 'DELETE'] as const) {
+    expect((await send(f.ctx, cookie, method, recordUrl(f, record.id, `/log/${response.json().id}`), { text: 'changed' })).statusCode).toBe(403);
+  }
+});
+
+it('permits uploads independently and only combined grants attach to public Logs', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  const publicLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Public' });
+  const privateLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'PRIVATE_LOG', private: true });
+  await grant(record.id, true, false);
+  const response = await upload(record.id);
+  expect(response.statusCode).toBe(201);
+  expect(response.json().uploadedBy).toBe('Alex Builder');
+  expect(f.ctx.db.prepare('SELECT uploaded_by FROM attachments WHERE id = ?').pluck().get(response.json().id)).toBe(userId);
+  expect((await upload(record.id, {}, true)).statusCode).toBe(201);
+  expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(403);
+  await grant(record.id, true, true);
+  expect((await upload(record.id, { logEntryId: privateLog.json().id })).statusCode).toBe(404);
+  expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(201);
+  expect((await send(f.ctx, cookie, 'DELETE', recordUrl(f, record.id, `/attachments/${response.json().id}`))).statusCode).toBe(403);
+  expect((await get(f.ctx, cookie, assigned(record.id))).body).not.toContain('PRIVATE_');
+});
+
+it('rechecks grants on downloads and HEAD while isolating private and other-record occurrences', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  const other = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  const file = await addAttachment(f, record.id);
+  const foreignFile = await addAttachment(f, other.id);
+  const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'private', private: true });
+  const privateFile = await addAttachment(f, record.id, { logEntryId: log.json().id });
+  await grant(record.id);
+  for (const method of ['GET', 'HEAD'] as const) {
+    const response = await f.ctx.app.inject({ method, url: assigned(record.id, `/attachments/${file.id}/file`), headers: { cookie } });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    if (method === 'HEAD') expect(response.body).toBe('');
+    for (const id of [foreignFile.id, privateFile.id]) {
+      expect((await f.ctx.app.inject({ method, url: assigned(record.id, `/attachments/${id}/file`), headers: { cookie } })).statusCode).toBe(404);
+    }
+  }
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, record.id, `/grants/${userId}`))).statusCode).toBe(200);
+  for (const suffix of ['', `/attachments/${file.id}/file`]) {
+    expect((await f.ctx.app.inject({ method: 'HEAD', url: assigned(record.id, suffix), headers: { cookie } })).statusCode).toBe(404);
+  }
+  await grant(record.id);
+  disableContributor(f.ctx.db, 'PRIVATE_LOGIN');
+  expect((await get(f.ctx, cookie, assigned(record.id))).statusCode).toBe(401);
+});
+
+it('rechecks a grant revoked during publication before creating an occurrence', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id, true, false);
+  const publish = storage.publishFile;
+  vi.spyOn(storage, 'publishFile').mockImplementation(async (...args) => {
+    await publish(...args);
+    f.ctx.db.prepare('DELETE FROM record_grants WHERE user_id = ?').run(userId);
+  });
+  expect((await upload(record.id)).statusCode).toBe(404);
+  expect(f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get()).toBe(0);
+});
+
+it.each(['disable', 'logout'] as const)('rejects an upload when %s ends access during publication', async action => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id, true, false);
+  const publish = storage.publishFile;
+  vi.spyOn(storage, 'publishFile').mockImplementation(async (...args) => {
+    await publish(...args);
+    if (action === 'disable') disableContributor(f.ctx.db, 'PRIVATE_LOGIN');
+    else deleteUserSessions(f.ctx.db, userId);
+  });
+  expect((await upload(record.id)).statusCode).toBe(401);
+  expect(f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get()).toBe(0);
+});
+``````
+
+#### File: `tests/server/auth-api.test.ts`
+
+<!-- replay task=10 phase=test sha256=8cbebfec81e27800ebd06e6f4791d6c82b0145493706ffa5f511c0e66da4170e -->
+
+``````ts
+import { afterEach, describe, expect, it } from 'vitest';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { get, loginAsOwner, makeContext, OWNER, type TestContext } from './helpers';
+
+let ctx: TestContext;
+afterEach(async () => {
+  await ctx.close();
+});
+
+function login(body: object, headers: Record<string, string> = {}) {
+  return ctx.app.inject({ method: 'POST', url: '/api/auth/login', headers: { origin: ctx.origin, ...headers }, payload: body });
+}
+const wrong = { username: OWNER.username, password: 'not the right password' };
+
+describe('authentication and request rules (design §11.5)', () => {
+  it('health is public', async () => {
+    ctx = await makeContext();
+    const res = await ctx.app.inject({ method: 'GET', url: '/api/health' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+  });
+
+  it('login sets a host-only, HttpOnly, SameSite=Lax session cookie', async () => {
+    ctx = await makeContext();
+    setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+    const res = await login({ ...OWNER });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ username: 'owner' });
+    const cookie = String(res.headers['set-cookie']);
+    expect(cookie).toMatch(/^bb_session=/);
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).toContain('Path=/');
+    expect(cookie).not.toContain('Domain=');
+    expect(cookie).not.toContain('Secure');
+  });
+
+  it('marks the cookie Secure when the public URL is https', async () => {
+    ctx = await makeContext({ publicBaseUrl: 'https://builtbasis.example' });
+    setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+    expect(String((await login({ ...OWNER })).headers['set-cookie'])).toContain('Secure');
+  });
+
+  it('rejects a wrong password and an unknown user alike', async () => {
+    ctx = await makeContext();
+    setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+    for (const body of [wrong, { username: 'nobody', password: OWNER.password }]) {
+      const res = await login(body);
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toEqual({ error: 'invalid_credentials' });
+    }
+  });
+
+  it('blocks an address after 5 failed attempts, even with the right password', async () => {
+    ctx = await makeContext();
+    setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+    for (let i = 0; i < 5; i += 1) await login(wrong);
+    const res = await login({ ...OWNER });
+    expect(res.statusCode).toBe(429);
+    expect(res.json()).toEqual({ error: 'too_many_attempts' });
+  });
+
+  it('behind Cloudflare, counts failures per CF-Connecting-IP', async () => {
+    ctx = await makeContext({ behindCloudflare: true });
+    setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+    for (let i = 0; i < 5; i += 1) await login(wrong, { 'cf-connecting-ip': '203.0.113.1' });
+    expect((await login({ ...OWNER }, { 'cf-connecting-ip': '203.0.113.1' })).statusCode).toBe(429);
+    expect((await login({ ...OWNER }, { 'cf-connecting-ip': '203.0.113.2' })).statusCode).toBe(200);
+  });
+
+  it('caps failed attempts globally, so rotating addresses does not help', async () => {
+    ctx = await makeContext({ behindCloudflare: true });
+    setOwnerPassword(ctx.db, OWNER.username, OWNER.password);
+    for (let i = 0; i < 20; i += 1) await login(wrong, { 'cf-connecting-ip': `198.51.100.${i}` });
+    expect((await login({ ...OWNER }, { 'cf-connecting-ip': '192.0.2.1' })).statusCode).toBe(429);
+  });
+
+  it('a valid login needs no existing session; logout ends the session', async () => {
+    ctx = await makeContext();
+    const cookie = await loginAsOwner(ctx);
+    expect((await get(ctx, cookie, '/api/auth/me')).json()).toEqual({ username: 'owner', displayName: 'Owner', isOwner: true });
+    const out = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ctx.origin, cookie },
+      payload: {},
+    });
+    expect(out.statusCode).toBe(200);
+    expect((await get(ctx, cookie, '/api/auth/me')).statusCode).toBe(401);
+  });
+
+  it.each(['missing', 'invalid', 'expired'] as const)('rejects logout when the session is %s', async (state) => {
+    ctx = await makeContext();
+    let cookie: string | undefined;
+    if (state === 'invalid') cookie = 'bb_session=invalid-token';
+    if (state === 'expired') {
+      cookie = await loginAsOwner(ctx);
+      ctx.db.prepare('UPDATE sessions SET expires_at = ?').run('2000-01-01T00:00:00.000Z');
+    }
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ctx.origin, ...(cookie ? { cookie } : {}) },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthenticated' });
+  });
+  it('rejects owner data changes without a session', async () => {
+    ctx = await makeContext();
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/projects/1/people',
+      headers: { origin: ctx.origin },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: 'unauthenticated' });
+  });
+
+  it('rejects state-changing requests with a wrong or missing Origin, including login', async () => {
+    ctx = await makeContext();
+    const cookie = await loginAsOwner(ctx);
+    const wrongOrigin = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: 'https://evil.example', cookie },
+      payload: {},
+    });
+    expect(wrongOrigin.statusCode).toBe(403);
+    expect(wrongOrigin.json()).toEqual({ error: 'origin_rejected' });
+    const noOrigin = await ctx.app.inject({ method: 'POST', url: '/api/auth/logout', headers: { cookie }, payload: {} });
+    expect(noOrigin.statusCode).toBe(403);
+    const loginNoOrigin = await ctx.app.inject({ method: 'POST', url: '/api/auth/login', payload: { ...OWNER } });
+    expect(loginNoOrigin.statusCode).toBe(403);
+  });
+
+  it('rejects state-changing requests that are not JSON', async () => {
+    ctx = await makeContext();
+    const cookie = await loginAsOwner(ctx);
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ctx.origin, cookie, 'content-type': 'text/plain' },
+      payload: 'logout',
+    });
+    expect(res.statusCode).toBe(415);
+    expect(res.json()).toEqual({ error: 'unsupported_content_type' });
+  });
+
+  it('rejects media types that only begin with application/json', async () => {
+    ctx = await makeContext();
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: ctx.origin, 'content-type': 'application/json-extra' },
+      payload: JSON.stringify(OWNER),
+    });
+    expect(res.statusCode).toBe(415);
+    expect(res.json()).toEqual({ error: 'unsupported_content_type' });
+  });
+
+  it('GET requests never change the database', async () => {
+    ctx = await makeContext();
+    const cookie = await loginAsOwner(ctx);
+    const changes = () => ctx.db.prepare('SELECT total_changes()').pluck().get();
+    const before = changes();
+    await get(ctx, cookie, '/api/auth/me');
+    await get(ctx, cookie, '/api/projects');
+    await get(ctx, cookie, '/api/health');
+    expect(changes()).toBe(before);
+  });
+});
+``````
+
+#### File: `tests/server/contributors.test.ts`
+
+<!-- replay task=10 phase=test sha256=a66b83e5cd166f8078b3b5ec1df6f4e31fd62ba50dc9b9443f0e328eee2e9f20 -->
+
+``````ts
+import { afterEach, expect, it } from 'vitest';
+import { createContributor, disableContributor, enableContributor, resetContributorPassword } from '../../src/server/auth/contributors';
+import { createSession, findSessionUser } from '../../src/server/auth/sessions';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { loginAsOwner, makeContext, OWNER, type TestContext } from './helpers';
+
+let ctx: TestContext;
+afterEach(async () => { if (ctx) await ctx.close(); });
+
+it('provisions a named contributor without changing the owner and refuses owner operations', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex-login', 'Alex Builder', OWNER.password);
+  expect(ctx.db.prepare('SELECT display_name, is_owner, is_active FROM users WHERE id = ?').get(id))
+    .toEqual({ display_name: 'Alex Builder', is_owner: 0, is_active: 1 });
+  expect(() => resetContributorPassword(ctx.db, 'owner', OWNER.password)).toThrow('owner');
+  expect(() => disableContributor(ctx.db, 'owner')).toThrow('owner');
+  expect(() => setOwnerPassword(ctx.db, 'alex-login', OWNER.password)).toThrow('contributor');
+  expect(() => createContributor(ctx.db, 'bad', ' ', OWNER.password)).toThrow('Display name');
+});
+
+it('resets only the selected contributor sessions and disables login and stale sessions', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  const other = createContributor(ctx.db, 'sam', 'Sam', OWNER.password);
+  const session = createSession(ctx.db, id);
+  const otherSession = createSession(ctx.db, other);
+  expect(resetContributorPassword(ctx.db, 'alex', 'another long password')).toBe(1);
+  expect(findSessionUser(ctx.db, session.token)).toBeNull();
+  expect(findSessionUser(ctx.db, otherSession.token)?.userId).toBe(other);
+  const next = createSession(ctx.db, id);
+  expect(disableContributor(ctx.db, 'alex')).toBe(1);
+  expect(findSessionUser(ctx.db, next.token)).toBeNull();
+  const stale = createSession(ctx.db, id);
+  expect(findSessionUser(ctx.db, stale.token)).toBeNull();
+  const response = await ctx.app.inject({ method: 'POST', url: '/api/auth/login',
+    headers: { origin: ctx.origin }, payload: { username: 'alex', password: 'another long password' } });
+  expect(response.statusCode).toBe(401);
+});
+
+it('allows contributor session endpoints but fails closed on owner and unmarked routes', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  const cookie = `bb_session=${createSession(ctx.db, id).token}`;
+  expect((await ctx.app.inject({ url: '/api/auth/me', headers: { cookie } })).json())
+    .toEqual({ username: 'alex', displayName: 'Alex', isOwner: false });
+  for (const url of ['/api/projects', '/api/assigned-records/unregistered/unknown']) {
+    expect((await ctx.app.inject({ url, headers: { cookie } })).statusCode).toBe(403);
+  }
+  expect((await ctx.app.inject({ method: 'POST', url: '/api/auth/logout',
+    headers: { cookie, origin: ctx.origin }, payload: {} })).statusCode).toBe(200);
+});
+
+it('explicitly enables a disabled contributor without reviving sessions or changing the owner', async () => {
+  ctx = await makeContext();
+  await loginAsOwner(ctx);
+  const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+  const session = createSession(ctx.db, id);
+  disableContributor(ctx.db, 'alex');
+  resetContributorPassword(ctx.db, 'alex', OWNER.password);
+  expect(ctx.db.prepare('SELECT is_active FROM users WHERE id = ?').pluck().get(id)).toBe(0);
+  enableContributor(ctx.db, 'alex');
+  expect(findSessionUser(ctx.db, session.token)).toBeNull();
+  expect(() => enableContributor(ctx.db, 'owner')).toThrow('owner');
+  const response = await ctx.app.inject({ method: 'POST', url: '/api/auth/login',
+    headers: { origin: ctx.origin }, payload: { username: 'alex', password: OWNER.password } });
+  expect(response.statusCode).toBe(200);
+});
+``````
+
+#### File: `tests/server/log-api.test.ts`
+
+<!-- replay task=10 phase=test sha256=84278d6621f459fa3a2dfcadfc3cd7f56c53065e6532d96b42c7e4542b03d7a7 -->
+
+``````ts
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { get, send } from './helpers';
+import { makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+beforeEach(async () => {
+  f = await makeFixture();
+});
+afterEach(async () => {
+  await f.ctx.close();
+});
+
+const logUrl = (recordId: number, entryId?: number) => recordUrl(f, recordId, entryId === undefined ? '/log' : `/log/${entryId}`);
+
+describe('Log (design §5.11)', () => {
+  it('stores entries with the event time, who logged them and when', async () => {
+    const dc = await postRecord(f, { subtype: 'detail_clarification' });
+    const res = await send(f.ctx, f.cookie, 'POST', logUrl(dc.id), {
+      eventAt: '2026-05-01T09:30:00+03:00',
+      text: 'Architect sent plans',
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({
+      id: expect.any(Number),
+      eventAt: '2026-05-01T06:30:00.000Z',
+      text: 'Architect sent plans',
+      private: false,
+      loggedBy: 'Owner',
+      loggedAt: expect.any(String),
+      editedAt: null,
+    });
+  });
+
+  it('defaults the event time to now', async () => {
+    const task = await postRecord(f, { subtype: 'task' });
+    const res = await send(f.ctx, f.cookie, 'POST', logUrl(task.id), { text: 'Called the plumber' });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().eventAt).toBe(res.json().loggedAt);
+  });
+
+  it('lists newest first by event time, then by logged-at', async () => {
+    const task = await postRecord(f, { subtype: 'task' });
+    const add = (eventAt: string, text: string) => send(f.ctx, f.cookie, 'POST', logUrl(task.id), { eventAt, text });
+    await add('2026-05-02T10:00:00Z', 'Contractor confirmed receipt');
+    await add('2026-05-01T10:00:00Z', 'Architect sent plans');
+    await add('2026-05-02T10:00:00Z', 'Same time, logged later');
+    const texts = (await get(f.ctx, f.cookie, logUrl(task.id))).json().map((entry: { text: string }) => entry.text);
+    expect(texts).toEqual(['Same time, logged later', 'Contractor confirmed receipt', 'Architect sent plans']);
+  });
+
+  it('edits text, event time and the private marker; logged-at never changes', async () => {
+    const task = await postRecord(f, { subtype: 'task' });
+    const entry = (await send(f.ctx, f.cookie, 'POST', logUrl(task.id), { text: 'Draft note' })).json();
+    const edited = await send(f.ctx, f.cookie, 'PATCH', logUrl(task.id, entry.id), {
+      text: 'Final note',
+      private: true,
+      eventAt: '2026-04-30T08:00:00Z',
+    });
+    expect(edited.json()).toEqual({
+      ...entry,
+      text: 'Final note',
+      private: true,
+      eventAt: '2026-04-30T08:00:00.000Z',
+      editedAt: expect.any(String),
+    });
+  });
+
+  it('deletes an entry; rejects an entry of another record and an empty text', async () => {
+    const task = await postRecord(f, { subtype: 'task' });
+    const other = await postRecord(f, { subtype: 'task' });
+    const entry = (await send(f.ctx, f.cookie, 'POST', logUrl(other.id), { text: 'Elsewhere' })).json();
+    const wrong = await send(f.ctx, f.cookie, 'DELETE', logUrl(task.id, entry.id));
+    expect(wrong.statusCode).toBe(404);
+    expect(wrong.json()).toEqual({ error: 'log_entry_not_found' });
+    expect((await send(f.ctx, f.cookie, 'POST', logUrl(task.id), { text: ' ' })).statusCode).toBe(400);
+    expect((await send(f.ctx, f.cookie, 'DELETE', logUrl(other.id, entry.id))).statusCode).toBe(200);
+    expect((await get(f.ctx, f.cookie, logUrl(other.id))).json()).toEqual([]);
+  });
+});
+``````
+
+#### File: `tests/server/records-api.test.ts`
+
+<!-- replay task=10 phase=test sha256=e681db27233278a87924788e49657ff4c2eb8bfd4690079529ed57ceebfd93c9 -->
+
+``````ts
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createProject } from '../../src/server/lists/projects';
+import { updateTrade } from '../../src/server/lists/trades';
+import { get, send } from './helpers';
+import { forceStatus, getRecord, makeFixture, patchRecord, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+beforeEach(async () => {
+  f = await makeFixture();
+});
+afterEach(async () => {
+  await f.ctx.close();
+});
+
+describe('creating records (design §4.2, §10.3)', () => {
+  it('creates Drafts with the next human ID per project and subtype', async () => {
+    const ids = [];
+    for (const subtype of ['quality_issue', 'quality_issue', 'detail_clarification', 'task']) {
+      ids.push((await postRecord(f, { subtype })).humanId);
+    }
+    expect(ids).toEqual(['QI-0001', 'QI-0002', 'DC-0001', 'T-0001']);
+
+    const other = createProject(f.ctx.db, { code: 'p2', name: 'Project 2' });
+    const res = await send(f.ctx, f.cookie, 'POST', `/api/projects/${other.id}/records`, { subtype: 'quality_issue' });
+    expect(res.json().humanId).toBe('QI-0001');
+  });
+
+  it('returns the full record, starting as Draft', async () => {
+    const record = await postRecord(f, {
+      subtype: 'quality_issue',
+      title: 'West door jamb',
+      locationIds: [f.locations.v1Kitchen],
+    });
+    expect(record).toMatchObject({
+      humanId: 'QI-0001',
+      subtype: 'quality_issue',
+      status: 'draft',
+      statusReason: null,
+      title: 'West door jamb',
+      locationIds: [f.locations.v1Kitchen],
+      tradeIds: [],
+      problemTypes: [],
+      safety: false,
+      outsideScope: false,
+      estimatedCost: null,
+      mustBeDoneBefore: [],
+      requiresFirst: [],
+      allowedTransitions: ['open', 'cancelled'],
+    });
+    expect(await getRecord(f, record.id)).toEqual(record);
+  });
+
+  it('rejects unknown fields, a status, and a record of another project', async () => {
+    const extra = await send(f.ctx, f.cookie, 'POST', `${f.base}/records`, { subtype: 'task', status: 'closed' });
+    expect(extra.statusCode).toBe(400);
+    expect(extra.json().error).toBe('invalid_input');
+    const record = await postRecord(f, { subtype: 'task' });
+    const other = createProject(f.ctx.db, { code: 'p2', name: 'Project 2' });
+    const res = await get(f.ctx, f.cookie, `/api/projects/${other.id}/records/${record.id}`);
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: 'record_not_found' });
+  });
+});
+
+describe('updating records (design §5, §6, §8.2)', () => {
+  it('saves fields and returns the record', async () => {
+    const record = await postRecord(f, { subtype: 'quality_issue' });
+    const res = await patchRecord(f, record.id, {
+      description: 'Stone thickness differs left and right.',
+      severity: 'major',
+      priority: 'high',
+      dueDate: '2026-11-15',
+      completion: 30,
+      safety: true,
+      problemTypes: ['defect', 'nonconformance'],
+      stage: 'construction',
+      notes: 'Ask about cost.',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      description: 'Stone thickness differs left and right.',
+      severity: 'major',
+      priority: 'high',
+      dueDate: '2026-11-15',
+      completion: 30,
+      safety: true,
+      problemTypes: ['defect', 'nonconformance'],
+      stage: 'construction',
+      notes: 'Ask about cost.',
+    });
+  });
+
+  it('rejects fields that the subtype does not have', async () => {
+    const task = await postRecord(f, { subtype: 'task' });
+    const res = await patchRecord(f, task.id, { disposition: 'rework', instructionText: 'x' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'field_not_applicable', details: { fields: ['disposition', 'instructionText'] } });
+    const dc = await postRecord(f, { subtype: 'detail_clarification' });
+    expect((await patchRecord(f, dc.id, { problemTypes: ['defect'] })).statusCode).toBe(400);
+    expect((await patchRecord(f, dc.id, { question: 'Which stone?', instructionText: 'Use 3 cm' })).statusCode).toBe(200);
+  });
+
+  it('rejects people outside the project and newly selected inactive entries', async () => {
+    const record = await postRecord(f, { subtype: 'task' });
+    const other = createProject(f.ctx.db, { code: 'p2', name: 'Project 2' });
+    const foreign = (
+      await send(f.ctx, f.cookie, 'POST', `/api/projects/${other.id}/people`, { code: 'X', name: 'X', role: 'other' })
+    ).json();
+    const outside = await patchRecord(f, record.id, { ballInCourtId: foreign.id });
+    expect(outside.statusCode).toBe(400);
+    expect(outside.json()).toEqual({ error: 'invalid_reference', details: { field: 'ballInCourtId', ids: [foreign.id] } });
+    const inactive = await patchRecord(f, record.id, { responsibleId: f.people.retired });
+    expect(inactive.statusCode).toBe(400);
+    expect(inactive.json()).toEqual({
+      error: 'inactive_selection',
+      details: { field: 'responsibleId', ids: [f.people.retired] },
+    });
+    const retiredTrade = await patchRecord(f, record.id, { tradeIds: [f.trades.retired] });
+    expect(retiredTrade.json().error).toBe('inactive_selection');
+    const retiredNode = await patchRecord(f, record.id, { locationIds: [f.locations.retired] });
+    expect(retiredNode.json().error).toBe('inactive_selection');
+  });
+
+  it('keeps an entry that was retired after it was selected (design §9.1, §9.2)', async () => {
+    const record = await postRecord(f, { subtype: 'task', tradeIds: [f.trades.tiling] });
+    updateTrade(f.ctx.db, f.projectId, f.trades.tiling, { active: false });
+    const res = await patchRecord(f, record.id, { tradeIds: [f.trades.tiling, f.trades.masonry], title: 'Still valid' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().tradeIds).toEqual([f.trades.tiling, f.trades.masonry].sort((a, b) => a - b));
+  });
+
+  it('applies the save rules of the current status; a rejected save changes nothing', async () => {
+    const qi = await postRecord(f, { subtype: 'quality_issue', title: 'Jamb', problemTypes: ['defect'] });
+    forceStatus(f, qi.id, 'open');
+    const noTitle = await patchRecord(f, qi.id, { title: '', description: 'changed' });
+    expect(noTitle.statusCode).toBe(422);
+    expect(noTitle.json()).toEqual({ error: 'rule_violation', details: { errors: ['required:title'] } });
+    const undecided = await patchRecord(f, qi.id, { disposition: 'repair' });
+    expect(undecided.json()).toEqual({ error: 'rule_violation', details: { errors: ['decision_required'] } });
+    const decided = await patchRecord(f, qi.id, {
+      disposition: 'repair',
+      decidedById: f.people.architect,
+      decidedOn: '2026-10-01',
+    });
+    expect(decided.statusCode).toBe(200);
+    const after = await getRecord(f, qi.id);
+    expect(after).toMatchObject({ title: 'Jamb', description: null, disposition: 'repair' });
+  });
+
+  it('allows incomplete records while Draft', async () => {
+    const qi = await postRecord(f, { subtype: 'quality_issue', title: 'Jamb' });
+    expect((await patchRecord(f, qi.id, { title: null, disposition: 'accept_as_is' })).statusCode).toBe(200);
+  });
+
+  it('takes an estimated cost only while Outside contract scope is ticked; unticking keeps it (design §5.4)', async () => {
+    const record = await postRecord(f, { subtype: 'task' });
+    const refused = await patchRecord(f, record.id, { estimatedCost: 100 });
+    expect(refused.statusCode).toBe(422);
+    expect(refused.json()).toEqual({ error: 'estimated_cost_requires_outside_scope' });
+    const ticked = await patchRecord(f, record.id, { outsideScope: true, estimatedCost: 1250.5 });
+    expect(ticked.json()).toMatchObject({ outsideScope: true, estimatedCost: 1250.5 });
+    const unticked = await patchRecord(f, record.id, { outsideScope: false });
+    expect(unticked.json()).toMatchObject({ outsideScope: false, estimatedCost: 1250.5 });
+    expect((await patchRecord(f, record.id, { estimatedCost: 900 })).statusCode).toBe(422);
+    expect((await patchRecord(f, record.id, { estimatedCost: null })).json().estimatedCost).toBeNull();
+  });
+});
+
+describe('activity log (design §5.12)', () => {
+  it('logs creation and every change to the tracked fields, newest first', async () => {
+    const dc = await postRecord(f, { subtype: 'detail_clarification', ballInCourtId: f.people.architect });
+    await patchRecord(f, dc.id, { title: 'Not tracked', ballInCourtId: f.people.contractor });
+    await patchRecord(f, dc.id, { instructionText: 'Use 3 cm stone' });
+    await patchRecord(f, dc.id, { instructionText: 'Use 2 cm stone' });
+    const activity = (await get(f.ctx, f.cookie, recordUrl(f, dc.id, '/activity'))).json();
+    expect(
+      activity.map(({ action, field, from, to, by }: Record<string, unknown>) => ({ action, field, from, to, by })),
+    ).toEqual([
+      { action: 'field_changed', field: 'instructionText', from: 'Use 3 cm stone', to: 'Use 2 cm stone', by: 'Owner' },
+      { action: 'field_changed', field: 'instructionText', from: null, to: 'Use 3 cm stone', by: 'Owner' },
+      {
+        action: 'field_changed',
+        field: 'ballInCourtId',
+        from: f.people.architect,
+        to: f.people.contractor,
+        by: 'Owner',
+      },
+      { action: 'field_changed', field: 'ballInCourtId', from: null, to: f.people.architect, by: 'Owner' },
+      { action: 'created', field: null, from: null, to: 'draft', by: 'Owner' },
+    ]);
+  });
+
+  it('writes nothing when a save is rejected', async () => {
+    const record = await postRecord(f, { subtype: 'task', title: 'Before' });
+    const res = await patchRecord(f, record.id, { title: 'After', ballInCourtId: f.people.retired });
+    expect(res.statusCode).toBe(400);
+    expect((await getRecord(f, record.id)).title).toBe('Before');
+    expect((await get(f.ctx, f.cookie, recordUrl(f, record.id, '/activity'))).json()).toHaveLength(1);
+  });
+});
+
+it('checks project ownership even for a previously selected trade', async () => {
+  const record = await postRecord(f, { subtype: 'task', tradeIds: [f.trades.tiling] });
+  const other = createProject(f.ctx.db, { code: 'p2', name: 'Project 2' });
+  f.ctx.db.prepare('UPDATE trades SET project_id = ? WHERE id = ?').run(other.id, f.trades.tiling);
+  const res = await patchRecord(f, record.id, { tradeIds: [f.trades.tiling] });
+  expect(res.statusCode).toBe(400);
+  expect(res.json()).toEqual({ error: 'invalid_reference', details: { field: 'tradeIds', ids: [f.trades.tiling] } });
+});
+
+it('stores whole cents and rejects fractional cents on create and update', async () => {
+  const bad = await send(f.ctx, f.cookie, 'POST', `${f.base}/records`, {
+    subtype: 'task', outsideScope: true, estimatedCost: 1.005,
+  });
+  expect(bad.statusCode).toBe(400);
+  const record = await postRecord(f, { subtype: 'task', outsideScope: true, estimatedCost: 0.29 });
+  expect(record.humanId).toBe('T-0001');
+  expect(record.estimatedCost).toBe(0.29);
+  expect(f.ctx.db.prepare('SELECT estimated_cost_cents FROM records WHERE id = ?').pluck().get(record.id)).toBe(29);
+  expect((await patchRecord(f, record.id, { estimatedCost: 2.345 })).statusCode).toBe(400);
+  expect((await getRecord(f, record.id)).estimatedCost).toBe(0.29);
+});
+
+it('rejects foreign options and preserves chosen and unchosen option snapshots', async () => {
+  const record = await postRecord(f, { subtype: 'detail_clarification' });
+  const other = await postRecord(f, { subtype: 'detail_clarification' });
+  const insert = f.ctx.db.prepare(
+    'INSERT INTO decision_options (record_id, label, description, sort_order, created_at) VALUES (?, ?, ?, 0, ?)',
+  );
+  const optionId = Number(insert.run(record.id, 'Stone A', 'Original detail', '2026-10-03').lastInsertRowid);
+  const foreignId = Number(insert.run(other.id, 'Foreign', null, '2026-10-03').lastInsertRowid);
+  const refused = await patchRecord(f, record.id, { chosenOptionId: foreignId });
+  expect(refused.statusCode).toBe(400);
+  expect(refused.json().error).toBe('invalid_reference');
+  expect((await patchRecord(f, record.id, { chosenOptionId: optionId })).statusCode).toBe(200);
+  f.ctx.db.prepare('UPDATE decision_options SET label = ? WHERE id = ?').run('Stone B', optionId);
+  expect((await patchRecord(f, record.id, { chosenOptionId: null })).statusCode).toBe(200);
+  f.ctx.db.prepare('DELETE FROM decision_options WHERE id = ?').run(optionId);
+  const activity = (await get(f.ctx, f.cookie, recordUrl(f, record.id, '/activity'))).json();
+  expect(activity.filter((entry: { field: string }) => entry.field === 'chosenOptionId').map((entry: { detail: unknown }) => entry.detail)).toEqual([
+    { fromOption: { label: 'Stone B', description: 'Original detail' }, toOption: null },
+    { fromOption: null, toOption: { label: 'Stone A', description: 'Original detail' } },
+  ]);
+});
+
+it('rolls back columns, selections, precedence and activity after save rules reject the result', async () => {
+  const later = await postRecord(f, { subtype: 'task' });
+  const record = await postRecord(f, { subtype: 'task', title: 'Before', tradeIds: [f.trades.tiling] });
+  forceStatus(f, record.id, 'open');
+  const before = await getRecord(f, record.id);
+  const rejected = await patchRecord(f, record.id, {
+    title: null, priority: 'high', tradeIds: [f.trades.masonry], mustBeDoneBeforeIds: [later.id],
+  });
+  expect(rejected.statusCode).toBe(422);
+  expect(await getRecord(f, record.id)).toEqual(before);
+  expect((await getRecord(f, later.id)).requiresFirst).toEqual([]);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, record.id, '/activity'))).json()).toHaveLength(1);
+  const badCreate = await send(f.ctx, f.cookie, 'POST', `${f.base}/records`, { subtype: 'quality_issue', responsibleId: f.people.retired });
+  expect(badCreate.statusCode).toBe(400);
+  expect((await postRecord(f, { subtype: 'quality_issue' })).humanId).toBe('QI-0001');
+});
+``````
+
+#### File: `tests/server/shared-record-api.test.ts`
+
+<!-- replay task=10 phase=test sha256=e1c1d438148bddc70ab0df5c8c69254034322fb11bae906bac937d1ad38ea864 -->
+
+``````ts
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { createPerson } from '../../src/server/lists/people';
+import { createProject } from '../../src/server/lists/projects';
+import { authorizeShare } from '../../src/server/sharing/links';
+import { addAttachment, addPhoto } from './file-fixture';
+import { get, send } from './helpers';
+import { forceStatus, getRecord, makeFixture, patchRecord, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+beforeEach(async () => { f = await makeFixture(); });
+afterEach(async () => { await f.ctx.close(); });
+
+async function share(id: number) {
+  const response = await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/share-links'), { label: 'PRIVATE_SENTINEL recipient' });
+  expect(response.statusCode).toBe(201);
+  return { ...response.json(), token: response.json().url.split('#')[1] as string };
+}
+function read(token: string, method: 'GET' | 'HEAD' = 'GET') {
+  return f.ctx.app.inject({ method, url: '/api/shared/record', headers: { authorization: `Bearer ${token}` } });
+}
+const keys = (value: object) => Object.keys(value).sort();
+
+it('projects all visible sections and only their referenced labels, omitting private content and login identities', async () => {
+  f.ctx.db.exec("UPDATE users SET username='PRIVATE_SENTINEL_LOGIN'");
+  const foreignProject = createProject(f.ctx.db, { code: 'other', name: 'PRIVATE_SENTINEL project' }).id;
+  createPerson(f.ctx.db, foreignProject, { code: 'HIDDEN', name: 'PRIVATE_SENTINEL foreign person', role: 'other' });
+  createPerson(f.ctx.db, f.projectId, { code: 'UNUSED', name: 'PRIVATE_SENTINEL unrelated person', role: 'other' });
+  const downstream = await postRecord(f, { subtype: 'task', title: 'Public successor' });
+  const hidden = await postRecord(f, { subtype: 'task', title: 'PRIVATE_SENTINEL draft' });
+  const record = await postRecord(f, {
+    subtype: 'detail_clarification', title: 'Stone', question: 'Thickness?', notes: 'PRIVATE_SENTINEL notes', outsideScope: true, estimatedCost: 123.45,
+    ballInCourtId: f.people.architect, tradeIds: [f.trades.tiling], tagIds: [f.tags.stone], locationIds: [f.locations.v1Kitchen],
+    mustBeDoneBeforeIds: [downstream.id, hidden.id], instructionText: 'Old instruction',
+  });
+  await postRecord(f, { subtype: 'task', title: 'PRIVATE_SENTINEL predecessor', mustBeDoneBeforeIds: [record.id] });
+  forceStatus(f, downstream.id, 'open');
+  const option = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/options'), { label: 'Honed', description: '20 mm' });
+  expect(option.statusCode).toBe(201);
+  expect((await patchRecord(f, record.id, { instructionText: 'New instruction', chosenOptionId: option.json().id })).statusCode).toBe(200);
+  const measurement = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/measurement-sets'), {
+    date: '2026-10-03', phase: 'before', measuredById: f.people.architect, note: 'Public set note',
+    rows: [{ item: 'Stone', quantity: 'Thickness', value: 20, unit: 'mm', note: 'Public row note' }],
+  });
+  expect(measurement.statusCode).toBe(201);
+  f.ctx.db.prepare(`INSERT INTO verifications(record_id, checked_by_id, date, method, outcome, note, created_at, created_by)
+    VALUES (?,?,'2026-10-03','visual','passed','Public check','2026-10-03',(SELECT id FROM users LIMIT 1))`).run(record.id, f.people.architect);
+  const publicLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Public Log' });
+  const privateLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'PRIVATE_SENTINEL log', private: true });
+  expect(publicLog.statusCode).toBe(201);
+  expect(privateLog.statusCode).toBe(201);
+  await addAttachment(f, record.id, { logEntryId: privateLog.json().id, title: 'PRIVATE_SENTINEL title' }, 'PRIVATE_SENTINEL.pdf');
+  const publicFile = await addAttachment(f, record.id, { logEntryId: publicLog.json().id });
+  await addAttachment(f, record.id);
+  await addPhoto(f, record.id);
+  const userId = f.ctx.db.prepare('SELECT id FROM users').pluck().get();
+  f.ctx.db.prepare(`INSERT INTO activity(record_id,at,user_id,action,field,old_value,new_value,detail)
+    VALUES (?,'2026-10-04',?,'field_changed','notes',NULL,?,?)`).run(record.id, userId, JSON.stringify('PRIVATE_SENTINEL future field'), JSON.stringify({ secret: 'PRIVATE_SENTINEL detail' }));
+  f.ctx.db.prepare(`UPDATE activity SET detail=? WHERE record_id=? AND field='chosenOptionId'`).run(JSON.stringify({ fromOption: null, toOption: { label: 'Historical option', description: 'Preserved', extra: 'PRIVATE_SENTINEL nested' }, unknown: 'PRIVATE_SENTINEL detail' }), record.id);
+  f.ctx.db.prepare('UPDATE people SET active=0, email=?, phone=? WHERE id=?').run('PRIVATE_SENTINEL email', 'PRIVATE_SENTINEL phone', f.people.architect);
+  forceStatus(f, record.id, 'open');
+  const link = await share(record.id);
+  const before = await getRecord(f, record.id);
+  const response = await read(link.token);
+  expect(response.statusCode).toBe(200);
+  expect(response.headers['cache-control']).toBe('no-store');
+  const body = response.json();
+  expect(keys(body)).toEqual(['activity','attachments','labels','log','measurements','options','photos','record','verifications']);
+  for (const field of ['notes','outsideScope','estimatedCost','id','projectId','createdBy','updatedBy','allowedTransitions']) expect(body.record).not.toHaveProperty(field);
+  expect(JSON.stringify(body)).not.toContain('PRIVATE_SENTINEL');
+  expect(body.record.mustBeDoneBefore).toEqual([{ humanId: downstream.humanId, title: downstream.title }]);
+  expect(body.record.requiresFirst).toEqual([]);
+  expect(keys(body.options[0])).toEqual(['description','id','label']);
+  expect(keys(body.measurements[0])).toEqual(['date','id','measuredById','note','phase','rows']);
+  expect(keys(body.measurements[0].rows[0])).toEqual(['item','note','quantity','unit','value']);
+  expect(keys(body.verifications[0])).toEqual(['checkedById','createdAt','date','id','method','note','outcome']);
+  expect(keys(body.photos[0])).toEqual(['caption','id','originalFilename','phase','takenAt','uploadedAt','uploadedBy']);
+  expect(keys(body.attachments[0])).toEqual(['contentType','id','logEntry','originalFilename','size','title','uploadedAt','uploadedBy']);
+  expect(body.log).toEqual([{ id: publicLog.json().id, eventAt: publicLog.json().eventAt, text: 'Public Log', loggedBy: 'Owner', attachmentIds: [publicFile.id] }]);
+  expect(body.activity.find((a: { field: string }) => a.field === 'instructionText')).toMatchObject({ from: 'Old instruction', to: 'New instruction', detail: null });
+  expect(body.activity.find((a: { field: string }) => a.field === 'chosenOptionId').detail).toEqual({ fromOption: null, toOption: { label: 'Historical option', description: 'Preserved' } });
+  for (const entry of body.activity) expect(keys(entry)).toEqual(['action','at','detail','field','from','id','to']);
+  expect(body.labels.people).toEqual([{ id: f.people.architect, code: 'ARCH', name: 'Person ARCH', role: 'other' }]);
+  expect(body.labels.locations[0].path.map((node: { id: number }) => node.id)).toEqual([f.locations.villa1, f.locations.v1Ground, f.locations.v1Kitchen]);
+  expect(body.labels.zoneTypes).toEqual([{ id: f.zones.kitchen, nameEn: 'Kitchen', nameEl: '' }]);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, record.id, '/share-links'))).json()[0].viewCount).toBe(1);
+  expect(await getRecord(f, record.id)).toEqual(before);
+});
+
+it('denies malformed, unknown, expired, revoked and Draft links uniformly without granting owner access', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'Task' });
+  const link = await share(record.id);
+  for (const token of [link.token, '', 'a'.repeat(43), 'A'.repeat(43)]) {
+    const response = await read(token);
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: 'not_available' });
+  }
+  forceStatus(f, record.id, 'open');
+  f.ctx.db.prepare('UPDATE share_links SET expires_at=?').run('2026-10-03T00:00:00.000Z');
+  expect(() => authorizeShare(f.ctx.db, `Bearer ${link.token}`, new Date('2026-10-03'))).toThrow('not_available');
+  f.ctx.db.exec('UPDATE share_links SET expires_at=NULL');
+  expect((await read(link.token)).statusCode).toBe(200);
+  expect((await f.ctx.app.inject({ method: 'GET', url: recordUrl(f, record.id), headers: { authorization: `Bearer ${link.token}` } })).statusCode).toBe(401);
+  expect((await f.ctx.app.inject({ method: 'GET', url: '/api/shared/not-a-route', headers: { authorization: `Bearer ${link.token}` } })).statusCode).toBe(401);
+  await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, `/share-links/${link.id}/revoke`));
+  const denied = await f.ctx.app.inject({ method: 'GET', url: '/api/shared/record', headers: { cookie: f.cookie, authorization: `Bearer ${link.token}` } });
+  expect(denied.json()).toEqual({ error: 'not_available' });
+});
+
+it('HEAD skips projection and counters, and projection failures never increment views', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'Task' });
+  forceStatus(f, record.id, 'open');
+  const link = await share(record.id);
+  // listActivity cannot decode this row. HEAD must never call the projection.
+  f.ctx.db.prepare("UPDATE activity SET detail='bad-json' WHERE record_id=?").run(record.id);
+  const changes = f.ctx.db.prepare('SELECT total_changes()').pluck().get();
+  const head = await read(link.token, 'HEAD');
+  expect(head.statusCode).toBe(200);
+  expect(head.body).toBe('');
+  expect(f.ctx.db.prepare('SELECT total_changes()').pluck().get()).toBe(changes);
+  expect((await read(link.token)).statusCode).toBe(500);
+  expect(f.ctx.db.prepare('SELECT view_count,last_viewed_at FROM share_links WHERE id=?').get(link.id)).toEqual({ view_count: 0, last_viewed_at: null });
+});
+
+it('allowlists status history details and resolves visible historical people without publishing unknown objects', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'History' });
+  forceStatus(f, record.id, 'open');
+  const userId = f.ctx.db.prepare('SELECT id FROM users').pluck().get();
+  const insert = f.ctx.db.prepare('INSERT INTO activity(record_id,at,user_id,action,field,old_value,new_value,detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insert.run(record.id, '2026-01-02', userId, 'status_changed', 'status', '"ready_for_verification"', '"closed"', JSON.stringify({
+    reasonCode: null, note: 'Public note', hidden: 'PRIVATE_SENTINEL',
+    verification: { id: 1, outcome: 'passed', method: 'visual', checkedById: f.people.retired, date: '2026-01-02', hidden: 'PRIVATE_SENTINEL' },
+  }));
+  insert.run(record.id, '2026-01-03', userId, 'field_changed', 'responsibleId', JSON.stringify({ secret: 'PRIVATE_SENTINEL' }), 'null', null);
+  insert.run(record.id, '2026-01-04', userId, 'future_action', 'instructionText', 'null', '"PRIVATE_SENTINEL"', null);
+  const link = await share(record.id);
+  const response = await read(link.token);
+  expect(response.statusCode).toBe(200);
+  const body = response.json();
+  expect(JSON.stringify(body)).not.toContain('PRIVATE_SENTINEL');
+  expect(body.activity.find((entry: { action: string }) => entry.action === 'status_changed')).toMatchObject({ action: 'status_changed', field: 'status', detail: {
+    reasonCode: null, note: 'Public note', verification: { id: 1, outcome: 'passed', method: 'visual', checkedById: f.people.retired, date: '2026-01-02' },
+  } });
+  expect(body.labels.people).toEqual([{ id: f.people.retired, code: 'OLD', name: 'Person OLD', role: 'other' }]);
+});
+``````
+
+#### File: `tests/server/user-command.test.ts`
+
+<!-- replay task=10 phase=test sha256=0262b66d6e7ab7b3585872f578c07a31fd42c5fc9a840a1babced0319b7803f2 -->
+
+``````ts
+import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { expect, it } from 'vitest';
+import { createContributor } from '../../src/server/auth/contributors';
+import { createSession, findSessionUser } from '../../src/server/auth/sessions';
+import { loginAsOwner, makeContext, OWNER } from './helpers';
+
+const exec = promisify(execFile);
+
+it('runs disable and enable against temporary data, refuses owner changes and noninteractive password input', async () => {
+  const ctx = await makeContext();
+  try {
+    await loginAsOwner(ctx);
+    const id = createContributor(ctx.db, 'alex', 'Alex', OWNER.password);
+    const session = createSession(ctx.db, id);
+    const args = ['--import', new URL('../../node_modules/tsx/dist/loader.mjs', import.meta.url).href,
+      fileURLToPath(new URL('../../scripts/user.ts', import.meta.url))];
+    const options = { cwd: ctx.config.dataDir, env: { ...process.env, BUILTBASIS_DATA_DIR: ctx.config.dataDir } };
+    await exec(process.execPath, [...args, 'disable', 'alex'], options);
+    expect(ctx.db.prepare('SELECT is_active FROM users WHERE id = ?').pluck().get(id)).toBe(0);
+    await exec(process.execPath, [...args, 'enable', 'alex'], options);
+    expect(ctx.db.prepare('SELECT is_active FROM users WHERE id = ?').pluck().get(id)).toBe(1);
+    expect(findSessionUser(ctx.db, session.token)).toBeNull();
+    await expect(exec(process.execPath, [...args, 'disable', 'owner'], options)).rejects.toMatchObject({ code: 1 });
+    await expect(exec(process.execPath, [...args, 'create', 'new', 'New Person'], options)).rejects.toMatchObject({ code: 2 });
+    expect(ctx.db.prepare("SELECT is_active FROM users WHERE username = 'owner'").pluck().get()).toBe(1);
+  } finally { await ctx.close(); }
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/contributors.test.ts tests/server/contributors-db.test.ts tests/server/user-command.test.ts tests/server/assigned-records.test.ts tests/server/shared-record-api.test.ts tests/server/records-api.test.ts tests/server/log-api.test.ts tests/server/auth-api.test.ts`.
+
+Expected: new assigned-record route and account enable tests fail before implementation.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `scripts/user.ts`
+
+<!-- replay task=10 phase=implementation sha256=f15a92e1dfdc19f1cbba0df743f21666538bcd234ba1d599681a0c0450f05854 -->
+
+``````ts
+import { stdin } from 'node:process';
+import { createContributor, disableContributor, enableContributor, resetContributorPassword } from '../src/server/auth/contributors';
+import { loadEnvFile, openMigratedDatabase } from '../src/server/bootstrap';
+import { loadConfig } from '../src/server/config';
+import { readHidden } from './hidden-input';
+
+const [action, username, displayName, extra] = process.argv.slice(2);
+if (!username || extra || !['create', 'reset', 'disable', 'enable'].includes(action ?? '') ||
+    (action === 'create' ? !displayName : displayName !== undefined)) {
+  console.error('Usage: npm run user -- create <username> <displayName> | reset <username> | disable <username> | enable <username>');
+  process.exit(2);
+}
+let password = '';
+if (action === 'create' || action === 'reset') {
+  if (!stdin.isTTY) {
+    console.error('Run in an interactive terminal. Passwords are never arguments or piped input.');
+    process.exit(2);
+  }
+  password = await readHidden('New password: ');
+  if (await readHidden('Repeat the password: ') !== password) {
+    console.error('The passwords differ. Nothing was changed.');
+    process.exit(1);
+  }
+}
+loadEnvFile();
+const { db } = openMigratedDatabase(loadConfig());
+try {
+  if (action === 'create') {
+    const id = createContributor(db, username, displayName!, password);
+    console.log(`Contributor ${id} created.`);
+  } else {
+    const sessions = action === 'reset'
+      ? resetContributorPassword(db, username, password)
+      : action === 'enable' ? enableContributor(db, username) : disableContributor(db, username);
+    console.log(`Contributor ${action === 'reset' ? 'password reset' : action === 'enable' ? 'enabled' : 'disabled'}; ${sessions} session(s) ended.`);
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+} finally {
+  db.close();
+}
+``````
+
+#### File: `src/domain/records.ts`
+
+<!-- replay task=10 phase=implementation sha256=ec1de89764b95a91c2bc32b72d51d1143ea51ff0dc909d01799fa33b8348be7a -->
+
+``````ts
+import { z } from 'zod';
+import { isCode, type CodeOf, type ListKey, type Subtype } from './vocab';
+
+const codeOf = <K extends ListKey>(key: K) =>
+  z.custom<CodeOf<K>>((value) => isCode(key, value), `Unknown ${key} code`);
+const id = z.number().int().positive();
+/** A list of ids; duplicates are dropped. */
+const ids = z
+  .array(id)
+  .max(500)
+  .transform((values) => [...new Set(values)]);
+const isoDate = z.iso.date();
+const isoDateTime = z.iso.datetime({ offset: true });
+
+/**
+ * Optional free text, stored exactly as typed (design §3); empty or whitespace-only text is stored as null.
+ * Text is never trimmed or rewritten.
+ */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .nullable()
+    .transform((value) => (value === null || value.trim() === '' ? null : value));
+/** Required free text, stored exactly as typed; must contain more than whitespace. */
+const requiredText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .refine((value) => value.trim() !== '', 'Required');
+
+/** Euros with at most two decimals (design §5.4). */
+const euros = z
+  .number()
+  .min(0)
+  .max(100_000_000)
+  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, 'At most 2 decimals');
+
+/** Every editable record field (design §5, §6). Status changes go through transitions, never through a save. */
+export const RecordPatch = z.strictObject({
+  title: optionalText(200).optional(),
+  description: optionalText(20_000).optional(),
+  reference: optionalText(2_000).optional(),
+  notes: optionalText(20_000).optional(),
+  publicNotes: optionalText(20_000).optional(),
+  ballInCourtId: id.nullable().optional(),
+  responsibleId: id.nullable().optional(),
+  tradeIds: ids.optional(),
+  severity: codeOf('severity').nullable().optional(),
+  priority: codeOf('priority').nullable().optional(),
+  dueDate: isoDate.nullable().optional(),
+  completion: z.number().int().min(0).max(100).multipleOf(10).nullable().optional(),
+  safety: z.boolean().optional(),
+  tagIds: ids.optional(),
+  mustBeDoneBeforeIds: ids.optional(),
+  locationIds: ids.optional(),
+  outsideScope: z.boolean().optional(),
+  estimatedCost: euros.nullable().optional(),
+  problemTypes: z
+    .array(codeOf('problemType'))
+    .max(10)
+    .transform((values) => [...new Set(values)])
+    .optional(),
+  stage: codeOf('stage').nullable().optional(),
+  disposition: codeOf('disposition').nullable().optional(),
+  correction: optionalText(20_000).optional(),
+  question: optionalText(20_000).optional(),
+  route: codeOf('route').nullable().optional(),
+  issuedById: id.nullable().optional(),
+  chosenOptionId: id.nullable().optional(),
+  decidedById: id.nullable().optional(),
+  decidedOn: isoDate.nullable().optional(),
+  instructionText: optionalText(20_000).optional(),
+});
+
+/** Quick capture (design §10.3): a subtype and any fields; the record starts as Draft. */
+export const RecordCreate = RecordPatch.extend({ subtype: codeOf('subtype') });
+
+export type RecordPatchInput = z.output<typeof RecordPatch>;
+export type RecordCreateInput = z.output<typeof RecordCreate>;
+export type RecordField = keyof RecordPatchInput;
+
+const QUALITY_ISSUE_FIELDS: readonly RecordField[] = ['problemTypes', 'stage', 'disposition', 'correction'];
+const DETAIL_CLARIFICATION_FIELDS: readonly RecordField[] = ['question', 'route', 'issuedById'];
+/** Decision and instruction (design §5.6): Quality Issues and Detail Clarifications, not Tasks. */
+const DECISION_FIELDS: readonly RecordField[] = ['chosenOptionId', 'decidedById', 'decidedOn', 'instructionText'];
+
+/** Whether the subtype has the decision fields and options (design §5.6). */
+export function hasDecision(subtype: Subtype): boolean {
+  return subtype !== 'task';
+}
+
+/** The given fields that the subtype does not have (design §5.6, §6). */
+export function fieldsNotApplicable(subtype: Subtype, fields: readonly string[]): string[] {
+  const has = (list: readonly RecordField[], field: string): boolean => (list as readonly string[]).includes(field);
+  return fields.filter(
+    (field) =>
+      (has(QUALITY_ISSUE_FIELDS, field) && subtype !== 'quality_issue') ||
+      (has(DETAIL_CLARIFICATION_FIELDS, field) && subtype !== 'detail_clarification') ||
+      (has(DECISION_FIELDS, field) && !hasDecision(subtype)),
+  );
+}
+
+/** A status change (design §8.1). The domain rules in checkTransition decide what is required. */
+export const TransitionBody = z.strictObject({
+  to: codeOf('status'),
+  reasonCode: z.string().max(50).nullable().optional(),
+  reasonNote: optionalText(2_000).optional(),
+  note: optionalText(2_000).optional(),
+  verification: z
+    .strictObject({
+      checkedById: id.nullable(),
+      date: isoDate.nullable(),
+      method: z.string().max(50).nullable(),
+      note: optionalText(2_000).optional(),
+    })
+    .nullable()
+    .optional(),
+});
+export type TransitionBodyInput = z.output<typeof TransitionBody>;
+
+/** An option considered for the decision (design §5.6). */
+export const OptionBody = z.strictObject({
+  label: requiredText(200),
+  description: optionalText(20_000).optional(),
+});
+export const OptionPatch = OptionBody.partial();
+export type OptionInput = z.output<typeof OptionBody>;
+export type OptionPatchInput = z.output<typeof OptionPatch>;
+
+/** One measured value (design §5.7). Labels are stored as typed and matched after normalising. */
+export const MeasurementRowBody = z.strictObject({
+  item: requiredText(200),
+  quantity: requiredText(200),
+  value: z.number(),
+  unit: codeOf('unit'),
+  note: optionalText(2_000).optional(),
+});
+export const MeasurementSetBody = z.strictObject({
+  date: isoDate,
+  measuredById: id.nullable().optional(),
+  phase: codeOf('measurementPhase'),
+  note: optionalText(2_000).optional(),
+  rows: z.array(MeasurementRowBody).max(500).optional(),
+});
+/** `rows`, when given, replaces all of the set's rows. */
+export const MeasurementSetPatch = MeasurementSetBody.partial();
+export type MeasurementRowInput = z.output<typeof MeasurementRowBody>;
+export type MeasurementSetInput = z.output<typeof MeasurementSetBody>;
+export type MeasurementSetPatchInput = z.output<typeof MeasurementSetPatch>;
+
+/** A Log entry (design §5.11). The event time defaults to now. */
+export const LogEntryBody = z.strictObject({
+  eventAt: isoDateTime.optional(),
+  text: requiredText(20_000),
+  private: z.boolean().optional(),
+});
+export const LogEntryPatch = LogEntryBody.partial();
+export type LogEntryInput = z.output<typeof LogEntryBody>;
+export type LogEntryPatchInput = z.output<typeof LogEntryPatch>;
+``````
+
+#### File: `src/domain/sharing.ts`
+
+<!-- replay task=10 phase=implementation sha256=2f3ec252c083a0caf69ae042d45f41ce602255a0a15d94fd57e950a3e99fb980 -->
+
+``````ts
+import { z } from 'zod';
+import { FileTimestamp } from './files';
+import type { PhotoPhase, Subtype, Status, Severity, Priority, ProblemType, Stage, Disposition, Route, MeasurementPhase, Unit, VerificationMethod, VerificationOutcome } from './vocab';
+
+export const ShareCreate = z.strictObject({ label: z.string().max(200).refine(value => value.trim() !== '', 'Required'), expiresAt: FileTimestamp.nullable().optional() });
+export type ShareCreateInput = z.output<typeof ShareCreate>;
+export interface ShareLinkOut {
+  id: number; label: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastViewedAt: string | null; viewCount: number; url: string | null;
+}
+
+export interface SharedRecordFields {
+  humanId: string;
+  subtype: Subtype;
+  status: Status;
+  statusReason: { code: string | null; note: string | null } | null;
+  title: string | null;
+  description: string | null;
+  publicNotes: string | null;
+  reference: string | null;
+  ballInCourtId: number | null;
+  responsibleId: number | null;
+  tradeIds: number[];
+  severity: Severity | null;
+  priority: Priority | null;
+  dueDate: string | null;
+  completion: number | null;
+  safety: boolean;
+  tagIds: number[];
+  locationIds: number[];
+  problemTypes: ProblemType[];
+  stage: Stage | null;
+  disposition: Disposition | null;
+  correction: string | null;
+  question: string | null;
+  route: Route | null;
+  issuedById: number | null;
+  chosenOptionId: number | null;
+  decidedById: number | null;
+  decidedOn: string | null;
+  instructionText: string | null;
+  createdAt: string;
+  updatedAt: string;
+  mustBeDoneBefore: { humanId: string; title: string | null }[];
+  requiresFirst: { humanId: string; title: string | null }[];
+}
+
+export interface SharedActivity {
+  id: number;
+  at: string;
+  action: 'created' | 'status_changed' | 'field_changed';
+  field: string | null;
+  from: string | number | null;
+  to: string | number | null;
+  detail: {
+    reasonCode?: string | null;
+    reasonNote?: string | null;
+    note?: string | null;
+    verification?: { id: number; outcome: VerificationOutcome; method: VerificationMethod; checkedById: number; date: string };
+    fromOption?: { label: string; description: string | null } | null;
+    toOption?: { label: string; description: string | null } | null;
+  } | null;
+}
+
+export interface SharedRecord {
+  record: SharedRecordFields;
+  options: { id: number; label: string; description: string | null }[];
+  measurements: {
+    id: number; date: string; measuredById: number | null; phase: MeasurementPhase; note: string | null;
+    rows: { item: string; quantity: string; value: number; unit: Unit; note: string | null }[];
+  }[];
+  verifications: { id: number; checkedById: number; date: string; method: VerificationMethod; outcome: VerificationOutcome; note: string | null; createdAt: string }[];
+  photos: { id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string }[];
+  attachments: {
+    id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
+    logEntry: { id: number; eventAt: string; text: string } | null;
+  }[];
+  log: { id: number; eventAt: string; text: string; loggedBy: string; attachmentIds: number[] }[];
+  activity: SharedActivity[];
+  labels: {
+    people: { id: number; code: string; name: string; role: string }[];
+    trades: { id: number; nameEn: string; nameEl: string }[];
+    tags: { id: number; nameEn: string; nameEl: string }[];
+    locations: { id: number; path: { id: number; nameEn: string; nameEl: string; kind: string; zoneTypeId: number | null }[] }[];
+    zoneTypes: { id: number; nameEn: string; nameEl: string }[];
+  };
+}
+``````
+
+#### File: `src/server/access/grants.ts`
+
+<!-- replay task=10 phase=implementation sha256=2c6f0eaa491026cc689a620bedcc308d3919837caabf9fccfb1fb7492c2d197c -->
+
+``````ts
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+
+export interface ContributorAccess {
+  projectId: number;
+  recordId: number;
+  canUpload: boolean;
+  canAddLog: boolean;
+}
+
+/** Presence grants read access. Each write capability is independent and checked afresh. */
+export function requireContributorAccess(
+  db: Db,
+  userId: number,
+  recordId: number,
+  permission: 'read' | 'upload' | 'addLog' = 'read',
+): ContributorAccess {
+  const row = db.prepare(`SELECT r.project_id AS projectId, r.id AS recordId,
+    g.can_upload AS canUpload, g.can_add_log AS canAddLog
+    FROM record_grants g JOIN records r ON r.id = g.record_id JOIN users u ON u.id = g.user_id
+    WHERE g.user_id = ? AND r.id = ? AND r.status <> 'draft' AND u.is_active = 1 AND u.is_owner = 0`)
+    .get(userId, recordId) as { projectId: number; recordId: number; canUpload: number; canAddLog: number } | undefined;
+  if (!row) throw new HttpError(404, 'not_available');
+  if ((permission === 'upload' && !row.canUpload) || (permission === 'addLog' && !row.canAddLog)) {
+    throw new HttpError(403, 'permission_denied');
+  }
+  return { ...row, canUpload: row.canUpload === 1, canAddLog: row.canAddLog === 1 };
+}
+``````
+
+#### File: `src/server/access/routes.ts`
+
+<!-- replay task=10 phase=implementation sha256=211f7659e26e3b19ea31acd861c65a0eb614609e3615ffbb4cbbc1e6ec1bffdd -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { LogEntryBody, PhotoVariantParam, type AttachmentMeta } from '../../domain';
+import type { AppConfig } from '../config';
+import { findSessionUser } from '../auth/sessions';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
+import { saveUpload } from '../files/occurrences';
+import { discardStaged, publishFile } from '../files/storage';
+import { parseUpload } from '../files/uploads';
+import { ItemParams } from '../http/params';
+import { SESSION_COOKIE } from '../http/guards';
+import { requireUserId } from '../http/user';
+import { recordActivity } from '../records/activity';
+import { addLogEntry } from '../records/log';
+import { requireRecord } from '../records/store';
+import { buildSharedRecord } from '../sharing/projection';
+import { requireContributorAccess } from './grants';
+
+const Id = z.coerce.number().int().positive();
+const AssignedParams = z.object({ id: Id });
+const FileParams = AssignedParams.extend({ itemId: Id });
+const GrantParams = ItemParams.extend({ userId: Id });
+const GrantBody = z.strictObject({ canUpload: z.boolean(), canAddLog: z.boolean() });
+const PublicLogBody = LogEntryBody.omit({ private: true });
+const contributorConfig = { contributor: true, privateResponse: true };
+
+export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
+  app.get('/api/contributors', { config: { privateResponse: true } }, async () => {
+    const rows = db.prepare(`SELECT id, username, display_name AS displayName, is_active AS active
+      FROM users WHERE is_owner = 0 ORDER BY display_name, id`).all() as { id: number; username: string; displayName: string; active: number }[];
+    return rows.map(row => ({ ...row, active: row.active === 1 }));
+  });
+  const grantsUrl = '/api/projects/:projectId/records/:id/grants';
+  app.get(grantsUrl, { config: { privateResponse: true } }, async request => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    const rows = db.prepare(`SELECT user_id AS userId, can_upload AS canUpload, can_add_log AS canAddLog
+      FROM record_grants WHERE record_id = ? ORDER BY user_id`).all(id) as { userId: number; canUpload: number; canAddLog: number }[];
+    return rows.map(row => ({ ...row, canUpload: row.canUpload === 1, canAddLog: row.canAddLog === 1 }));
+  });
+  app.put(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    const body = GrantBody.parse(request.body);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      if (!db.prepare('SELECT id FROM users WHERE id = ? AND is_owner = 0 AND is_active = 1').get(userId)) {
+        throw new HttpError(404, 'contributor_not_found');
+      }
+      const old = db.prepare('SELECT can_upload, can_add_log FROM record_grants WHERE record_id = ? AND user_id = ?').get(id, userId) as { can_upload: number; can_add_log: number } | undefined;
+      db.prepare(`INSERT INTO record_grants VALUES (?,?,?,?) ON CONFLICT(record_id,user_id)
+        DO UPDATE SET can_upload=excluded.can_upload, can_add_log=excluded.can_add_log`)
+        .run(id, userId, Number(body.canUpload), Number(body.canAddLog));
+      if (!old || old.can_upload !== Number(body.canUpload) || old.can_add_log !== Number(body.canAddLog)) {
+        recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+          action: 'grant_changed', detail: { userId, ...body } });
+      }
+      return { userId, ...body };
+    })();
+  });
+  app.delete(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      const result = db.prepare('DELETE FROM record_grants WHERE record_id = ? AND user_id = ?').run(id, userId);
+      if (result.changes) recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+        action: 'grant_revoked', detail: { userId } });
+      return { ok: true };
+    })();
+  });
+
+  app.get('/api/assigned-records', { config: contributorConfig }, async request => db.prepare(`
+    SELECT r.id, r.human_id AS humanId, r.title FROM record_grants g
+    JOIN records r ON r.id = g.record_id JOIN users u ON u.id = g.user_id
+    WHERE g.user_id = ? AND u.is_active = 1 AND u.is_owner = 0 AND r.status <> 'draft'
+    ORDER BY r.id`).all(requireUserId(request)));
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const access = requireContributorAccess(db, requireUserId(request), id);
+      if (request.method === 'HEAD') return reply.send();
+      return { ...buildSharedRecord(db, access), permissions: { canUpload: access.canUpload, canAddLog: access.canAddLog } };
+    },
+  });
+  app.post('/api/assigned-records/:id/log', { config: contributorConfig }, async (request, reply) => {
+    const { id } = AssignedParams.parse(request.params);
+    const userId = requireUserId(request);
+    const body = PublicLogBody.parse(request.body);
+    const entry = db.transaction(() => {
+      const access = requireContributorAccess(db, userId, id, 'addLog');
+      return addLogEntry(db, access.projectId, id, userId, body);
+    })();
+    return reply.status(201).send({ id: entry.id, eventAt: entry.eventAt, text: entry.text, loggedBy: entry.loggedBy, attachmentIds: [] });
+  });
+  for (const kind of ['photos', 'attachments'] as const) {
+    app.post(`/api/assigned-records/:id/${kind}`, { config: { ...contributorConfig, multipart: true } }, async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const userId = requireUserId(request);
+      requireContributorAccess(db, userId, id, 'upload');
+      const envelope = await parseUpload(request, config.filesDir, kind);
+      try {
+        for (const file of Object.values(envelope.files)) await publishFile(config.filesDir, file);
+        const result = db.transaction(() => {
+          const token = request.cookies[SESSION_COOKIE];
+          if (!token || findSessionUser(db, token)?.userId !== userId) throw new HttpError(401, 'unauthenticated');
+          const access = requireContributorAccess(db, userId, id, 'upload');
+          const logEntryId = kind === 'attachments' ? (envelope.metadata as AttachmentMeta).logEntryId : null;
+          if (logEntryId != null) {
+            requireContributorAccess(db, userId, id, 'addLog');
+            if (!db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ? AND private = 0').get(logEntryId, id)) {
+              throw new HttpError(404, 'log_entry_not_found');
+            }
+          }
+          const occurrence = saveUpload(db, access.projectId, id, userId, kind, envelope);
+          return buildSharedRecord(db, access)[kind].find(item => item.id === occurrence.id);
+        })();
+        return reply.status(201).send(result);
+      } finally {
+        await Promise.all(Object.values(envelope.files).map(discardStaged));
+      }
+    });
+  }
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/photos/:itemId/:variant', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+      await sendFile(request, reply, config.filesDir, resolvePhotoFile(db, id, itemId, variant), variant === 'original' ? 'attachment' : 'inline');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/file', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'shared'), 'attachment');
+    },
+  });
+}
+``````
+
+#### File: `src/server/app.ts`
+
+<!-- replay task=10 phase=implementation sha256=901782c284edffa2aeb43333ea48d9f48573e25495a994ce000a8a253f62528b -->
+
+``````ts
+import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { ZodError } from 'zod';
+import { DEFAULT_LOGIN_LIMITS, LoginLimiter } from './auth/login-limiter';
+import type { AppConfig } from './config';
+import type { Db } from './db/connection';
+import { HttpError } from './errors';
+import { registerGuards } from './http/guards';
+import { registerProjectRoutes } from './lists/projects';
+import { registerPeopleRoutes } from './lists/people';
+import { registerTradeRoutes } from './lists/trades';
+import { registerZoneTypeRoutes } from './lists/zone-types';
+import { registerTagRoutes } from './lists/tags';
+import { registerLocationRoutes } from './lists/locations';
+import { registerRecordRoutes } from './records/routes';
+import { registerFileRoutes } from './files/routes';
+import { requireShareKey } from './sharing/crypto';
+import { reconcileShareKey } from './sharing/links';
+import { registerSharingRoutes } from './sharing/routes';
+import { safeLogger } from './http/logging';
+import { registerAccessRoutes } from './access/routes';
+import { registerAuthRoutes } from './routes/auth';
+import { registerHealthRoutes } from './routes/health';
+
+export interface AppDeps {
+  config: AppConfig;
+  db: Db;
+  /** Tests may pass their own limiter; the server uses the defaults. */
+  limiter?: LoginLimiter;
+  logger?: FastifyServerOptions['logger'];
+}
+
+export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+  const { config, db } = deps;
+  requireShareKey(config.shareKey);
+  const revokedLinks = reconcileShareKey(db, config.shareKey);
+  const app = Fastify({ logger: safeLogger(deps.logger), bodyLimit: 1024 * 1024 });
+  if (revokedLinks > 0) app.log.info({ event: 'share_key_changed', revokedLinks });
+  await app.register(cookie);
+  await app.register(multipart);
+  registerGuards(app, config, db);
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof HttpError) {
+      return reply
+        .status(error.statusCode)
+        .send(error.details === undefined ? { error: error.code } : { error: error.code, details: error.details });
+    }
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        error: 'invalid_input',
+        details: error.issues.map((issue) => ({ path: issue.path.map(String).join('.'), message: issue.message })),
+      });
+    }
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      return reply.status(statusCode).send({ error: 'bad_request' });
+    }
+    request.log.error({ event: 'internal_error' });
+    return reply.status(500).send({ error: 'internal_error' });
+  });
+  app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));
+
+  registerHealthRoutes(app);
+  registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
+  registerProjectRoutes(app, db);
+  registerPeopleRoutes(app, db);
+  registerTradeRoutes(app, db);
+  registerZoneTypeRoutes(app, db);
+  registerTagRoutes(app, db);
+  registerLocationRoutes(app, db);
+  registerRecordRoutes(app, db);
+  registerFileRoutes(app, db, config);
+  registerSharingRoutes(app, db, config);
+  registerAccessRoutes(app, db, config);
+  return app;
+}
+``````
+
+#### File: `src/server/auth/contributors.ts`
+
+<!-- replay task=10 phase=implementation sha256=23e89ba6660db42d7978d4fbf78499110eaf869b555564500985a5e2005c21dc -->
+
+``````ts
+import type { Db } from '../db/connection';
+import { hashPassword } from './passwords';
+import { deleteUserSessions } from './sessions';
+import { findUserByUsername, MAX_USERNAME_LENGTH, validateDisplayName } from './users';
+
+export function createContributor(db: Db, username: string, displayName: string, password: string): number {
+  if (username.length === 0 || username.length > MAX_USERNAME_LENGTH) throw new RangeError('Invalid username');
+  validateDisplayName(displayName);
+  const hash = hashPassword(password);
+  return db.transaction(() => {
+    if (findUserByUsername(db, username)) throw new Error('Account already exists');
+    const now = new Date().toISOString();
+    const result = db.prepare(`INSERT INTO users (username,password_hash,display_name,created_at,updated_at)
+      VALUES (?,?,?,?,?)`).run(username, hash, displayName, now, now);
+    return Number(result.lastInsertRowid);
+  }).immediate();
+}
+
+function contributorId(db: Db, username: string): number {
+  const user = findUserByUsername(db, username);
+  if (!user) throw new Error('Contributor does not exist');
+  if (user.isOwner) throw new Error('The contributor command cannot change the owner');
+  return user.id;
+}
+
+export function resetContributorPassword(db: Db, username: string, password: string): number {
+  const hash = hashPassword(password);
+  return db.transaction(() => {
+    const id = contributorId(db, username);
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(hash, new Date().toISOString(), id);
+    return deleteUserSessions(db, id);
+  }).immediate();
+}
+
+export function disableContributor(db: Db, username: string): number {
+  return db.transaction(() => {
+    const id = contributorId(db, username);
+    db.prepare('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+    return deleteUserSessions(db, id);
+  }).immediate();
+}
+
+export function enableContributor(db: Db, username: string): number {
+  return db.transaction(() => {
+    const id = contributorId(db, username);
+    db.prepare('UPDATE users SET is_active = 1, updated_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+    // Enabling always requires a fresh login, including after a repeated enable command.
+    return deleteUserSessions(db, id);
+  }).immediate();
+}
+``````
+
+#### File: `src/server/files/occurrences.ts`
+
+<!-- replay task=10 phase=implementation sha256=1a61c8c7e4419c7b83dd7bb7663eb82364b7cc21260756ccaff4db48d0023a5c -->
+
+``````ts
+import type { AttachmentMeta, AttachmentOut, AttachmentPatchInput, PhotoMeta, PhotoOut, PhotoPatchInput } from '../../domain';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { requireRecord, touchRecord } from '../records/store';
+import type { StagedFile } from './storage';
+import type { UploadEnvelope } from './uploads';
+
+const PHOTO_SELECT = `SELECT p.id, p.original_filename AS originalFilename, p.phase, p.caption, p.taken_at AS takenAt,
+  u.display_name AS uploadedBy, p.uploaded_at AS uploadedAt FROM photos p JOIN users u ON u.id = p.uploaded_by`;
+
+export function listPhotos(db: Db, recordId: number): PhotoOut[] {
+  return db.prepare(`${PHOTO_SELECT} WHERE p.record_id = ?
+    ORDER BY CASE p.phase WHEN 'before' THEN 0 WHEN 'during' THEN 1 ELSE 2 END, p.uploaded_at DESC, p.id DESC`).all(recordId) as PhotoOut[];
+}
+
+export function listAttachments(db: Db, recordId: number): AttachmentOut[] {
+  const rows = db.prepare(`SELECT a.id, a.original_filename AS originalFilename, a.title, b.size, b.content_type AS contentType,
+    u.display_name AS uploadedBy, a.uploaded_at AS uploadedAt, l.id AS logId, l.event_at AS eventAt, l.text, l.private
+    FROM attachments a JOIN blobs b ON b.hash = a.blob_hash JOIN users u ON u.id = a.uploaded_by
+    LEFT JOIN log_entries l ON l.id = a.log_entry_id AND l.record_id = a.record_id
+    WHERE a.record_id = ? ORDER BY a.uploaded_at DESC, a.id DESC`).all(recordId) as (Omit<AttachmentOut, 'logEntry'> & {
+      logId: number | null; eventAt: string; text: string; private: number;
+    })[];
+  return rows.map(row => ({
+    id: row.id,
+    originalFilename: row.originalFilename,
+    title: row.title,
+    size: row.size,
+    contentType: row.contentType,
+    uploadedBy: row.uploadedBy,
+    uploadedAt: row.uploadedAt,
+    logEntry: row.logId === null ? null : { id: row.logId, eventAt: row.eventAt, text: row.text, private: row.private === 1 },
+  }));
+}
+
+export function requireOccurrence(db: Db, kind: 'photos' | 'attachments', recordId: number, id: number): void {
+  if (!db.prepare(`SELECT id FROM ${kind} WHERE record_id = ? AND id = ?`).get(recordId, id)) {
+    throw new HttpError(404, 'file_not_found');
+  }
+}
+
+function insertBlob(db: Db, file: StagedFile): void {
+  db.prepare('INSERT OR IGNORE INTO blobs(hash, size, content_type) VALUES (?, ?, ?)').run(file.hash, file.size, file.contentType);
+  const row = db.prepare('SELECT size, content_type AS contentType FROM blobs WHERE hash = ?').get(file.hash) as { size: number; contentType: string };
+  if (row.size !== file.size || row.contentType !== file.contentType) throw new Error('blob_metadata_collision');
+}
+
+/** Called only after all files are published. Recheck associations inside the synchronous transaction. */
+export function saveUpload(db: Db, projectId: number, recordId: number, userId: number, kind: 'photos' | 'attachments', envelope: UploadEnvelope): PhotoOut | AttachmentOut {
+  return db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    const at = new Date().toISOString();
+    let id: number;
+    if (kind === 'photos') {
+      const meta = envelope.metadata as PhotoMeta;
+      const { original, display, thumbnail } = envelope.files;
+      if (!original || !display || !thumbnail) throw new HttpError(400, 'invalid_upload');
+      for (const file of [original, display, thumbnail]) insertBlob(db, file);
+      id = Number(db.prepare(`INSERT INTO photos(record_id, original_hash, display_hash, thumbnail_hash, original_filename, phase, caption, taken_at, uploaded_by, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(recordId, original.hash, display.hash, thumbnail.hash, original.filename, meta.phase, meta.caption ?? null, meta.takenAt ?? null, userId, at).lastInsertRowid);
+    } else {
+      const meta = envelope.metadata as AttachmentMeta;
+      if (meta.logEntryId != null && !db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ?').get(meta.logEntryId, recordId)) {
+        throw new HttpError(404, 'log_entry_not_found');
+      }
+      const file = envelope.files.file;
+      if (!file) throw new HttpError(400, 'invalid_upload');
+      insertBlob(db, file);
+      id = Number(db.prepare(`INSERT INTO attachments(record_id, blob_hash, original_filename, title, log_entry_id, uploaded_by, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(recordId, file.hash, file.filename, meta.title ?? null, meta.logEntryId ?? null, userId, at).lastInsertRowid);
+    }
+    touchRecord(db, recordId, userId, at);
+    return (kind === 'photos' ? listPhotos(db, recordId) : listAttachments(db, recordId)).find(row => row.id === id)!;
+  })();
+}
+
+export function editOccurrence(db: Db, projectId: number, recordId: number, id: number, userId: number, kind: 'photos' | 'attachments', patch: PhotoPatchInput | AttachmentPatchInput): PhotoOut | AttachmentOut {
+  return db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    requireOccurrence(db, kind, recordId, id);
+    const fields = kind === 'photos' ? { phase: 'phase', caption: 'caption', takenAt: 'taken_at' } : { title: 'title' };
+    for (const [key, column] of Object.entries(fields)) {
+      if (Object.hasOwn(patch, key)) db.prepare(`UPDATE ${kind} SET ${column} = ? WHERE id = ?`).run((patch as Record<string, unknown>)[key], id);
+    }
+    touchRecord(db, recordId, userId, new Date().toISOString());
+    return (kind === 'photos' ? listPhotos(db, recordId) : listAttachments(db, recordId)).find(row => row.id === id)!;
+  })();
+}
+
+export function deleteOccurrence(db: Db, projectId: number, recordId: number, id: number, userId: number, kind: 'photos' | 'attachments'): void {
+  db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    requireOccurrence(db, kind, recordId, id);
+    db.prepare(`DELETE FROM ${kind} WHERE id = ?`).run(id);
+    touchRecord(db, recordId, userId, new Date().toISOString());
+  })();
+}
+``````
+
+#### File: `src/server/http/guards.ts`
+
+<!-- replay task=10 phase=implementation sha256=fde159f4d467837d8dc9dca5afd8b926a4a83b970e30f3bf1c2fd925a9aa1e50 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { findSessionUser, type SessionUser } from '../auth/sessions';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { shareHeaders } from './privacy';
+
+export const SESSION_COOKIE = 'bb_session';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const PUBLIC_API_ROUTES = new Set(['/api/health', '/api/auth/login']);
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user: SessionUser | null;
+  }
+  interface FastifyContextConfig {
+    /** Set on upload routes (Plan 4) to accept multipart/form-data instead of JSON. */
+    multipart?: boolean;
+    shareRead?: boolean;
+    privateResponse?: boolean;
+    sessionOnly?: boolean;
+    contributor?: boolean;
+  }
+}
+
+/**
+ * Request rules (design §11.5):
+ * - every state-changing request needs Origin = the public origin and a JSON body
+ *   (multipart only on routes that allow it);
+ * - protected /api routes require an active owner unless explicitly configured for
+ *   contributor access or the account's own session endpoints;
+ * - contributor handlers check the current record grant and each requested capability;
+ * - only explicitly marked shared GET/HEAD routes bypass that session requirement,
+ *   and their handlers independently require a valid bearer share token;
+ * - session lookup and file reads are read-only. Only a successful shared record GET
+ *   updates its link's view counter; HEAD changes nothing.
+ */
+export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {
+  app.decorateRequest('user', null);
+
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.routeOptions.config.privateResponse) shareHeaders(reply);
+    if (SAFE_METHODS.has(request.method)) return;
+    if (request.headers.origin !== config.publicOrigin) throw new HttpError(403, 'origin_rejected');
+    const contentType = (request.headers['content-type']?.split(';', 1)[0] ?? '').trim().toLowerCase();
+    const isJson = contentType === 'application/json';
+    const isAllowedMultipart =
+      contentType === 'multipart/form-data' && request.routeOptions.config?.multipart === true;
+    if (!isJson && !isAllowedMultipart) throw new HttpError(415, 'unsupported_content_type');
+  });
+
+  app.addHook('preHandler', async (request) => {
+    if (request.routeOptions.config.shareRead === true && (request.method === 'GET' || request.method === 'HEAD')) return;
+    const token = request.cookies[SESSION_COOKIE];
+    request.user = token ? findSessionUser(db, token) : null;
+    const route = request.routeOptions.url ?? request.url;
+    if (!route.startsWith('/api/') || PUBLIC_API_ROUTES.has(route)) return;
+    if (request.user === null) throw new HttpError(401, 'unauthenticated');
+    if (request.routeOptions.config.sessionOnly || request.routeOptions.config.contributor) return;
+    const owner = db.prepare('SELECT is_owner FROM users WHERE id = ?').pluck().get(request.user.userId);
+    if (owner !== 1) throw new HttpError(403, 'owner_required');
+  });
+}
+``````
+
+#### File: `src/server/records/activity.ts`
+
+<!-- replay task=10 phase=implementation sha256=86f838b7c5931b9f8d564e909287940f6799696069495bbf3b9b0ef91d653cb3 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import type { Db } from '../db/connection';
+import { ItemParams } from '../http/params';
+import { requireProject } from '../lists/projects';
+import { requireRecord } from './store';
+
+export type ActivityAction = 'created' | 'field_changed' | 'status_changed' | 'share_created' | 'share_revoked' | 'grant_changed' | 'grant_revoked';
+
+export interface ActivityInput {
+  recordId: number;
+  userId: number;
+  at: string;
+  action: ActivityAction;
+  field?: string;
+  from?: unknown;
+  to?: unknown;
+  detail?: Record<string, unknown>;
+}
+
+export interface ActivityEntry {
+  id: number;
+  at: string;
+  by: string;
+  action: ActivityAction;
+  field: string | null;
+  from: unknown;
+  to: unknown;
+  detail: Record<string, unknown> | null;
+}
+
+const toJson = (value: unknown): string | null => (value === undefined ? null : JSON.stringify(value));
+const fromJson = (value: string | null): unknown => (value === null ? null : JSON.parse(value));
+
+/** Appends one entry to the record's activity log (design §5.12). Entries are never changed or deleted. */
+export function recordActivity(db: Db, entry: ActivityInput): void {
+  db.prepare(
+    'INSERT INTO activity (record_id, at, user_id, action, field, old_value, new_value, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(
+    entry.recordId,
+    entry.at,
+    entry.userId,
+    entry.action,
+    entry.field ?? null,
+    toJson(entry.from),
+    toJson(entry.to),
+    toJson(entry.detail),
+  );
+}
+
+/** Newest first. */
+export function listActivity(db: Db, recordId: number): ActivityEntry[] {
+  const rows = db
+    .prepare(
+      `SELECT a.id, a.at, u.display_name AS displayName, a.action, a.field, a.old_value AS oldValue, a.new_value AS newValue, a.detail
+       FROM activity a JOIN users u ON u.id = a.user_id
+       WHERE a.record_id = ? ORDER BY a.at DESC, a.id DESC`,
+    )
+    .all(recordId) as {
+    id: number;
+    at: string;
+    displayName: string;
+    action: ActivityAction;
+    field: string | null;
+    oldValue: string | null;
+    newValue: string | null;
+    detail: string | null;
+  }[];
+  return rows.map((row) => ({
+    id: row.id,
+    at: row.at,
+    by: row.displayName,
+    action: row.action,
+    field: row.field,
+    from: fromJson(row.oldValue),
+    to: fromJson(row.newValue),
+    detail: fromJson(row.detail) as Record<string, unknown> | null,
+  }));
+}
+
+export function registerActivityRoutes(app: FastifyInstance, db: Db): void {
+  app.get('/api/projects/:projectId/records/:id/activity', async (request) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    requireRecord(db, projectId, id);
+    return listActivity(db, id);
+  });
+}
+``````
+
+#### File: `src/server/records/log.ts`
+
+<!-- replay task=10 phase=implementation sha256=a743cf70849fa21b5a8ae3784db8cdaa3b63e3df7483671f110a694235040fbb -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { LogEntryBody, LogEntryPatch, type LogEntryInput, type LogEntryPatchInput } from '../../domain';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { ItemParams, RecordItemParams } from '../http/params';
+import { requireUserId } from '../http/user';
+import { requireProject } from '../lists/projects';
+import { requireRecord, touchRecord } from './store';
+
+/** A Log entry (design §5.11). `loggedAt` and `editedAt` are stored for the record but not shown in the UI. */
+export interface LogEntry {
+  id: number;
+  eventAt: string;
+  text: string;
+  private: boolean;
+  loggedBy: string;
+  loggedAt: string;
+  editedAt: string | null;
+}
+
+type LogRow = Omit<LogEntry, 'private'> & { private: number };
+const SELECT = `SELECT l.id, l.event_at AS eventAt, l.text, l.private, u.display_name AS loggedBy,
+  l.logged_at AS loggedAt, l.edited_at AS editedAt
+  FROM log_entries l JOIN users u ON u.id = l.logged_by`;
+const toEntry = (row: LogRow): LogEntry => ({ ...row, private: row.private === 1 });
+
+/** Event times are stored in UTC so that they sort correctly whatever offset the browser sent. */
+const toUtc = (value: string): string => new Date(value).toISOString();
+
+/** Newest first: by event time, then by logged-at (design §5.11). */
+export function listLog(db: Db, recordId: number): LogEntry[] {
+  return (
+    db.prepare(`${SELECT} WHERE l.record_id = ? ORDER BY l.event_at DESC, l.logged_at DESC, l.id DESC`).all(recordId) as LogRow[]
+  ).map(toEntry);
+}
+
+function requireEntry(db: Db, recordId: number, entryId: number): LogEntry {
+  const row = db.prepare(`${SELECT} WHERE l.record_id = ? AND l.id = ?`).get(recordId, entryId) as LogRow | undefined;
+  if (!row) throw new HttpError(404, 'log_entry_not_found');
+  return toEntry(row);
+}
+
+export function addLogEntry(
+  db: Db,
+  projectId: number,
+  recordId: number,
+  userId: number,
+  input: LogEntryInput,
+  now: Date = new Date(),
+): LogEntry {
+  return db.transaction((): LogEntry => {
+    requireRecord(db, projectId, recordId);
+    const at = now.toISOString();
+    const info = db
+      .prepare(
+        'INSERT INTO log_entries (record_id, event_at, text, private, logged_by, logged_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(recordId, input.eventAt ? toUtc(input.eventAt) : at, input.text, input.private ? 1 : 0, userId, at);
+    touchRecord(db, recordId, userId, at);
+    return requireEntry(db, recordId, Number(info.lastInsertRowid));
+  })();
+}
+
+/** Event time, text and the private marker can change; logged-at and logged-by never do. */
+export function updateLogEntry(
+  db: Db,
+  projectId: number,
+  recordId: number,
+  entryId: number,
+  userId: number,
+  patch: LogEntryPatchInput,
+  now: Date = new Date(),
+): LogEntry {
+  return db.transaction((): LogEntry => {
+    requireRecord(db, projectId, recordId);
+    const current = requireEntry(db, recordId, entryId);
+    const at = now.toISOString();
+    db.prepare('UPDATE log_entries SET event_at = ?, text = ?, private = ?, edited_at = ? WHERE id = ?').run(
+      patch.eventAt ? toUtc(patch.eventAt) : current.eventAt,
+      patch.text ?? current.text,
+      (patch.private ?? current.private) ? 1 : 0,
+      at,
+      entryId,
+    );
+    touchRecord(db, recordId, userId, at);
+    return requireEntry(db, recordId, entryId);
+  })();
+}
+
+/** The composite attachment FK cascades occurrence deletion in this transaction; stored blobs remain. */
+export function deleteLogEntry(
+  db: Db,
+  projectId: number,
+  recordId: number,
+  entryId: number,
+  userId: number,
+  now: Date = new Date(),
+): void {
+  db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    requireEntry(db, recordId, entryId);
+    db.prepare('DELETE FROM log_entries WHERE id = ?').run(entryId);
+    touchRecord(db, recordId, userId, now.toISOString());
+  })();
+}
+
+export function registerLogRoutes(app: FastifyInstance, db: Db): void {
+  app.get('/api/projects/:projectId/records/:id/log', async (request) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    requireRecord(db, projectId, id);
+    return listLog(db, id);
+  });
+
+  app.post('/api/projects/:projectId/records/:id/log', async (request, reply) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    const entry = addLogEntry(db, projectId, id, requireUserId(request), LogEntryBody.parse(request.body));
+    return reply.status(201).send(entry);
+  });
+
+  app.patch('/api/projects/:projectId/records/:id/log/:itemId', async (request) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireProject(db, projectId);
+    return updateLogEntry(db, projectId, id, itemId, requireUserId(request), LogEntryPatch.parse(request.body));
+  });
+
+  app.delete('/api/projects/:projectId/records/:id/log/:itemId', async (request) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireProject(db, projectId);
+    deleteLogEntry(db, projectId, id, itemId, requireUserId(request));
+    return { ok: true };
+  });
+}
+``````
+
+#### File: `src/server/records/records.ts`
+
+<!-- replay task=10 phase=implementation sha256=7f7b4a3b809776b187fa038b7ac5698f12221e805fd98fb95ee4c3806497a067 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import {
+  allowedTargets,
+  fieldsNotApplicable,
+  formatHumanId,
+  RecordCreate,
+  RecordPatch,
+  validateSave,
+  type Disposition,
+  type Priority,
+  type ProblemType,
+  type RecordCreateInput,
+  type RecordPatchInput,
+  type Route,
+  type Severity,
+  type Stage,
+  type Status,
+  type Subtype,
+} from '../../domain';
+import type { Db } from '../db/connection';
+import { updateColumns } from '../db/update';
+import { HttpError } from '../errors';
+import { ItemParams, ProjectParams } from '../http/params';
+import { requireUserId } from '../http/user';
+import { requireProject } from '../lists/projects';
+import { recordActivity } from './activity';
+import {
+  LINK_FIELDS,
+  readLinkIds,
+  readMustBeDoneBefore,
+  readRequiresFirst,
+  replaceLinks,
+  replaceMustBeDoneBefore,
+  type RecordRef,
+} from './links';
+import { checkOption, checkPerson, checkSelection } from './references';
+import { problemTypesOf, requireRecord, toRecordState, type RecordRow } from './store';
+
+/** A record as the owner sees it. Sub-collections (options, measurements, verifications, Log, activity) have their own routes. */
+export interface RecordDetail {
+  id: number;
+  projectId: number;
+  humanId: string;
+  subtype: Subtype;
+  status: Status;
+  statusBeforeHold: Status | null;
+  statusReason: { code: string | null; note: string | null } | null;
+  title: string | null;
+  description: string | null;
+  reference: string | null;
+  notes: string | null;
+  publicNotes: string | null;
+  ballInCourtId: number | null;
+  responsibleId: number | null;
+  tradeIds: number[];
+  severity: Severity | null;
+  priority: Priority | null;
+  dueDate: string | null;
+  completion: number | null;
+  safety: boolean;
+  tagIds: number[];
+  locationIds: number[];
+  mustBeDoneBefore: RecordRef[];
+  requiresFirst: RecordRef[];
+  outsideScope: boolean;
+  estimatedCost: number | null;
+  problemTypes: ProblemType[];
+  stage: Stage | null;
+  disposition: Disposition | null;
+  correction: string | null;
+  question: string | null;
+  route: Route | null;
+  issuedById: number | null;
+  chosenOptionId: number | null;
+  decidedById: number | null;
+  decidedOn: string | null;
+  instructionText: string | null;
+  /** Statuses offered in the status dialog; the server still checks every condition on the change (design §10.5). */
+  allowedTransitions: Status[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Changes to these fields are written to the activity log (design §5.12). */
+const TRACKED_FIELDS = [
+  'ballInCourtId',
+  'responsibleId',
+  'severity',
+  'priority',
+  'dueDate',
+  'disposition',
+  'chosenOptionId',
+  'decidedById',
+  'decidedOn',
+  'instructionText',
+] as const satisfies readonly (keyof RecordRow)[];
+
+const PERSON_FIELDS = ['ballInCourtId', 'responsibleId', 'issuedById', 'decidedById'] as const;
+
+const toFlag = (value: boolean | undefined): number | undefined => (value === undefined ? undefined : Number(value));
+
+/** The option as it was when chosen or unchosen, so the history stays readable after the option changes or is deleted. */
+function optionSnapshot(db: Db, optionId: number | null): { label: string; description: string | null } | null {
+  if (optionId === null) return null;
+  return (
+    (db.prepare('SELECT label, description FROM decision_options WHERE id = ?').get(optionId) as
+      | { label: string; description: string | null }
+      | undefined) ?? null
+  );
+}
+
+export function getRecordDetail(db: Db, projectId: number, recordId: number): RecordDetail {
+  const row = requireRecord(db, projectId, recordId);
+  const hasReason = row.statusReasonCode !== null || row.statusReasonNote !== null;
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    humanId: row.humanId,
+    subtype: row.subtype,
+    status: row.status,
+    statusBeforeHold: row.statusBeforeHold,
+    statusReason: hasReason ? { code: row.statusReasonCode, note: row.statusReasonNote } : null,
+    title: row.title,
+    description: row.description,
+    reference: row.reference,
+    notes: row.notes,
+    publicNotes: row.publicNotes,
+    ballInCourtId: row.ballInCourtId,
+    responsibleId: row.responsibleId,
+    tradeIds: readLinkIds(db, recordId, 'tradeIds'),
+    severity: row.severity,
+    priority: row.priority,
+    dueDate: row.dueDate,
+    completion: row.completion,
+    safety: row.safety === 1,
+    tagIds: readLinkIds(db, recordId, 'tagIds'),
+    locationIds: readLinkIds(db, recordId, 'locationIds'),
+    mustBeDoneBefore: readMustBeDoneBefore(db, recordId),
+    requiresFirst: readRequiresFirst(db, recordId),
+    outsideScope: row.outsideScope === 1,
+    estimatedCost: row.estimatedCostCents === null ? null : row.estimatedCostCents / 100,
+    problemTypes: problemTypesOf(row),
+    stage: row.stage,
+    disposition: row.disposition,
+    correction: row.correction,
+    question: row.question,
+    route: row.route,
+    issuedById: row.issuedById,
+    chosenOptionId: row.chosenOptionId,
+    decidedById: row.decidedById,
+    decidedOn: row.decidedOn,
+    instructionText: row.instructionText,
+    allowedTransitions: allowedTargets(toRecordState(row)),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * Applies a save to a record: subtype fields, references, links, the commercial rule, then the save rules on
+ * the result (design §8.2), then the activity entries. Runs inside the caller's transaction, so any rejection
+ * leaves the record unchanged.
+ */
+function applyPatch(db: Db, current: RecordRow, userId: number, patch: RecordPatchInput, at: string): void {
+  const { projectId, id: recordId } = current;
+  const sent = Object.entries(patch)
+    .filter(([, value]) => value !== undefined)
+    .map(([field]) => field);
+  const notApplicable = fieldsNotApplicable(current.subtype, sent);
+  if (notApplicable.length > 0) throw new HttpError(400, 'field_not_applicable', { fields: notApplicable });
+
+  for (const field of PERSON_FIELDS) checkPerson(db, projectId, field, patch[field], current[field]);
+  if (patch.tradeIds) checkSelection(db, projectId, 'trades', 'tradeIds', patch.tradeIds, readLinkIds(db, recordId, 'tradeIds'));
+  if (patch.tagIds) checkSelection(db, projectId, 'tags', 'tagIds', patch.tagIds, readLinkIds(db, recordId, 'tagIds'));
+  if (patch.locationIds) {
+    checkSelection(db, projectId, 'location_nodes', 'locationIds', patch.locationIds, readLinkIds(db, recordId, 'locationIds'));
+  }
+  checkOption(db, recordId, patch.chosenOptionId);
+
+  // An estimate is entered only while Outside contract scope is ticked; unticking keeps it (design §5.4).
+  const outsideScope = patch.outsideScope ?? current.outsideScope === 1;
+  if (patch.estimatedCost !== undefined && patch.estimatedCost !== null && !outsideScope) {
+    throw new HttpError(422, 'estimated_cost_requires_outside_scope');
+  }
+
+  updateColumns(db, 'records', projectId, recordId, {
+    title: patch.title,
+    description: patch.description,
+    reference: patch.reference,
+    notes: patch.notes,
+    public_notes: patch.publicNotes,
+    ball_in_court_id: patch.ballInCourtId,
+    responsible_id: patch.responsibleId,
+    severity: patch.severity,
+    priority: patch.priority,
+    due_date: patch.dueDate,
+    completion: patch.completion,
+    safety: toFlag(patch.safety),
+    outside_scope: toFlag(patch.outsideScope),
+    estimated_cost_cents:
+      patch.estimatedCost === undefined || patch.estimatedCost === null
+        ? patch.estimatedCost
+        : Math.round(patch.estimatedCost * 100),
+    problem_types: patch.problemTypes === undefined ? undefined : JSON.stringify(patch.problemTypes),
+    stage: patch.stage,
+    disposition: patch.disposition,
+    correction: patch.correction,
+    question: patch.question,
+    route: patch.route,
+    issued_by_id: patch.issuedById,
+    chosen_option_id: patch.chosenOptionId,
+    decided_by_id: patch.decidedById,
+    decided_on: patch.decidedOn,
+    instruction_text: patch.instructionText,
+    updated_at: at,
+    updated_by: userId,
+  });
+  for (const field of LINK_FIELDS) {
+    const ids = patch[field];
+    if (ids) replaceLinks(db, recordId, field, ids);
+  }
+  if (patch.mustBeDoneBeforeIds) replaceMustBeDoneBefore(db, projectId, recordId, patch.mustBeDoneBeforeIds);
+
+  const updated = requireRecord(db, projectId, recordId);
+  const errors = validateSave(toRecordState(updated));
+  if (errors.length > 0) throw new HttpError(422, 'rule_violation', { errors });
+
+  for (const field of TRACKED_FIELDS) {
+    if (current[field] === updated[field]) continue;
+    const detail =
+      field === 'chosenOptionId'
+        ? { fromOption: optionSnapshot(db, current.chosenOptionId), toOption: optionSnapshot(db, updated.chosenOptionId) }
+        : undefined;
+    recordActivity(db, { recordId, userId, at, action: 'field_changed', field, from: current[field], to: updated[field], detail });
+  }
+}
+
+/** Creates a Draft record with the next human ID of its subtype (design §4.2, §10.3). */
+export function createRecord(
+  db: Db,
+  projectId: number,
+  userId: number,
+  input: RecordCreateInput,
+  now: Date = new Date(),
+): RecordDetail {
+  const { subtype, ...patch } = input;
+  const at = now.toISOString();
+  return db.transaction((): RecordDetail => {
+    const sequence = db
+      .prepare(
+        `INSERT INTO record_counters (project_id, subtype, last_sequence) VALUES (?, ?, 1)
+         ON CONFLICT (project_id, subtype) DO UPDATE SET last_sequence = last_sequence + 1
+         RETURNING last_sequence`,
+      )
+      .pluck()
+      .get(projectId, subtype) as number;
+    const info = db
+      .prepare(
+        `INSERT INTO records (project_id, subtype, sequence, human_id, status, created_at, created_by, updated_at, updated_by)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+      )
+      .run(projectId, subtype, sequence, formatHumanId(subtype, sequence), at, userId, at, userId);
+    const recordId = Number(info.lastInsertRowid);
+    recordActivity(db, { recordId, userId, at, action: 'created', to: 'draft' });
+    applyPatch(db, requireRecord(db, projectId, recordId), userId, patch, at);
+    return getRecordDetail(db, projectId, recordId);
+  })();
+}
+
+export function updateRecord(
+  db: Db,
+  projectId: number,
+  recordId: number,
+  userId: number,
+  patch: RecordPatchInput,
+  now: Date = new Date(),
+): RecordDetail {
+  return db.transaction((): RecordDetail => {
+    applyPatch(db, requireRecord(db, projectId, recordId), userId, patch, now.toISOString());
+    return getRecordDetail(db, projectId, recordId);
+  })();
+}
+
+export function registerRecordCoreRoutes(app: FastifyInstance, db: Db): void {
+  app.post('/api/projects/:projectId/records', async (request, reply) => {
+    const { projectId } = ProjectParams.parse(request.params);
+    requireProject(db, projectId);
+    const record = createRecord(db, projectId, requireUserId(request), RecordCreate.parse(request.body));
+    return reply.status(201).send(record);
+  });
+
+  app.get('/api/projects/:projectId/records/:id', async (request) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    return getRecordDetail(db, projectId, id);
+  });
+
+  app.patch('/api/projects/:projectId/records/:id', async (request) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    return updateRecord(db, projectId, id, requireUserId(request), RecordPatch.parse(request.body));
+  });
+}
+``````
+
+#### File: `src/server/records/store.ts`
+
+<!-- replay task=10 phase=implementation sha256=f1a83602f86be85f59d46b9b0a0e07d60a797102ff8888205d854d3b730bfffc -->
+
+``````ts
+import type {
+  Disposition,
+  Priority,
+  ProblemType,
+  RecordState,
+  Route,
+  Severity,
+  Stage,
+  Status,
+  Subtype,
+} from '../../domain';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+
+/** One row of `records`, with camelCase names. */
+export interface RecordRow {
+  id: number;
+  projectId: number;
+  subtype: Subtype;
+  sequence: number;
+  humanId: string;
+  status: Status;
+  statusBeforeHold: Status | null;
+  statusReasonCode: string | null;
+  statusReasonNote: string | null;
+  title: string | null;
+  description: string | null;
+  reference: string | null;
+  notes: string | null;
+  publicNotes: string | null;
+  ballInCourtId: number | null;
+  responsibleId: number | null;
+  severity: Severity | null;
+  priority: Priority | null;
+  dueDate: string | null;
+  completion: number | null;
+  safety: number;
+  outsideScope: number;
+  estimatedCostCents: number | null;
+  /** JSON array of problem-type codes. */
+  problemTypes: string;
+  stage: Stage | null;
+  disposition: Disposition | null;
+  correction: string | null;
+  question: string | null;
+  route: Route | null;
+  issuedById: number | null;
+  chosenOptionId: number | null;
+  decidedById: number | null;
+  decidedOn: string | null;
+  instructionText: string | null;
+  createdAt: string;
+  createdBy: number;
+  updatedAt: string;
+  updatedBy: number;
+}
+
+/** Field name → column name. Column names come from this map only, never from request input. */
+export const RECORD_COLUMNS = {
+  id: 'id',
+  projectId: 'project_id',
+  subtype: 'subtype',
+  sequence: 'sequence',
+  humanId: 'human_id',
+  status: 'status',
+  statusBeforeHold: 'status_before_hold',
+  statusReasonCode: 'status_reason_code',
+  statusReasonNote: 'status_reason_note',
+  title: 'title',
+  description: 'description',
+  reference: 'reference',
+  notes: 'notes',
+  publicNotes: 'public_notes',
+  ballInCourtId: 'ball_in_court_id',
+  responsibleId: 'responsible_id',
+  severity: 'severity',
+  priority: 'priority',
+  dueDate: 'due_date',
+  completion: 'completion',
+  safety: 'safety',
+  outsideScope: 'outside_scope',
+  estimatedCostCents: 'estimated_cost_cents',
+  problemTypes: 'problem_types',
+  stage: 'stage',
+  disposition: 'disposition',
+  correction: 'correction',
+  question: 'question',
+  route: 'route',
+  issuedById: 'issued_by_id',
+  chosenOptionId: 'chosen_option_id',
+  decidedById: 'decided_by_id',
+  decidedOn: 'decided_on',
+  instructionText: 'instruction_text',
+  createdAt: 'created_at',
+  createdBy: 'created_by',
+  updatedAt: 'updated_at',
+  updatedBy: 'updated_by',
+} as const satisfies Record<keyof RecordRow, string>;
+
+const SELECT = `SELECT ${Object.entries(RECORD_COLUMNS)
+  .map(([field, column]) => `${column} AS ${field}`)
+  .join(', ')} FROM records`;
+
+export function requireRecord(db: Db, projectId: number, recordId: number): RecordRow {
+  const row = db.prepare(`${SELECT} WHERE project_id = ? AND id = ?`).get(projectId, recordId) as RecordRow | undefined;
+  if (!row) throw new HttpError(404, 'record_not_found');
+  return row;
+}
+
+export function problemTypesOf(row: Pick<RecordRow, 'problemTypes'>): ProblemType[] {
+  return JSON.parse(row.problemTypes) as ProblemType[];
+}
+
+/** The fields the domain rules need (design §5–§8). */
+export function toRecordState(row: RecordRow): RecordState {
+  return {
+    subtype: row.subtype,
+    status: row.status,
+    statusBeforeHold: row.statusBeforeHold,
+    title: row.title,
+    problemTypes: problemTypesOf(row),
+    question: row.question,
+    disposition: row.disposition,
+    decidedById: row.decidedById,
+    decidedOn: row.decidedOn,
+  };
+}
+
+/** Marks the record as changed; every change to a record or anything on it updates this. */
+export function touchRecord(db: Db, recordId: number, userId: number, at: string): void {
+  db.prepare('UPDATE records SET updated_at = ?, updated_by = ? WHERE id = ?').run(at, userId, recordId);
+}
+``````
+
+#### File: `src/server/routes/auth.ts`
+
+<!-- replay task=10 phase=implementation sha256=6a32b055005486de8c883f4ae944bbc511c386b931a0bb5eec4f896a20e2c6be -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import type { LoginLimiter } from '../auth/login-limiter';
+import { hashPassword, MAX_PASSWORD_LENGTH, verifyPassword } from '../auth/passwords';
+import { createSession, deleteExpiredSessions, deleteSession } from '../auth/sessions';
+import { findUserByUsername, MAX_USERNAME_LENGTH } from '../auth/users';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { clientIp } from '../http/client-ip';
+import { SESSION_COOKIE } from '../http/guards';
+
+/** The same limits as the owner command, so every account it creates can log in. */
+const LoginBody = z.strictObject({
+  username: z.string().min(1).max(MAX_USERNAME_LENGTH),
+  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+});
+
+export function registerAuthRoutes(
+  app: FastifyInstance,
+  deps: { config: AppConfig; db: Db; limiter: LoginLimiter },
+): void {
+  const { config, db, limiter } = deps;
+  // Verifying unknown users against a dummy hash keeps both failure cases equally slow.
+  const dummyHash = hashPassword('builtbasis-dummy-password');
+
+  app.post('/api/auth/login', async (request, reply) => {
+    const ip = clientIp(request, config);
+    const now = Date.now();
+    if (limiter.isBlocked(ip, now)) throw new HttpError(429, 'too_many_attempts');
+    const body = LoginBody.parse(request.body);
+    const user = findUserByUsername(db, body.username);
+    const passwordOk = verifyPassword(body.password, user?.passwordHash ?? dummyHash);
+    if (user === null || !user.isActive || !passwordOk) {
+      limiter.recordFailure(ip, now);
+      throw new HttpError(401, 'invalid_credentials');
+    }
+    limiter.recordSuccess(ip);
+    deleteExpiredSessions(db);
+    const session = createSession(db, user.id);
+    reply.setCookie(SESSION_COOKIE, session.token, {
+      path: '/',
+      httpOnly: true,
+      secure: config.secureCookies,
+      sameSite: 'lax',
+      expires: session.expiresAt,
+    });
+    return { username: user.username };
+  });
+
+  app.post('/api/auth/logout', { config: { sessionOnly: true } }, async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) deleteSession(db, token);
+    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return { ok: true };
+  });
+
+  app.get('/api/auth/me', { config: { sessionOnly: true } }, async (request) => {
+    if (request.user === null) throw new HttpError(401, 'unauthenticated');
+    const user = findUserByUsername(db, request.user.username)!;
+    return { username: user.username, displayName: user.displayName, isOwner: user.isOwner === 1 };
+  });
+}
+``````
+
+#### File: `src/server/sharing/projection.ts`
+
+<!-- replay task=10 phase=implementation sha256=21f2937aee759c1407a86f459c4f2356eaface7b72db9ae3b783745f502eb30e -->
+
+``````ts
+import { z } from 'zod';
+import { isCode, type SharedActivity, type SharedRecord, type VerificationMethod, type VerificationOutcome } from '../../domain';
+import type { Db } from '../db/connection';
+import { listAttachments, listPhotos } from '../files/occurrences';
+import { listLocations } from '../lists/locations';
+import { listPeople } from '../lists/people';
+import { listTags } from '../lists/tags';
+import { listTrades } from '../lists/trades';
+import { listZoneTypes } from '../lists/zone-types';
+import { listActivity, type ActivityEntry } from '../records/activity';
+import { listLog } from '../records/log';
+import { listMeasurementSets } from '../records/measurements';
+import { listOptions } from '../records/options';
+import { getRecordDetail } from '../records/records';
+import { listVerifications } from '../records/transitions';
+import type { ShareAccess } from './links';
+
+const scalarFields = new Map<string, 'number' | 'string'>([
+  ['ballInCourtId', 'number'], ['responsibleId', 'number'], ['severity', 'string'], ['priority', 'string'],
+  ['dueDate', 'string'], ['disposition', 'string'], ['chosenOptionId', 'number'], ['decidedById', 'number'],
+  ['decidedOn', 'string'], ['instructionText', 'string'],
+]);
+const snapshot = z.object({ label: z.string(), description: z.string().nullable() }).nullable();
+const optionDetail = z.object({ fromOption: snapshot.optional(), toOption: snapshot.optional() });
+const statusDetail = z.object({
+  reasonCode: z.string().nullable().optional(),
+  reasonNote: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  verification: z.object({
+    id: z.number().int().positive(),
+    outcome: z.custom<VerificationOutcome>(value => isCode('verificationOutcome', value)),
+    method: z.custom<VerificationMethod>(value => isCode('verificationMethod', value)),
+    checkedById: z.number().int().positive(),
+    date: z.iso.date(),
+  }).optional(),
+});
+
+function publicActivity(entry: ActivityEntry): SharedActivity | null {
+  let detail: SharedActivity['detail'] = null;
+  if (entry.action === 'created') {
+    if (entry.from !== null || entry.to !== 'draft') return null;
+  } else if (entry.action === 'status_changed') {
+    if (!isCode('status', entry.from) || !isCode('status', entry.to)) return null;
+    const parsed = statusDetail.safeParse(entry.detail);
+    if (parsed.success) detail = parsed.data;
+  } else if (entry.action === 'field_changed') {
+    const expected = entry.field === null ? undefined : scalarFields.get(entry.field);
+    if (!expected || [entry.from, entry.to].some(value => value !== null && typeof value !== expected)) return null;
+    if (entry.field === 'chosenOptionId') {
+      const parsed = optionDetail.safeParse(entry.detail);
+      if (parsed.success) detail = parsed.data;
+    }
+  } else return null;
+  return {
+    id: entry.id,
+    at: entry.at,
+    action: entry.action,
+    field: entry.action === 'created' ? null : entry.action === 'status_changed' ? 'status' : entry.field,
+    from: entry.from as string | number | null,
+    to: entry.to as string | number | null,
+    detail,
+  };
+}
+
+/** Every public property is copied deliberately; future owner fields are private by default. */
+export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' | 'recordId'>): SharedRecord {
+  const { projectId, recordId } = access;
+  const r = getRecordDetail(db, projectId, recordId);
+  const record: SharedRecord['record'] = {
+    humanId: r.humanId,
+    subtype: r.subtype,
+    status: r.status,
+    statusReason: r.statusReason === null ? null : { code: r.statusReason.code, note: r.statusReason.note },
+    title: r.title,
+    description: r.description,
+    publicNotes: r.publicNotes,
+    reference: r.reference,
+    ballInCourtId: r.ballInCourtId,
+    responsibleId: r.responsibleId,
+    tradeIds: r.tradeIds,
+    severity: r.severity,
+    priority: r.priority,
+    dueDate: r.dueDate,
+    completion: r.completion,
+    safety: r.safety,
+    tagIds: r.tagIds,
+    locationIds: r.locationIds,
+    problemTypes: r.problemTypes,
+    stage: r.stage,
+    disposition: r.disposition,
+    correction: r.correction,
+    question: r.question,
+    route: r.route,
+    issuedById: r.issuedById,
+    chosenOptionId: r.chosenOptionId,
+    decidedById: r.decidedById,
+    decidedOn: r.decidedOn,
+    instructionText: r.instructionText,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    mustBeDoneBefore: r.mustBeDoneBefore.filter(item => item.status !== 'draft').map(item => ({ humanId: item.humanId, title: item.title })),
+    requiresFirst: r.requiresFirst.filter(item => item.status !== 'draft').map(item => ({ humanId: item.humanId, title: item.title })),
+  };
+  const options = listOptions(db, recordId).map(item => ({ id: item.id, label: item.label, description: item.description }));
+  const measurements = listMeasurementSets(db, recordId).map(item => ({
+    id: item.id, date: item.date, measuredById: item.measuredById, phase: item.phase, note: item.note,
+    rows: item.rows.map(row => ({ item: row.item, quantity: row.quantity, value: row.value, unit: row.unit, note: row.note })),
+  }));
+  const verifications = listVerifications(db, recordId).map(item => ({
+    id: item.id, checkedById: item.checkedById, date: item.date, method: item.method, outcome: item.outcome, note: item.note, createdAt: item.createdAt,
+  }));
+  const photos = listPhotos(db, recordId).map(item => ({
+    id: item.id, originalFilename: item.originalFilename, phase: item.phase, caption: item.caption, takenAt: item.takenAt, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
+  }));
+  const attachments = listAttachments(db, recordId).filter(item => !item.logEntry?.private).map(item => ({
+    id: item.id, originalFilename: item.originalFilename, title: item.title, size: item.size, contentType: item.contentType, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
+    logEntry: item.logEntry === null ? null : { id: item.logEntry.id, eventAt: item.logEntry.eventAt, text: item.logEntry.text },
+  }));
+  const log = listLog(db, recordId).filter(item => !item.private).map(item => ({
+    id: item.id, eventAt: item.eventAt, text: item.text, loggedBy: item.loggedBy,
+    attachmentIds: attachments.filter(file => file.logEntry?.id === item.id).map(file => file.id),
+  }));
+  const activity = listActivity(db, recordId).map(publicActivity).filter((item): item is SharedActivity => item !== null);
+  const personIds = new Set<number>();
+  const addPerson = (id: number | null | undefined) => { if (id != null) personIds.add(id); };
+  for (const id of [r.ballInCourtId, r.responsibleId, r.issuedById, r.decidedById]) addPerson(id);
+  measurements.forEach(item => addPerson(item.measuredById));
+  verifications.forEach(item => addPerson(item.checkedById));
+  for (const entry of activity) {
+    if (['ballInCourtId', 'responsibleId', 'decidedById'].includes(entry.field ?? '')) {
+      if (typeof entry.from === 'number') addPerson(entry.from);
+      if (typeof entry.to === 'number') addPerson(entry.to);
+    }
+    addPerson(entry.detail?.verification?.checkedById);
+  }
+  const nodes = new Map(listLocations(db, projectId).map(node => [node.id, node]));
+  const zoneIds = new Set<number>();
+  const locations = r.locationIds.map(id => {
+    const path: SharedRecord['labels']['locations'][number]['path'] = [];
+    let node = nodes.get(id);
+    const seen = new Set<number>();
+    while (node && !seen.has(node.id)) {
+      seen.add(node.id);
+      if (node.zoneTypeId !== null) zoneIds.add(node.zoneTypeId);
+      path.unshift({ id: node.id, nameEn: node.nameEn, nameEl: node.nameEl, kind: node.kind, zoneTypeId: node.zoneTypeId });
+      node = node.parentId === null ? undefined : nodes.get(node.parentId);
+    }
+    return { id, path };
+  });
+  const labels: SharedRecord['labels'] = {
+    people: listPeople(db, projectId).filter(item => personIds.has(item.id)).map(item => ({ id: item.id, code: item.code, name: item.name, role: item.role })),
+    trades: listTrades(db, projectId).filter(item => r.tradeIds.includes(item.id)).map(item => ({ id: item.id, nameEn: item.nameEn, nameEl: item.nameEl })),
+    tags: listTags(db, projectId).filter(item => r.tagIds.includes(item.id)).map(item => ({ id: item.id, nameEn: item.nameEn, nameEl: item.nameEl })),
+    locations,
+    zoneTypes: listZoneTypes(db, projectId).filter(item => zoneIds.has(item.id)).map(item => ({ id: item.id, nameEn: item.nameEn, nameEl: item.nameEl })),
+  };
+  return { record, options, measurements, verifications, photos, attachments, log, activity, labels };
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/contributors.test.ts tests/server/contributors-db.test.ts tests/server/user-command.test.ts tests/server/assigned-records.test.ts tests/server/shared-record-api.test.ts tests/server/records-api.test.ts tests/server/log-api.test.ts tests/server/auth-api.test.ts`, then `npm run typecheck`. Expected: 54 tests in eight files pass, followed by a clean TypeScript check.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'scripts/user.ts' 'src/domain/records.ts' 'src/domain/sharing.ts' 'src/server/access/grants.ts' 'src/server/access/routes.ts' 'src/server/app.ts' 'src/server/auth/contributors.ts' 'src/server/files/occurrences.ts' 'src/server/http/guards.ts' 'src/server/records/activity.ts' 'src/server/records/log.ts' 'src/server/records/records.ts' 'src/server/records/store.ts' 'src/server/routes/auth.ts' 'src/server/sharing/projection.ts' 'tests/server/assigned-records.test.ts' 'tests/server/auth-api.test.ts' 'tests/server/contributors.test.ts' 'tests/server/log-api.test.ts' 'tests/server/records-api.test.ts' 'tests/server/shared-record-api.test.ts' 'tests/server/user-command.test.ts'
+git commit -m "feat: grant per-record contributions and separate public notes"
+```
+
+## Task 11: Enforce the complete 100 MB upload envelope
+
+**Scratch checkpoint:** `89cebe2`. **Depends on:** Task 10.
+
+**Deliverable:** Count all multipart bytes, including delayed epilogues, and preserve transactional evidence and temporary-file cleanup.
+
+**Reviewed corrections:** the listed file blocks incorporate fixes from `3ef68bd` directly. Execute the corrected blocks below; do not reproduce the earlier defects.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/files-api.test.ts`
+
+<!-- replay task=11 phase=test sha256=7cf39943d9ef800ee4aaa5aa646ab9163c5fe5c725eb627821b5d496badf28b6 -->
+
+``````ts
+﻿import { readFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import type { FastifyRequest } from 'fastify';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { blobPath } from '../../src/server/files/storage';
+import { parseUpload } from '../../src/server/files/uploads';
+import { get, send } from './helpers';
+import { getRecord, makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+import { addAttachment, addPhoto, JPEG, multipart, PDF, PNG, upload } from './file-fixture';
+
+let f: Fixture;
+let id: number;
+beforeEach(async () => {
+  f = await makeFixture();
+  id = (await postRecord(f, { subtype: 'task' })).id;
+});
+afterEach(async () => { await f.ctx.close(); });
+
+it('stores photo bundles, preserves metadata and sorts phases', async () => {
+  const after = await addPhoto(f, id, { phase: 'after' });
+  const before = await addPhoto(f, id, { phase: 'before', takenAt: '2026-10-03T12:00:00+03:00' });
+  expect(before).toMatchObject({ originalFilename: 'όψη.jpg', phase: 'before', takenAt: '2026-10-03T09:00:00.000Z' });
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/photos'))).json().map((p: { id: number }) => p.id)).toEqual([before.id, after.id]);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+  const hash = f.ctx.db.prepare('SELECT original_hash FROM photos WHERE id=?').pluck().get(before.id) as string;
+  expect(await readFile(blobPath(f.ctx.config.filesDir, hash))).toEqual(JPEG);
+  f.ctx.db.prepare('UPDATE records SET updated_at=? WHERE id=?').run('2000-01-01', id);
+  const patched = await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, id, `/photos/${before.id}`), { caption: 'Caption' });
+  expect(patched.statusCode).toBe(200);
+  expect(patched.json()).toMatchObject({ caption: 'Caption', uploadedAt: before.uploadedAt, uploadedBy: before.uploadedBy });
+  expect((await getRecord(f, id)).updatedAt).not.toBe('2000-01-01');
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/photos/${before.id}`))).statusCode).toBe(200);
+  expect((await addPhoto(f, id)).id).toBeGreaterThan(before.id);
+});
+
+it('commits each photo variant and attachment only with complete matching disk bytes', async () => {
+  const original = PNG;
+  const display = Buffer.concat([JPEG, Buffer.from('display')]);
+  const thumbnail = Buffer.concat([JPEG, Buffer.from('thumbnail')]);
+  const photo = await upload(f, id, 'photos', [
+    { name: 'metadata', data: '{"phase":"during"}' },
+    { name: 'original', filename: 'original.png', data: original },
+    { name: 'display', filename: 'display.jpg', data: display },
+    { name: 'thumbnail', filename: 'thumbnail.jpg', data: thumbnail },
+  ]);
+  expect(photo.statusCode).toBe(201);
+  await addAttachment(f, id);
+  const hashes = f.ctx.db.prepare('SELECT original_hash, display_hash, thumbnail_hash FROM photos WHERE id=?').get(photo.json().id) as Record<string, string>;
+  for (const [column, bytes] of [['original_hash', original], ['display_hash', display], ['thumbnail_hash', thumbnail]] as const) {
+    expect(hashes[column]).toBe(createHash('sha256').update(bytes).digest('hex'));
+  }
+  const blobs = f.ctx.db.prepare('SELECT hash,size FROM blobs').all() as { hash: string; size: number }[];
+  expect(blobs).toHaveLength(4);
+  for (const blob of blobs) {
+    const bytes = await readFile(blobPath(f.ctx.config.filesDir, blob.hash));
+    expect(bytes.length).toBe(blob.size);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(blob.hash);
+  }
+});
+
+it('keeps separate occurrences, joins current Log metadata and cascades private Log deletion without deleting bytes', async () => {
+  const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/log'), { text: 'Plans received', private: true });
+  expect(log.statusCode).toBe(201);
+  const direct = await addAttachment(f, id);
+  const linked = await addAttachment(f, id, { logEntryId: log.json().id });
+  expect(linked.id).not.toBe(direct.id);
+  expect(linked.logEntry).toMatchObject({ id: log.json().id, text: 'Plans received', private: true });
+  expect(direct.logEntry).toBeNull();
+  const renamed = await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, id, `/attachments/${direct.id}`), { title: 'Changed' });
+  expect(renamed.statusCode).toBe(200);
+  expect(renamed.json()).toMatchObject({ title: 'Changed', uploadedAt: direct.uploadedAt });
+  const hash = f.ctx.db.prepare('SELECT blob_hash FROM attachments WHERE id=?').pluck().get(direct.id) as string;
+  await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, id, `/log/${log.json().id}`), { text: 'Revised', private: false });
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/attachments'))).json()[0].logEntry).toMatchObject({ text: 'Revised', private: false });
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/log/${log.json().id}`))).statusCode).toBe(200);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/attachments'))).json().map((a: { id: number }) => a.id)).toEqual([direct.id]);
+  expect(await readFile(blobPath(f.ctx.config.filesDir, hash))).toEqual(PDF);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+});
+
+it('checks session, Origin and upload content type before parsing files', async () => {
+  const parts = [{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }];
+  expect((await upload(f, id, 'attachments', parts, { cookie: '' })).statusCode).toBe(401);
+  expect((await upload(f, id, 'attachments', parts, { origin: '' })).statusCode).toBe(403);
+  expect((await upload(f, id, 'attachments', parts, { origin: 'https://evil.example' })).statusCode).toBe(403);
+  expect((await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/attachments'))).statusCode).toBe(415);
+  const form = multipart(parts);
+  expect((await f.ctx.app.inject({ method: 'PATCH', url: recordUrl(f, id), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body })).statusCode).toBe(415);
+});
+
+it('rejects malformed envelopes and cleans temporary files; accepts metadata after files', async () => {
+  for (const parts of [
+    [{ name: 'metadata', data: '{}' }],
+    [{ name: 'file', filename: 'a.pdf', data: PDF }],
+    [{ name: 'unknown', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }],
+    [{ name: 'metadata', data: '{bad' }, { name: 'file', filename: 'a.pdf', data: PDF }],
+    [{ name: 'metadata', data: '{"unknown":1}' }, { name: 'file', filename: 'a.pdf', data: PDF }],
+  ]) expect((await upload(f, id, 'attachments', parts)).statusCode).toBe(400);
+  const response = await upload(f, id, 'attachments', [
+    { name: 'file', filename: 'a.pdf', data: PDF }, { name: 'metadata', data: '{}' },
+  ]);
+  expect(response.statusCode).toBe(201);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+
+it('terminates invalid-filename multipart streams', async () => {
+  const source = Readable.from([PDF]);
+  const request = {
+    isMultipart: () => true,
+    raw: Readable.from([]),
+    parts: async function* () {
+      yield { type: 'file', fieldname: 'file', filename: 'a'.repeat(256), file: source };
+    },
+  } as unknown as FastifyRequest;
+  await expect(parseUpload(request, f.ctx.config.filesDir, 'attachments')).rejects.toMatchObject({ statusCode: 400 });
+  expect(source.destroyed).toBe(true);
+});
+
+it('normalises malformed parser envelopes and accepts JSON metadata fields', async () => {
+  const before = await getRecord(f, id);
+  const missingBoundary = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data' }, payload: 'bad' });
+  expect(missingBoundary.statusCode).toBe(400);
+  expect(missingBoundary.json()).toEqual({ error: 'invalid_upload' });
+  for (const [metadata, status] of [['{bad', 400], ['{}', 201]] as const) {
+    const body = Buffer.concat([
+      Buffer.from(`--json\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${metadata}\r\n--json\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\n\r\n`), PDF, Buffer.from('\r\n--json--\r\n'),
+    ]);
+    const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=json' }, payload: body });
+    expect(response.statusCode).toBe(status);
+    if (status === 400) {
+      expect(response.json()).toEqual({ error: 'invalid_upload' });
+      expect(await getRecord(f, id)).toEqual(before);
+    }
+  }
+});
+
+it('rejects duplicate photo parts, parser limits, bad third file and truncated multipart without changing evidence', async () => {
+  const before = await getRecord(f, id);
+  const files = ['original', 'display', 'thumbnail'].map(name => ({ name, filename: 'a.jpg', data: JPEG }));
+  expect((await upload(f, id, 'photos', [{ name: 'metadata', data: '{"phase":"before"}' }, files[0]!, files[0]!, files[2]!])).statusCode).toBe(400);
+  expect((await upload(f, id, 'photos', [{ name: 'metadata', data: '{"phase":"before"}' }, ...files, files[0]!])).statusCode).toBe(413);
+  expect((await upload(f, id, 'photos', [{ name: 'metadata', data: '{"phase":"before"}' }, files[0]!, files[1]!, { ...files[2]!, data: PDF }])).statusCode).toBe(415);
+  expect((await upload(f, id, 'attachments', [{ name: 'metadata', data: 'a'.repeat(16_385) }, { name: 'file', filename: 'a.pdf', data: PDF }])).statusCode).toBe(413);
+  const form = multipart([{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }]);
+  expect((await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body.subarray(0, -20) })).statusCode).toBe(400);
+  expect(await getRecord(f, id)).toEqual(before);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM photos').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+
+it('scopes occurrences and Log associations to the record', async () => {
+  const other = await postRecord(f, { subtype: 'task' });
+  const entry = (await send(f.ctx, f.cookie, 'POST', recordUrl(f, other.id, '/log'), { text: 'Other' })).json();
+  expect((await upload(f, id, 'attachments', [{ name: 'metadata', data: JSON.stringify({ logEntryId: entry.id }) }, { name: 'file', filename: 'a.pdf', data: PDF }])).statusCode).toBe(404);
+  const attachment = await addAttachment(f, id);
+  const photo = await addPhoto(f, id);
+  for (const [kind, occurrenceId] of [['attachments', attachment.id], ['photos', photo.id]]) {
+    expect((await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, other.id, `/${kind}/${occurrenceId}`), kind === 'photos' ? { caption: 'x' } : { title: 'x' })).statusCode).toBe(404);
+    expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, other.id, `/${kind}/${occurrenceId}`))).statusCode).toBe(404);
+  }
+});
+
+it('rolls database changes back after occurrence insertion and retains completed disk bytes', async () => {
+  const before = await getRecord(f, id);
+  f.ctx.db.exec("CREATE TRIGGER fail_touch BEFORE UPDATE ON records BEGIN SELECT RAISE(ABORT,'forced'); END");
+  const response = await upload(f, id, 'attachments', [{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }]);
+  expect(response.statusCode).toBe(500);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(0);
+  expect(await getRecord(f, id)).toEqual(before);
+  expect((await readdir(f.ctx.config.filesDir)).filter(name => name !== '.tmp')).toHaveLength(1);
+});
+
+it('rolls back the Log cascade if touching its record fails', async () => {
+  const entry = (await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/log'), { text: 'Private', private: true })).json();
+  const attachment = await addAttachment(f, id, { logEntryId: entry.id });
+  f.ctx.db.exec("CREATE TRIGGER fail_touch BEFORE UPDATE ON records BEGIN SELECT RAISE(ABORT,'forced'); END");
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/log/${entry.id}`))).statusCode).toBe(500);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/attachments'))).json()[0].id).toBe(attachment.id);
+});
+
+it('rechecks a Log association deleted while its multipart bytes are arriving', async () => {
+  const entry = (await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/log'), { text: 'Soon removed' })).json();
+  const form = multipart([
+    { name: 'metadata', data: JSON.stringify({ logEntryId: entry.id }) },
+    { name: 'file', filename: 'a.pdf', data: PDF },
+  ]);
+  const payload = Readable.from((async function* () {
+    yield form.body.subarray(0, form.body.length - 40);
+    f.ctx.db.prepare('DELETE FROM log_entries WHERE id=?').run(entry.id);
+    yield form.body.subarray(form.body.length - 40);
+  })());
+  const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload });
+  expect(response.statusCode).toBe(404);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+});
+
+it('rejects an oversized attachment by actual streamed bytes without a Content-Length', async () => {
+  const payload = Readable.from((function* () {
+    yield Buffer.from('--limit\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--limit\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\nContent-Type: application/pdf\r\n\r\n');
+    yield PDF;
+    let remaining = 100_000_001 - PDF.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) {
+      const n = Math.min(remaining, chunk.length);
+      yield chunk.subarray(0, n);
+      remaining -= n;
+    }
+    yield Buffer.from('\r\n--limit--\r\n');
+  })());
+  const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=limit' }, payload });
+  expect(response.statusCode).toBe(413);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+
+``````
+
+#### File: `tests/server/upload-budget.test.ts`
+
+<!-- replay task=11 phase=test sha256=516b001c49e253e02fa7b79cf3bc68480710b69a81d4394558145673cab0d439 -->
+
+``````ts
+import { Readable } from 'node:stream';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+let id: number;
+beforeEach(async () => { f = await makeFixture(); id = (await postRecord(f, { subtype: 'task' })).id; });
+afterEach(async () => { await f.ctx.close(); });
+const prefix = Buffer.from('--budget\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--budget\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.7\n');
+const suffix = Buffer.from('\r\n--budget--\r\n');
+function body(total: number) {
+  return Readable.from((function* () {
+    yield prefix;
+    let remaining = total - prefix.length - suffix.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) { const size = Math.min(remaining, chunk.length); yield chunk.subarray(0, size); remaining -= size; }
+    yield suffix;
+  })());
+}
+function request(total: number, declared?: number) {
+  return f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'),
+    headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=budget', ...(declared === undefined ? {} : { 'content-length': String(declared) }) },
+    payload: body(total),
+  });
+}
+it('accepts a streamed multipart envelope exactly 100,000,000 bytes including boundaries and part headers', async () => {
+  const response = await request(100_000_000);
+  expect(response.statusCode, response.body).toBe(201);
+  expect(response.json().size).toBe(100_000_000 - prefix.length - suffix.length + 9);
+});
+it('rejects chunked total envelope overflow even when its only file is below 100 MB and removes staging', async () => {
+  const response = await request(100_000_001);
+  expect(response.statusCode).toBe(413);
+  expect(response.json()).toEqual({ error: 'upload_too_large' });
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+it('rejects declared oversize before publishing any occurrence', async () => {
+  const response = await request(1000, 100_000_001);
+  expect(response.statusCode).toBe(413);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+});
+it('counts a delayed epilogue after the final multipart boundary before committing', async () => {
+  const payload = Readable.from((async function* () {
+    yield prefix;
+    yield suffix;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    let remaining = 100_000_001 - prefix.length - suffix.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) { const size = Math.min(remaining, chunk.length); yield chunk.subarray(0,size); remaining -= size; }
+  })());
+  const response = await f.ctx.app.inject({ method:'POST',url:recordUrl(f,id,'/attachments'),headers:{cookie:f.cookie,origin:f.ctx.origin,'content-type':'multipart/form-data; boundary=budget'},payload });
+  expect(response.statusCode).toBe(413);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir,'.tmp'))).toEqual([]);
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/upload-budget.test.ts tests/server/files-api.test.ts`.
+
+Expected: new budget tests fail against the previous narrower limits and absent whole-request accounting.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/domain/files.ts`
+
+<!-- replay task=11 phase=implementation sha256=fae91cb36cc0d985cad90c3ade47ec5b0f8146eb48149400fe2afd0a9c779033 -->
+
+``````ts
+﻿import { z } from 'zod';
+import type { PhotoPhase } from './vocab';
+
+export const UPLOAD_REQUEST_LIMIT = 100_000_000;
+export const FILE_LIMITS = { 'photo-original': UPLOAD_REQUEST_LIMIT, 'photo-display': 5_000_000, 'photo-thumbnail': 500_000, attachment: UPLOAD_REQUEST_LIMIT } as const;
+export type FilePurpose = keyof typeof FILE_LIMITS;
+const text = z.string().max(2_000).nullable().transform(value => value === null || value.trim() === '' ? null : value);
+export const FileTimestamp = z.iso.datetime({ offset: true }).transform(value => new Date(value).toISOString());
+export const Filename = z.string().transform(value => value.split(/[\\/]/).at(-1) ?? '').pipe(z.string().min(1).max(255).refine(value => !/[\x00-\x1f\x7f]/.test(value), 'Invalid filename'));
+export const PhotoVariantParam = z.enum(['original', 'display', 'thumbnail']);
+export type PhotoVariant = z.infer<typeof PhotoVariantParam>;
+const photoFields = { phase: z.enum(['before', 'during', 'after']), caption: text.optional(), takenAt: FileTimestamp.nullable().optional() };
+export const PhotoUploadMeta = z.strictObject(photoFields);
+export const PhotoPatch = PhotoUploadMeta.partial().refine(value => Object.keys(value).length > 0, 'Empty patch');
+export const AttachmentUploadMeta = z.strictObject({ title: text.optional(), logEntryId: z.number().int().positive().nullable().optional() });
+export const AttachmentPatch = z.strictObject({ title: text.optional() }).refine(value => Object.keys(value).length > 0, 'Empty patch');
+export type PhotoMeta = z.output<typeof PhotoUploadMeta>;
+export type PhotoPatchInput = z.output<typeof PhotoPatch>;
+export type AttachmentMeta = z.output<typeof AttachmentUploadMeta>;
+export type AttachmentPatchInput = z.output<typeof AttachmentPatch>;
+export interface PhotoOut {
+  id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string;
+}
+export interface AttachmentOut {
+  id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
+  logEntry: { id: number; eventAt: string; text: string; private: boolean } | null;
+}
+
+``````
+
+#### File: `src/server/files/uploads.ts`
+
+<!-- replay task=11 phase=implementation sha256=b5cccb21d643064952e4ad18a4f6adb3fa8a80610012135e27c475683d094d9d -->
+
+``````ts
+import type { FastifyRequest } from 'fastify';
+import type { Readable } from 'node:stream';
+import { ZodError } from 'zod';
+import { AttachmentUploadMeta, Filename, PhotoUploadMeta, UPLOAD_REQUEST_LIMIT, type AttachmentMeta, type PhotoMeta } from '../../domain';
+import { HttpError } from '../errors';
+import { discardStaged, stageFile, type StagedFile } from './storage';
+
+export interface UploadFile extends StagedFile { filename: string }
+export interface UploadEnvelope {
+  metadata: PhotoMeta | AttachmentMeta;
+  files: Record<string, UploadFile>;
+}
+
+export async function parseUpload(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments'): Promise<UploadEnvelope> {
+  if (!request.isMultipart()) throw new HttpError(415, 'unsupported_content_type');
+  // @fastify/multipart consumes request.raw directly, not Fastify's preParsing payload.
+  // Count that stream before starting its lazy parser, after the route's access check.
+  const declared = request.headers?.['content-length'];
+  if (declared !== undefined && Number(declared) > UPLOAD_REQUEST_LIMIT) {
+    request.raw.resume();
+    throw new HttpError(413, 'upload_too_large');
+  }
+  let bytes = 0;
+  let budgetError: HttpError | undefined;
+  const countBytes = (chunk: Buffer | string): void => {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > UPLOAD_REQUEST_LIMIT && !budgetError) {
+      budgetError = new HttpError(413, 'upload_too_large');
+      // Tell the multipart parser to terminate its active file without destroying
+      // the HTTP socket, so the caller still receives the 413 response.
+      request.raw.emit('error', budgetError);
+    }
+  };
+  request.raw.on('data', countBytes);
+  const photo = kind === 'photos';
+  const expected = photo ? ['original', 'display', 'thumbnail'] : ['file'];
+  const files: Record<string, UploadFile> = {};
+  let metadata: unknown;
+  let hasMetadata = false;
+  let currentFile: Readable | undefined;
+  try {
+    for await (const part of request.parts({
+      limits: {
+        files: photo ? 3 : 1,
+        fields: 1,
+        parts: photo ? 4 : 2,
+        fileSize: UPLOAD_REQUEST_LIMIT,
+        fieldSize: 16_384,
+        fieldNameSize: 100,
+        headerPairs: 100,
+      },
+    })) {
+      if (part.type === 'file') {
+        currentFile = part.file;
+        if (!expected.includes(part.fieldname) || files[part.fieldname]) {
+          part.file.resume();
+          throw new HttpError(400, 'invalid_upload');
+        }
+        const filename = Filename.parse(part.filename);
+        const purpose = photo ? `photo-${part.fieldname}` as 'photo-original' | 'photo-display' | 'photo-thumbnail' : 'attachment';
+        const staged = await stageFile(filesDir, part.file, filename, purpose);
+        files[part.fieldname] = { ...staged, filename };
+        currentFile = undefined;
+      } else {
+        if (part.fieldnameTruncated || part.valueTruncated) throw new HttpError(413, 'upload_too_large');
+        if (part.fieldname !== 'metadata' || hasMetadata) throw new HttpError(400, 'invalid_upload');
+        hasMetadata = true;
+        // Multipart parses application/json fields itself; text fields remain raw JSON strings.
+        metadata = typeof part.value === 'string' ? JSON.parse(part.value) : part.value;
+      }
+    }
+    if (budgetError) throw budgetError;
+    if (!hasMetadata || expected.some(name => !files[name])) throw new HttpError(400, 'invalid_upload');
+    return {
+      metadata: photo ? PhotoUploadMeta.parse(metadata) : AttachmentUploadMeta.parse(metadata),
+      files,
+    };
+  } catch (error) {
+    currentFile?.destroy();
+    // Stop the multipart parser and drain unread request bytes after an early rejection.
+    request.raw.unpipe();
+    request.raw.resume();
+    await Promise.all(Object.values(files).map(discardStaged));
+    if (budgetError) throw budgetError;
+    if (error instanceof HttpError) throw error;
+    const code = (error as { code?: string }).code;
+    if (code && ['FST_REQ_FILE_TOO_LARGE', 'FST_FILES_LIMIT', 'FST_FIELDS_LIMIT', 'FST_PARTS_LIMIT'].includes(code)) {
+      throw new HttpError(413, 'upload_too_large');
+    }
+    const malformed = ['Multipart: Boundary not found', 'Unexpected end of multipart data', 'Premature close'];
+    if (error instanceof ZodError || error instanceof SyntaxError || code === 'FST_INVALID_JSON_FIELD_ERROR' || malformed.includes((error as Error).message)) {
+      throw new HttpError(400, 'invalid_upload');
+    }
+    throw error;
+  } finally {
+    request.raw.off('data', countBytes);
+  }
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/upload-budget.test.ts tests/server/files-api.test.ts`, then `npm run typecheck`. Expected: 17 tests in two files pass; TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/domain/files.ts' 'src/server/files/uploads.ts' 'tests/server/files-api.test.ts' 'tests/server/upload-budget.test.ts'
+git commit -m "feat: enforce streamed 100 MB upload request ceiling"
+```
+
+## Task 12: Add the broad format catalog and authorised previews
+
+**Scratch checkpoint:** `c9a5500`. **Depends on:** Task 11.
+
+**Deliverable:** Shared 145-extension policy, per-occurrence capabilities, native view and preview descriptors, protected byte ranges and safe SVG responses. CAD remains download-only without a drawing-version gate.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/file-storage.test.ts`
+
+<!-- replay task=12 phase=test sha256=5434deb728763a4d73c5d287bf1af0a73ce638217bd555d5308e9fd559f1a174 -->
+
+``````ts
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import * as fsPromises from 'node:fs/promises';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { FILE_LIMITS } from '../../src/domain';
+import { blobPath, discardStaged, publishFile, stageFile } from '../../src/server/files/storage';
+import { HEIC, JPEG, OLE, PDF, PNG, ZIP } from './file-fixture';
+
+vi.mock('node:fs/promises', async importOriginal => ({
+  ...await importOriginal<typeof import('node:fs/promises')>(),
+}));
+
+let dir: string;
+beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'bb-storage-')); });
+afterEach(async () => { vi.restoreAllMocks(); await rm(dir, { recursive: true, force: true }); });
+
+it('preserves original bytes, hashes content and publishes concurrent duplicate bytes without replacement', async () => {
+  const a = await stageFile(dir, Readable.from([JPEG]), 'όψη.jpg', 'photo-original');
+  const b = await stageFile(dir, Readable.from([JPEG]), '../../same.jpeg', 'attachment');
+  expect(a.hash).toBe(createHash('sha256').update(JPEG).digest('hex'));
+  expect(b.hash).toBe(a.hash);
+  await Promise.all([publishFile(dir, a), publishFile(dir, b)]);
+  expect(await readFile(blobPath(dir, a.hash))).toEqual(JPEG);
+  expect(await readdir(join(dir, '.tmp'))).toEqual([]);
+  const c = await stageFile(dir, Readable.from([JPEG]), 'c.jpg', 'attachment');
+  await writeFile(blobPath(dir, a.hash), Buffer.alloc(JPEG.length));
+  await expect(publishFile(dir, c)).rejects.toThrow();
+  await discardStaged(c);
+  expect(await readFile(blobPath(dir, a.hash))).toEqual(Buffer.alloc(JPEG.length));
+  expect(() => blobPath(dir, '../guess')).toThrow();
+});
+
+it.each([
+  ['a.jpg', JPEG, 'image/jpeg'], ['a.png', PNG, 'image/png'], ['a.heic', HEIC, 'image/heic'], ['a.heif', HEIC, 'image/heic'],
+  ['a.pdf', PDF, 'application/pdf'], ['a.rtf', Buffer.from('{\\rtf1 synthetic}'), 'application/rtf'],
+  ...['doc', 'xls', 'ppt'].map(ext => [`a.${ext}`, OLE, 'application/x-cfb']),
+  ...['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp'].map(ext => [`a.${ext}`, ZIP, 'application/zip']),
+  ...['AC1006','AC1009','AC1012','AC1014','AC1015','AC1018','AC1021','AC1024','AC1027','AC1032'].map(sig => ['a.dwg', Buffer.from(sig), 'application/octet-stream']),
+] as [string, Buffer, string][])('screens allowed signature for %s', async (filename, bytes, type) => {
+  const file = await stageFile(dir, Readable.from([bytes]), filename, 'attachment');
+  expect(file.contentType).toBe(type);
+  await discardStaged(file);
+});
+
+it.each([
+  ['a.jpg', Buffer.from('<html>bad</html>')], ['a.exe', JPEG], ['a.docm', ZIP], ['a.pdf', JPEG],
+  ['a.jpg', Buffer.from('AC1032')], ['a.heic', Buffer.concat([Buffer.from([0,0,0,16]), Buffer.from('ftypmif1'), Buffer.alloc(4)])],
+] as [string, Buffer][])('rejects a misleading or disallowed format %s', async (filename, bytes) => {
+  await expect(stageFile(dir, Readable.from([bytes]), filename, 'attachment')).rejects.toMatchObject({ statusCode: 415 });
+  expect(await readdir(join(dir, '.tmp'))).toEqual([]);
+});
+
+it('cleans incomplete, empty, wrong-derived-format and interrupted streams', async () => {
+  await expect(stageFile(dir, Readable.from([]), 'a.jpg', 'photo-original')).rejects.toMatchObject({ statusCode: 415 });
+  await expect(stageFile(dir, Readable.from([PNG]), 'a.png', 'photo-display')).rejects.toMatchObject({ statusCode: 415 });
+  const broken = Readable.from((async function* () { yield JPEG; throw new Error('interrupted'); })());
+  await expect(stageFile(dir, broken, 'a.jpg', 'photo-original')).rejects.toThrow('interrupted');
+  expect(await readdir(join(dir, '.tmp'))).toEqual([]);
+});
+
+it('terminates sources rejected before staging and after a disk flush failure', async () => {
+  const invalid = Readable.from([JPEG]);
+  await expect(stageFile(dir, invalid, 'a'.repeat(256), 'attachment')).rejects.toThrow();
+  expect(invalid.destroyed).toBe(true);
+  await writeFile(join(dir, '.tmp'), 'occupied');
+  const blocked = Readable.from([JPEG]);
+  await expect(stageFile(dir, blocked, 'a.jpg', 'attachment')).rejects.toThrow();
+  expect(blocked.destroyed).toBe(true);
+  await rm(join(dir, '.tmp'));
+  const originalOpen = fsPromises.open;
+  vi.spyOn(fsPromises, 'open').mockImplementation(async (...args: Parameters<typeof originalOpen>) => {
+    const handle = await originalOpen(...args);
+    vi.spyOn(handle, 'sync').mockRejectedValue(new Error('forced_flush_failure'));
+    return handle;
+  });
+  const failed = Readable.from([JPEG]);
+  await expect(stageFile(dir, failed, 'a.jpg', 'attachment')).rejects.toThrow('forced_flush_failure');
+  expect(failed.destroyed).toBe(true);
+  expect(await readdir(join(dir, '.tmp'))).toEqual([]);
+});
+
+it.each(Object.entries(FILE_LIMITS))('enforces actual streamed limit for %s', async (purpose, limit) => {
+  const source = (size: number) => Readable.from((function* () {
+    yield JPEG;
+    let remaining = size - JPEG.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) { const n = Math.min(remaining, chunk.length); yield chunk.subarray(0, n); remaining -= n; }
+  })());
+  const valid = await stageFile(dir, source(limit), 'a.jpg', purpose as keyof typeof FILE_LIMITS);
+  expect(valid.size).toBe(limit); await discardStaged(valid);
+  await expect(stageFile(dir, source(limit + 1), 'a.jpg', purpose as keyof typeof FILE_LIMITS)).rejects.toMatchObject({ statusCode: 413 });
+  expect(await readdir(join(dir, '.tmp'))).toEqual([]);
+});
+``````
+
+#### File: `tests/server/files-api.test.ts`
+
+<!-- replay task=12 phase=test sha256=43f0ac4cffb9a03fe7df3754400e5f4c50da5d21114a5e9aebf6babac0afb88e -->
+
+``````ts
+import { readFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import type { FastifyRequest } from 'fastify';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { blobPath } from '../../src/server/files/storage';
+import { parseUpload } from '../../src/server/files/uploads';
+import { get, send } from './helpers';
+import { getRecord, makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+import { addAttachment, addPhoto, JPEG, multipart, PDF, PNG, upload } from './file-fixture';
+
+let f: Fixture;
+let id: number;
+beforeEach(async () => {
+  f = await makeFixture();
+  id = (await postRecord(f, { subtype: 'task' })).id;
+});
+afterEach(async () => { await f.ctx.close(); });
+
+it('stores photo bundles, preserves metadata and sorts phases', async () => {
+  const after = await addPhoto(f, id, { phase: 'after' });
+  const before = await addPhoto(f, id, { phase: 'before', takenAt: '2026-10-03T12:00:00+03:00' });
+  expect(before).toMatchObject({ originalFilename: 'όψη.jpg', phase: 'before', takenAt: '2026-10-03T09:00:00.000Z' });
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/photos'))).json().map((p: { id: number }) => p.id)).toEqual([before.id, after.id]);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+  const hash = f.ctx.db.prepare('SELECT original_hash FROM photos WHERE id=?').pluck().get(before.id) as string;
+  expect(await readFile(blobPath(f.ctx.config.filesDir, hash))).toEqual(JPEG);
+  f.ctx.db.prepare('UPDATE records SET updated_at=? WHERE id=?').run('2000-01-01', id);
+  const patched = await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, id, `/photos/${before.id}`), { caption: 'Caption' });
+  expect(patched.statusCode).toBe(200);
+  expect(patched.json()).toMatchObject({ caption: 'Caption', uploadedAt: before.uploadedAt, uploadedBy: before.uploadedBy });
+  expect((await getRecord(f, id)).updatedAt).not.toBe('2000-01-01');
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/photos/${before.id}`))).statusCode).toBe(200);
+  expect((await addPhoto(f, id)).id).toBeGreaterThan(before.id);
+});
+
+it('commits each photo variant and attachment only with complete matching disk bytes', async () => {
+  const original = PNG;
+  const display = Buffer.concat([JPEG, Buffer.from('display')]);
+  const thumbnail = Buffer.concat([JPEG, Buffer.from('thumbnail')]);
+  const photo = await upload(f, id, 'photos', [
+    { name: 'metadata', data: '{"phase":"during"}' },
+    { name: 'original', filename: 'original.png', data: original },
+    { name: 'display', filename: 'display.jpg', data: display },
+    { name: 'thumbnail', filename: 'thumbnail.jpg', data: thumbnail },
+  ]);
+  expect(photo.statusCode).toBe(201);
+  await addAttachment(f, id);
+  const hashes = f.ctx.db.prepare('SELECT original_hash, display_hash, thumbnail_hash FROM photos WHERE id=?').get(photo.json().id) as Record<string, string>;
+  for (const [column, bytes] of [['original_hash', original], ['display_hash', display], ['thumbnail_hash', thumbnail]] as const) {
+    expect(hashes[column]).toBe(createHash('sha256').update(bytes).digest('hex'));
+  }
+  const blobs = f.ctx.db.prepare('SELECT hash,size FROM blobs').all() as { hash: string; size: number }[];
+  expect(blobs).toHaveLength(4);
+  for (const blob of blobs) {
+    const bytes = await readFile(blobPath(f.ctx.config.filesDir, blob.hash));
+    expect(bytes.length).toBe(blob.size);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(blob.hash);
+  }
+});
+
+it('keeps separate occurrences, joins current Log metadata and cascades private Log deletion without deleting bytes', async () => {
+  const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/log'), { text: 'Plans received', private: true });
+  expect(log.statusCode).toBe(201);
+  const direct = await addAttachment(f, id);
+  const linked = await addAttachment(f, id, { logEntryId: log.json().id });
+  expect(linked.id).not.toBe(direct.id);
+  expect(linked.logEntry).toMatchObject({ id: log.json().id, text: 'Plans received', private: true });
+  expect(direct.logEntry).toBeNull();
+  const renamed = await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, id, `/attachments/${direct.id}`), { title: 'Changed' });
+  expect(renamed.statusCode).toBe(200);
+  expect(renamed.json()).toMatchObject({ title: 'Changed', uploadedAt: direct.uploadedAt });
+  const hash = f.ctx.db.prepare('SELECT blob_hash FROM attachments WHERE id=?').pluck().get(direct.id) as string;
+  await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, id, `/log/${log.json().id}`), { text: 'Revised', private: false });
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/attachments'))).json()[0].logEntry).toMatchObject({ text: 'Revised', private: false });
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/log/${log.json().id}`))).statusCode).toBe(200);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/attachments'))).json().map((a: { id: number }) => a.id)).toEqual([direct.id]);
+  expect(await readFile(blobPath(f.ctx.config.filesDir, hash))).toEqual(PDF);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+});
+
+it('checks session, Origin and upload content type before parsing files', async () => {
+  const parts = [{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }];
+  expect((await upload(f, id, 'attachments', parts, { cookie: '' })).statusCode).toBe(401);
+  expect((await upload(f, id, 'attachments', parts, { origin: '' })).statusCode).toBe(403);
+  expect((await upload(f, id, 'attachments', parts, { origin: 'https://evil.example' })).statusCode).toBe(403);
+  expect((await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/attachments'))).statusCode).toBe(415);
+  const form = multipart(parts);
+  expect((await f.ctx.app.inject({ method: 'PATCH', url: recordUrl(f, id), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body })).statusCode).toBe(415);
+});
+
+it('rejects malformed envelopes and cleans temporary files; accepts metadata after files', async () => {
+  for (const parts of [
+    [{ name: 'metadata', data: '{}' }],
+    [{ name: 'file', filename: 'a.pdf', data: PDF }],
+    [{ name: 'unknown', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }],
+    [{ name: 'metadata', data: '{bad' }, { name: 'file', filename: 'a.pdf', data: PDF }],
+    [{ name: 'metadata', data: '{"unknown":1}' }, { name: 'file', filename: 'a.pdf', data: PDF }],
+  ]) expect((await upload(f, id, 'attachments', parts)).statusCode).toBe(400);
+  const response = await upload(f, id, 'attachments', [
+    { name: 'file', filename: 'a.pdf', data: PDF }, { name: 'metadata', data: '{}' },
+  ]);
+  expect(response.statusCode).toBe(201);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+
+it('terminates invalid-filename multipart streams', async () => {
+  const source = Readable.from([PDF]);
+  const request = {
+    isMultipart: () => true,
+    raw: Readable.from([]),
+    parts: async function* () {
+      yield { type: 'file', fieldname: 'file', filename: 'a'.repeat(256), file: source };
+    },
+  } as unknown as FastifyRequest;
+  await expect(parseUpload(request, f.ctx.config.filesDir, 'attachments')).rejects.toMatchObject({ statusCode: 400 });
+  expect(source.destroyed).toBe(true);
+});
+
+it('normalises malformed parser envelopes and accepts JSON metadata fields', async () => {
+  const before = await getRecord(f, id);
+  const missingBoundary = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data' }, payload: 'bad' });
+  expect(missingBoundary.statusCode).toBe(400);
+  expect(missingBoundary.json()).toEqual({ error: 'invalid_upload' });
+  for (const [metadata, status] of [['{bad', 400], ['{}', 201]] as const) {
+    const body = Buffer.concat([
+      Buffer.from(`--json\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${metadata}\r\n--json\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\n\r\n`), PDF, Buffer.from('\r\n--json--\r\n'),
+    ]);
+    const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=json' }, payload: body });
+    expect(response.statusCode).toBe(status);
+    if (status === 400) {
+      expect(response.json()).toEqual({ error: 'invalid_upload' });
+      expect(await getRecord(f, id)).toEqual(before);
+    }
+  }
+});
+
+it('rejects duplicate photo parts, parser limits, bad third file and truncated multipart without changing evidence', async () => {
+  const before = await getRecord(f, id);
+  const files = ['original', 'display', 'thumbnail'].map(name => ({ name, filename: 'a.jpg', data: JPEG }));
+  expect((await upload(f, id, 'photos', [{ name: 'metadata', data: '{"phase":"before"}' }, files[0]!, files[0]!, files[2]!])).statusCode).toBe(400);
+  expect((await upload(f, id, 'photos', [{ name: 'metadata', data: '{"phase":"before"}' }, ...files, files[0]!])).statusCode).toBe(413);
+  expect((await upload(f, id, 'photos', [{ name: 'metadata', data: '{"phase":"before"}' }, files[0]!, files[1]!, { ...files[2]!, data: PDF }])).statusCode).toBe(415);
+  expect((await upload(f, id, 'attachments', [{ name: 'metadata', data: 'a'.repeat(16_385) }, { name: 'file', filename: 'a.pdf', data: PDF }])).statusCode).toBe(413);
+  const form = multipart([{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }]);
+  expect((await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body.subarray(0, -20) })).statusCode).toBe(400);
+  expect(await getRecord(f, id)).toEqual(before);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM photos').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+
+it('scopes occurrences and Log associations to the record', async () => {
+  const other = await postRecord(f, { subtype: 'task' });
+  const entry = (await send(f.ctx, f.cookie, 'POST', recordUrl(f, other.id, '/log'), { text: 'Other' })).json();
+  expect((await upload(f, id, 'attachments', [{ name: 'metadata', data: JSON.stringify({ logEntryId: entry.id }) }, { name: 'file', filename: 'a.pdf', data: PDF }])).statusCode).toBe(404);
+  const attachment = await addAttachment(f, id);
+  const photo = await addPhoto(f, id);
+  for (const [kind, occurrenceId] of [['attachments', attachment.id], ['photos', photo.id]]) {
+    expect((await send(f.ctx, f.cookie, 'PATCH', recordUrl(f, other.id, `/${kind}/${occurrenceId}`), kind === 'photos' ? { caption: 'x' } : { title: 'x' })).statusCode).toBe(404);
+    expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, other.id, `/${kind}/${occurrenceId}`))).statusCode).toBe(404);
+  }
+});
+
+it('rolls database changes back after occurrence insertion and retains completed disk bytes', async () => {
+  const before = await getRecord(f, id);
+  f.ctx.db.exec("CREATE TRIGGER fail_touch BEFORE UPDATE ON records BEGIN SELECT RAISE(ABORT,'forced'); END");
+  const response = await upload(f, id, 'attachments', [{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }]);
+  expect(response.statusCode).toBe(500);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(0);
+  expect(await getRecord(f, id)).toEqual(before);
+  expect((await readdir(f.ctx.config.filesDir)).filter(name => name !== '.tmp')).toHaveLength(1);
+});
+
+it('rolls back the Log cascade if touching its record fails', async () => {
+  const entry = (await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/log'), { text: 'Private', private: true })).json();
+  const attachment = await addAttachment(f, id, { logEntryId: entry.id });
+  f.ctx.db.exec("CREATE TRIGGER fail_touch BEFORE UPDATE ON records BEGIN SELECT RAISE(ABORT,'forced'); END");
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/log/${entry.id}`))).statusCode).toBe(500);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, id, '/attachments'))).json()[0].id).toBe(attachment.id);
+});
+
+it('rechecks a Log association deleted while its multipart bytes are arriving', async () => {
+  const entry = (await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/log'), { text: 'Soon removed' })).json();
+  const form = multipart([
+    { name: 'metadata', data: JSON.stringify({ logEntryId: entry.id }) },
+    { name: 'file', filename: 'a.pdf', data: PDF },
+  ]);
+  const payload = Readable.from((async function* () {
+    yield form.body.subarray(0, form.body.length - 40);
+    f.ctx.db.prepare('DELETE FROM log_entries WHERE id=?').run(entry.id);
+    yield form.body.subarray(form.body.length - 40);
+  })());
+  const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload });
+  expect(response.statusCode).toBe(404);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+});
+
+it('rejects an oversized attachment by actual streamed bytes without a Content-Length', async () => {
+  const payload = Readable.from((function* () {
+    yield Buffer.from('--limit\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--limit\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\nContent-Type: application/pdf\r\n\r\n');
+    yield PDF;
+    let remaining = 100_000_001 - PDF.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) {
+      const n = Math.min(remaining, chunk.length);
+      yield chunk.subarray(0, n);
+      remaining -= n;
+    }
+    yield Buffer.from('\r\n--limit--\r\n');
+  })());
+  const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'), headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=limit' }, payload });
+  expect(response.statusCode).toBe(413);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+``````
+
+#### File: `tests/server/media-formats.test.ts`
+
+<!-- replay task=12 phase=test sha256=292b0271eff526274657823f491c1cd07caecff74a27aa231390d053a4883ab1 -->
+
+``````ts
+import { expect, it } from 'vitest';
+import { detectFormat } from '../../src/server/files/formats';
+import { OLE, ZIP } from './file-fixture';
+it.each([
+ ['file.xlsm',ZIP],['model.ifc',Buffer.from('ISO-10303-21;')],['model.rvt',Buffer.from('synthetic native data')],
+ ['archive.zip',ZIP],['archive.rar',Buffer.from('Rar!\x1a\x07\x00')],['library.a',Buffer.from('!<arch>\n')],['material.mat',Buffer.from('synthetic native data')],
+ ['mail.eml',Buffer.from('From: a@example.test\r\nSubject: Hello\r\n\r\nMessage')],['mail.msg',OLE],
+ ['image.svg',Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')],
+ ['image.gif',Buffer.from('GIF89a')],['image.webp',Buffer.from('RIFF0000WEBP')],
+ ['video.mp4',Buffer.concat([Buffer.from([0,0,0,24]),Buffer.from('ftypisom'),Buffer.alloc(12)])],
+ ['audio.mp3',Buffer.from('ID3\x04\x00\x00')],['audio.wav',Buffer.from('RIFF0000WAVE')],
+] as [string,Buffer][])('accepts the approved storage format %s', (filename,bytes) => {
+ expect(() => detectFormat(bytes,filename,'attachment')).not.toThrow();
+});
+it('uses content-derived canonical storage types for identical bytes under different allowed extensions', () => {
+ const bytes=Buffer.from('%PDF-1.7\nfixture');
+ expect(detectFormat(bytes,'a.txt','attachment')).toBe(detectFormat(bytes,'a.pdf','attachment'));
+});
+it.each(['bad.html','bad.js','bad.exe','bad.docm'])('rejects an extension outside the approved catalog: %s', filename => {
+ expect(() => detectFormat(Buffer.from('hello'),filename,'attachment')).toThrow();
+});
+it('accepts ordinary SVG declarations and comments before its root element', () => {
+  const bytes = Buffer.from('<?xml version="1.0" encoding="utf-8"?>\n<!-- authored by drawing tool -->\n<svg xmlns="http://www.w3.org/2000/svg"/>');
+  expect(detectFormat(bytes,'drawing.svg','attachment')).toBe('image/svg+xml');
+});
+it('accepts new DWG versions as opaque download-only evidence without claiming validation', () => {
+  expect(detectFormat(Buffer.from('AC9999'),'future.dwg','attachment')).toBe('application/octet-stream');
+});
+``````
+
+#### File: `tests/server/media-preview.test.ts`
+
+<!-- replay task=12 phase=test sha256=27681a0543e95ff0c2759f3907efb2093fff933ebf64714821bc0c3dab507e3c -->
+
+``````ts
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { makeFixture, postRecord, recordUrl, forceStatus, type Fixture } from './record-fixture';
+import { addAttachment, PDF, JPEG, ZIP } from './file-fixture';
+import { send } from './helpers';
+let f: Fixture;
+let id: number;
+let token: string;
+beforeEach(async () => {
+  f = await makeFixture(); id = (await postRecord(f, { subtype: 'task', title: 'Media' })).id;
+  forceStatus(f, id, 'open');
+  const link = await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/share-links'), { label: 'Media reader' });
+  token = link.json().url.split('#')[1];
+});
+afterEach(async () => { await f.ctx.close(); });
+function read(file: number, suffix: string, audience: 'owner' | 'shared' = 'owner', method: 'GET' | 'HEAD' = 'GET', headers: Record<string,string> = {}) {
+  return f.ctx.app.inject({ method, url: audience === 'owner' ? recordUrl(f, id, `/attachments/${file}/${suffix}`) : `/api/shared/attachments/${file}/${suffix}`,
+    headers: { ...(audience === 'owner' ? {cookie:f.cookie} : {authorization:`Bearer ${token}`}), ...headers } });
+}
+it('describes and serves native PDF and image previews without exposing blob paths', async () => {
+  for (const [filename, bytes, kind] of [['a.pdf',PDF,'pdf'],['a.jpg',JPEG,'image']] as const) {
+    const file = await addAttachment(f,id,{},filename,bytes);
+    expect(file.capabilities).toMatchObject({kind,view:'native',download:true});
+    for (const audience of ['owner','shared'] as const) {
+      const descriptor = await read(file.id,'preview',audience);
+      expect(descriptor.statusCode).toBe(200);
+      expect(descriptor.json()).toMatchObject({id:file.id,capabilities:{kind,view:'native',download:true}});
+      expect(descriptor.body).not.toContain('hash');
+      const view = await read(file.id,'view',audience);
+      expect(view.statusCode).toBe(200);
+      expect(view.rawPayload).toEqual(bytes);
+      expect(view.headers['content-disposition']).toMatch(/^inline;/);
+      expect(view.headers['cache-control']).toBe('no-store');
+      expect(view.headers['content-security-policy']).toContain('sandbox');
+    }
+  }
+});
+it('streams single byte ranges, open ranges and suffix ranges for authorized originals and views', async () => {
+  const file = await addAttachment(f,id);
+  for (const audience of ['owner','shared'] as const) {
+    for (const suffix of ['file','view']) {
+      for (const [range,start,end] of [['bytes=1-4',1,4],['bytes=5-',5,PDF.length-1],['bytes=-3',PDF.length-3,PDF.length-1]] as const) {
+        const response = await read(file.id,suffix,audience,'GET',{range});
+        expect(response.statusCode).toBe(206);
+        expect(response.rawPayload).toEqual(PDF.subarray(start,end+1));
+        expect(response.headers['content-range']).toBe(`bytes ${start}-${end}/${PDF.length}`);
+        expect(response.headers['accept-ranges']).toBe('bytes');
+      }
+      const invalid = await read(file.id,suffix,audience,'GET',{range:'bytes=999999-'});
+      expect(invalid.statusCode).toBe(416);
+      expect(invalid.headers['content-range']).toBe(`bytes */${PDF.length}`);
+      expect((await read(file.id,suffix,audience,'HEAD',{range:'bytes=1-4'})).statusCode).toBe(200);
+      expect((await read(file.id,suffix,audience,'GET',{range:'bytes=1-4','if-range':'"old"'})).statusCode).toBe(200);
+    }
+  }
+});
+it('keeps document originals downloadable without offering native previews', async () => {
+  const file = await addAttachment(f,id,{},'a.docx',ZIP);
+  const descriptor = await read(file.id,'preview');
+  expect(descriptor.statusCode).toBe(200);
+  expect(descriptor.json().capabilities).toMatchObject({kind:'document',view:'download',download:true});
+  expect((await read(file.id,'view')).statusCode).toBe(415);
+  expect((await read(file.id,'file')).rawPayload).toEqual(ZIP);
+});
+it('checks current private, deleted, revoked and wrong-record state before every preview or byte range', async () => {
+  const log = (await send(f.ctx,f.cookie,'POST',recordUrl(f,id,'/log'),{text:'Private',private:true})).json();
+  const file = await addAttachment(f,id,{logEntryId:log.id});
+  for (const suffix of ['view','preview']) {
+    expect((await read(file.id,suffix,'shared','GET',{range:'bytes=0-1'})).json()).toEqual({error:'not_available'});
+    expect((await read(file.id,suffix)).statusCode).toBe(200);
+  }
+  await send(f.ctx,f.cookie,'PATCH',recordUrl(f,id,`/log/${log.id}`),{private:false});
+  expect((await read(file.id,'view','shared')).statusCode).toBe(200);
+  const other = await postRecord(f,{subtype:'task'});
+  const elsewhere = await addAttachment(f,other.id);
+  expect((await read(elsewhere.id,'preview','shared')).statusCode).toBe(404);
+  f.ctx.db.exec("UPDATE share_links SET revoked_at='2026-01-01'");
+  expect((await read(file.id,'view','shared')).statusCode).toBe(404);
+  await send(f.ctx,f.cookie,'DELETE',recordUrl(f,id,`/attachments/${file.id}`));
+  expect((await read(file.id,'preview')).statusCode).toBe(404);
+});
+it('preserves occurrence viewer policy when identical bytes were first uploaded under a download-only suffix', async () => {
+  const generic = await addAttachment(f,id,{},'evidence.txt',PDF);
+  const pdf = await addAttachment(f,id,{},'evidence.pdf',PDF);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs').pluck().get()).toBe(1);
+  expect((await read(generic.id,'preview')).json().capabilities.view).toBe('download');
+  expect((await read(generic.id,'view')).statusCode).toBe(415);
+  expect((await read(pdf.id,'view')).headers['content-type']).toBe('application/pdf');
+});
+it('offers a browser email reader descriptor and retains original bytes without server parsing', async () => {
+  const eml = Buffer.from('From: writer@example.test\r\nSubject: Site notes\r\n\r\nHello');
+  const file = await addAttachment(f,id,{},'notes.eml',eml);
+  for (const audience of ['owner','shared'] as const) {
+    expect((await read(file.id,'preview',audience)).json().capabilities).toMatchObject({kind:'email',view:'email',reader:'eml',download:true});
+    expect((await read(file.id,'file',audience)).rawPayload).toEqual(eml);
+    expect((await read(file.id,'view',audience)).statusCode).toBe(415);
+  }
+});
+it('serves media with an occurrence-specific player MIME and protects SVG document navigation', async () => {
+  const mp4 = Buffer.concat([Buffer.from([0,0,0,24]),Buffer.from('ftypisom'),Buffer.alloc(12),Buffer.from('synthetic media')]);
+  const video = await addAttachment(f,id,{},'clip.mp4',mp4);
+  const audio = await addAttachment(f,id,{},'clip.m4a',mp4);
+  expect((await read(video.id,'preview')).json().capabilities).toMatchObject({kind:'video',view:'native',mediaType:'video/mp4'});
+  expect((await read(audio.id,'view')).headers['content-type']).toBe('audio/mp4');
+  expect((await read(video.id,'view','shared','GET',{range:'bytes=8-11'})).rawPayload).toEqual(Buffer.from('isom'));
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><image href="https://external.invalid/tracker"/></svg>');
+  const generic = await addAttachment(f,id,{},'vector.txt',svg);
+  const image = await addAttachment(f,id,{},'vector.svg',svg);
+  expect((await read(generic.id,'view')).statusCode).toBe(415);
+  const view = await read(image.id,'view','shared');
+  expect(view.headers['content-type']).toBe('image/svg+xml');
+  expect(view.headers['content-security-policy']).toContain("default-src 'none'");
+  expect(view.headers['content-security-policy']).toContain('sandbox');
+  expect(view.headers['x-content-type-options']).toBe('nosniff');
+});
+it('rejects invalid and multi ranges without returning file bytes, and clamps a valid long end', async () => {
+  const file = await addAttachment(f,id);
+  for (const range of ['bytes=-0','bytes=2-1','bytes=0-1,3-4','bytes=999999999999999999999-','nonsense']) {
+    const response = await read(file.id,'view','shared','GET',{range});
+    expect(response.statusCode).toBe(416);
+    expect(response.headers['content-range']).toBe(`bytes */${PDF.length}`);
+    expect(response.rawPayload).not.toEqual(PDF);
+  }
+  expect((await read(file.id,'view','owner','GET',{range:'bytes=0-999999'})).rawPayload).toEqual(PDF);
+});
+``````
+
+#### File: `tests/server/shared-record-api.test.ts`
+
+<!-- replay task=12 phase=test sha256=3fd1d620228ce94292c6e5b88ad7c78658546e550adf4bf4eb4205d1982f7d6f -->
+
+``````ts
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { createPerson } from '../../src/server/lists/people';
+import { createProject } from '../../src/server/lists/projects';
+import { authorizeShare } from '../../src/server/sharing/links';
+import { addAttachment, addPhoto } from './file-fixture';
+import { get, send } from './helpers';
+import { forceStatus, getRecord, makeFixture, patchRecord, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+beforeEach(async () => { f = await makeFixture(); });
+afterEach(async () => { await f.ctx.close(); });
+
+async function share(id: number) {
+  const response = await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, '/share-links'), { label: 'PRIVATE_SENTINEL recipient' });
+  expect(response.statusCode).toBe(201);
+  return { ...response.json(), token: response.json().url.split('#')[1] as string };
+}
+function read(token: string, method: 'GET' | 'HEAD' = 'GET') {
+  return f.ctx.app.inject({ method, url: '/api/shared/record', headers: { authorization: `Bearer ${token}` } });
+}
+const keys = (value: object) => Object.keys(value).sort();
+
+it('projects all visible sections and only their referenced labels, omitting private content and login identities', async () => {
+  f.ctx.db.exec("UPDATE users SET username='PRIVATE_SENTINEL_LOGIN'");
+  const foreignProject = createProject(f.ctx.db, { code: 'other', name: 'PRIVATE_SENTINEL project' }).id;
+  createPerson(f.ctx.db, foreignProject, { code: 'HIDDEN', name: 'PRIVATE_SENTINEL foreign person', role: 'other' });
+  createPerson(f.ctx.db, f.projectId, { code: 'UNUSED', name: 'PRIVATE_SENTINEL unrelated person', role: 'other' });
+  const downstream = await postRecord(f, { subtype: 'task', title: 'Public successor' });
+  const hidden = await postRecord(f, { subtype: 'task', title: 'PRIVATE_SENTINEL draft' });
+  const record = await postRecord(f, {
+    subtype: 'detail_clarification', title: 'Stone', question: 'Thickness?', notes: 'PRIVATE_SENTINEL notes', outsideScope: true, estimatedCost: 123.45,
+    ballInCourtId: f.people.architect, tradeIds: [f.trades.tiling], tagIds: [f.tags.stone], locationIds: [f.locations.v1Kitchen],
+    mustBeDoneBeforeIds: [downstream.id, hidden.id], instructionText: 'Old instruction',
+  });
+  await postRecord(f, { subtype: 'task', title: 'PRIVATE_SENTINEL predecessor', mustBeDoneBeforeIds: [record.id] });
+  forceStatus(f, downstream.id, 'open');
+  const option = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/options'), { label: 'Honed', description: '20 mm' });
+  expect(option.statusCode).toBe(201);
+  expect((await patchRecord(f, record.id, { instructionText: 'New instruction', chosenOptionId: option.json().id })).statusCode).toBe(200);
+  const measurement = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/measurement-sets'), {
+    date: '2026-10-03', phase: 'before', measuredById: f.people.architect, note: 'Public set note',
+    rows: [{ item: 'Stone', quantity: 'Thickness', value: 20, unit: 'mm', note: 'Public row note' }],
+  });
+  expect(measurement.statusCode).toBe(201);
+  f.ctx.db.prepare(`INSERT INTO verifications(record_id, checked_by_id, date, method, outcome, note, created_at, created_by)
+    VALUES (?,?,'2026-10-03','visual','passed','Public check','2026-10-03',(SELECT id FROM users LIMIT 1))`).run(record.id, f.people.architect);
+  const publicLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Public Log' });
+  const privateLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'PRIVATE_SENTINEL log', private: true });
+  expect(publicLog.statusCode).toBe(201);
+  expect(privateLog.statusCode).toBe(201);
+  await addAttachment(f, record.id, { logEntryId: privateLog.json().id, title: 'PRIVATE_SENTINEL title' }, 'PRIVATE_SENTINEL.pdf');
+  const publicFile = await addAttachment(f, record.id, { logEntryId: publicLog.json().id });
+  await addAttachment(f, record.id);
+  await addPhoto(f, record.id);
+  const userId = f.ctx.db.prepare('SELECT id FROM users').pluck().get();
+  f.ctx.db.prepare(`INSERT INTO activity(record_id,at,user_id,action,field,old_value,new_value,detail)
+    VALUES (?,'2026-10-04',?,'field_changed','notes',NULL,?,?)`).run(record.id, userId, JSON.stringify('PRIVATE_SENTINEL future field'), JSON.stringify({ secret: 'PRIVATE_SENTINEL detail' }));
+  f.ctx.db.prepare(`UPDATE activity SET detail=? WHERE record_id=? AND field='chosenOptionId'`).run(JSON.stringify({ fromOption: null, toOption: { label: 'Historical option', description: 'Preserved', extra: 'PRIVATE_SENTINEL nested' }, unknown: 'PRIVATE_SENTINEL detail' }), record.id);
+  f.ctx.db.prepare('UPDATE people SET active=0, email=?, phone=? WHERE id=?').run('PRIVATE_SENTINEL email', 'PRIVATE_SENTINEL phone', f.people.architect);
+  forceStatus(f, record.id, 'open');
+  const link = await share(record.id);
+  const before = await getRecord(f, record.id);
+  const response = await read(link.token);
+  expect(response.statusCode).toBe(200);
+  expect(response.headers['cache-control']).toBe('no-store');
+  const body = response.json();
+  expect(keys(body)).toEqual(['activity','attachments','labels','log','measurements','options','photos','record','verifications']);
+  for (const field of ['notes','outsideScope','estimatedCost','id','projectId','createdBy','updatedBy','allowedTransitions']) expect(body.record).not.toHaveProperty(field);
+  expect(JSON.stringify(body)).not.toContain('PRIVATE_SENTINEL');
+  expect(body.record.mustBeDoneBefore).toEqual([{ humanId: downstream.humanId, title: downstream.title }]);
+  expect(body.record.requiresFirst).toEqual([]);
+  expect(keys(body.options[0])).toEqual(['description','id','label']);
+  expect(keys(body.measurements[0])).toEqual(['date','id','measuredById','note','phase','rows']);
+  expect(keys(body.measurements[0].rows[0])).toEqual(['item','note','quantity','unit','value']);
+  expect(keys(body.verifications[0])).toEqual(['checkedById','createdAt','date','id','method','note','outcome']);
+  expect(keys(body.photos[0])).toEqual(['caption','id','originalFilename','phase','takenAt','uploadedAt','uploadedBy']);
+  expect(keys(body.attachments[0])).toEqual(['capabilities','contentType','id','logEntry','originalFilename','size','title','uploadedAt','uploadedBy']);
+  expect(body.log).toEqual([{ id: publicLog.json().id, eventAt: publicLog.json().eventAt, text: 'Public Log', loggedBy: 'Owner', attachmentIds: [publicFile.id] }]);
+  expect(body.activity.find((a: { field: string }) => a.field === 'instructionText')).toMatchObject({ from: 'Old instruction', to: 'New instruction', detail: null });
+  expect(body.activity.find((a: { field: string }) => a.field === 'chosenOptionId').detail).toEqual({ fromOption: null, toOption: { label: 'Historical option', description: 'Preserved' } });
+  for (const entry of body.activity) expect(keys(entry)).toEqual(['action','at','detail','field','from','id','to']);
+  expect(body.labels.people).toEqual([{ id: f.people.architect, code: 'ARCH', name: 'Person ARCH', role: 'other' }]);
+  expect(body.labels.locations[0].path.map((node: { id: number }) => node.id)).toEqual([f.locations.villa1, f.locations.v1Ground, f.locations.v1Kitchen]);
+  expect(body.labels.zoneTypes).toEqual([{ id: f.zones.kitchen, nameEn: 'Kitchen', nameEl: '' }]);
+  expect((await get(f.ctx, f.cookie, recordUrl(f, record.id, '/share-links'))).json()[0].viewCount).toBe(1);
+  expect(await getRecord(f, record.id)).toEqual(before);
+});
+
+it('denies malformed, unknown, expired, revoked and Draft links uniformly without granting owner access', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'Task' });
+  const link = await share(record.id);
+  for (const token of [link.token, '', 'a'.repeat(43), 'A'.repeat(43)]) {
+    const response = await read(token);
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: 'not_available' });
+  }
+  forceStatus(f, record.id, 'open');
+  f.ctx.db.prepare('UPDATE share_links SET expires_at=?').run('2026-10-03T00:00:00.000Z');
+  expect(() => authorizeShare(f.ctx.db, `Bearer ${link.token}`, new Date('2026-10-03'))).toThrow('not_available');
+  f.ctx.db.exec('UPDATE share_links SET expires_at=NULL');
+  expect((await read(link.token)).statusCode).toBe(200);
+  expect((await f.ctx.app.inject({ method: 'GET', url: recordUrl(f, record.id), headers: { authorization: `Bearer ${link.token}` } })).statusCode).toBe(401);
+  expect((await f.ctx.app.inject({ method: 'GET', url: '/api/shared/not-a-route', headers: { authorization: `Bearer ${link.token}` } })).statusCode).toBe(401);
+  await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, `/share-links/${link.id}/revoke`));
+  const denied = await f.ctx.app.inject({ method: 'GET', url: '/api/shared/record', headers: { cookie: f.cookie, authorization: `Bearer ${link.token}` } });
+  expect(denied.json()).toEqual({ error: 'not_available' });
+});
+
+it('HEAD skips projection and counters, and projection failures never increment views', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'Task' });
+  forceStatus(f, record.id, 'open');
+  const link = await share(record.id);
+  // listActivity cannot decode this row. HEAD must never call the projection.
+  f.ctx.db.prepare("UPDATE activity SET detail='bad-json' WHERE record_id=?").run(record.id);
+  const changes = f.ctx.db.prepare('SELECT total_changes()').pluck().get();
+  const head = await read(link.token, 'HEAD');
+  expect(head.statusCode).toBe(200);
+  expect(head.body).toBe('');
+  expect(f.ctx.db.prepare('SELECT total_changes()').pluck().get()).toBe(changes);
+  expect((await read(link.token)).statusCode).toBe(500);
+  expect(f.ctx.db.prepare('SELECT view_count,last_viewed_at FROM share_links WHERE id=?').get(link.id)).toEqual({ view_count: 0, last_viewed_at: null });
+});
+
+it('allowlists status history details and resolves visible historical people without publishing unknown objects', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'History' });
+  forceStatus(f, record.id, 'open');
+  const userId = f.ctx.db.prepare('SELECT id FROM users').pluck().get();
+  const insert = f.ctx.db.prepare('INSERT INTO activity(record_id,at,user_id,action,field,old_value,new_value,detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insert.run(record.id, '2026-01-02', userId, 'status_changed', 'status', '"ready_for_verification"', '"closed"', JSON.stringify({
+    reasonCode: null, note: 'Public note', hidden: 'PRIVATE_SENTINEL',
+    verification: { id: 1, outcome: 'passed', method: 'visual', checkedById: f.people.retired, date: '2026-01-02', hidden: 'PRIVATE_SENTINEL' },
+  }));
+  insert.run(record.id, '2026-01-03', userId, 'field_changed', 'responsibleId', JSON.stringify({ secret: 'PRIVATE_SENTINEL' }), 'null', null);
+  insert.run(record.id, '2026-01-04', userId, 'future_action', 'instructionText', 'null', '"PRIVATE_SENTINEL"', null);
+  const link = await share(record.id);
+  const response = await read(link.token);
+  expect(response.statusCode).toBe(200);
+  const body = response.json();
+  expect(JSON.stringify(body)).not.toContain('PRIVATE_SENTINEL');
+  expect(body.activity.find((entry: { action: string }) => entry.action === 'status_changed')).toMatchObject({ action: 'status_changed', field: 'status', detail: {
+    reasonCode: null, note: 'Public note', verification: { id: 1, outcome: 'passed', method: 'visual', checkedById: f.people.retired, date: '2026-01-02' },
+  } });
+  expect(body.labels.people).toEqual([{ id: f.people.retired, code: 'OLD', name: 'Person OLD', role: 'other' }]);
+});
+``````
+
+#### File: `tests/server/upload-budget.test.ts`
+
+<!-- replay task=12 phase=test sha256=516b001c49e253e02fa7b79cf3bc68480710b69a81d4394558145673cab0d439 -->
+
+``````ts
+import { Readable } from 'node:stream';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+let id: number;
+beforeEach(async () => { f = await makeFixture(); id = (await postRecord(f, { subtype: 'task' })).id; });
+afterEach(async () => { await f.ctx.close(); });
+const prefix = Buffer.from('--budget\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{}\r\n--budget\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.7\n');
+const suffix = Buffer.from('\r\n--budget--\r\n');
+function body(total: number) {
+  return Readable.from((function* () {
+    yield prefix;
+    let remaining = total - prefix.length - suffix.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) { const size = Math.min(remaining, chunk.length); yield chunk.subarray(0, size); remaining -= size; }
+    yield suffix;
+  })());
+}
+function request(total: number, declared?: number) {
+  return f.ctx.app.inject({ method: 'POST', url: recordUrl(f, id, '/attachments'),
+    headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'multipart/form-data; boundary=budget', ...(declared === undefined ? {} : { 'content-length': String(declared) }) },
+    payload: body(total),
+  });
+}
+it('accepts a streamed multipart envelope exactly 100,000,000 bytes including boundaries and part headers', async () => {
+  const response = await request(100_000_000);
+  expect(response.statusCode, response.body).toBe(201);
+  expect(response.json().size).toBe(100_000_000 - prefix.length - suffix.length + 9);
+});
+it('rejects chunked total envelope overflow even when its only file is below 100 MB and removes staging', async () => {
+  const response = await request(100_000_001);
+  expect(response.statusCode).toBe(413);
+  expect(response.json()).toEqual({ error: 'upload_too_large' });
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir, '.tmp'))).toEqual([]);
+});
+it('rejects declared oversize before publishing any occurrence', async () => {
+  const response = await request(1000, 100_000_001);
+  expect(response.statusCode).toBe(413);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+});
+it('counts a delayed epilogue after the final multipart boundary before committing', async () => {
+  const payload = Readable.from((async function* () {
+    yield prefix;
+    yield suffix;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    let remaining = 100_000_001 - prefix.length - suffix.length;
+    const chunk = Buffer.alloc(64 * 1024);
+    while (remaining > 0) { const size = Math.min(remaining, chunk.length); yield chunk.subarray(0,size); remaining -= size; }
+  })());
+  const response = await f.ctx.app.inject({ method:'POST',url:recordUrl(f,id,'/attachments'),headers:{cookie:f.cookie,origin:f.ctx.origin,'content-type':'multipart/form-data; boundary=budget'},payload });
+  expect(response.statusCode).toBe(413);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM attachments').pluck().get()).toBe(0);
+  expect(await readdir(join(f.ctx.config.filesDir,'.tmp'))).toEqual([]);
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/media-formats.test.ts tests/server/media-preview.test.ts tests/server/file-access.test.ts tests/server/file-storage.test.ts tests/server/upload-budget.test.ts tests/server/shared-record-api.test.ts`.
+
+Expected: new format, capability and preview tests fail before the catalog and routes exist.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/domain/files.ts`
+
+<!-- replay task=12 phase=implementation sha256=550ba994abb788db243f350baaa28591756d15bb70846a8f44cd3782516df5ae -->
+
+``````ts
+import { z } from 'zod';
+import type { PhotoPhase } from './vocab';
+
+/** Shared attachment picker/storage policy. Extensions omit the leading dot. */
+export const ACCEPTED_ATTACHMENT_EXTENSIONS: readonly string[] = (`3dm 3ds 3dxml a asm avi axm bmp bpm brd cam360 catpart catproduct cgr csv dae ddx ddz dgk dgn dlv3 dmt doc docx dwf dwfx dwg dwt dxf e57 eml emodel exp f3d fbx flv g gbxml gc3 gif glb gltf heic heif iam ico idw ifc ige iges igs ipt iwm jfif jpe jpeg jpg jt key kml kmz kof las laz ln3 m4a mat max mkv model mov mp3 mp4 mpeg mpp msg neu numbers nwc nwd obj odp ods odt ogg osb pages pan par pdf pmlprj pmlprjz png pps ppt pptx prt psm psmodel pts rar rcp rd3 rtf rvm rvt sab sat skp sldasm sldprt smb step stl stp stpz svg tif tiff tn3 tp3 txt usd usda usdc usdz vpb vue wav webm webp wire x_b x_t xas xer xls xlsm xlsx xlt xltx xpr zdd zip zipx`.split(' '));
+
+export const UPLOAD_REQUEST_LIMIT = 100_000_000;
+export const FILE_LIMITS = { 'photo-original': UPLOAD_REQUEST_LIMIT, 'photo-display': 5_000_000, 'photo-thumbnail': 500_000, attachment: UPLOAD_REQUEST_LIMIT } as const;
+export type FilePurpose = keyof typeof FILE_LIMITS;
+const text = z.string().max(2_000).nullable().transform(value => value === null || value.trim() === '' ? null : value);
+export const FileTimestamp = z.iso.datetime({ offset: true }).transform(value => new Date(value).toISOString());
+export const Filename = z.string().transform(value => value.split(/[\\/]/).at(-1) ?? '').pipe(z.string().min(1).max(255).refine(value => !/[\x00-\x1f\x7f]/.test(value), 'Invalid filename'));
+export const PhotoVariantParam = z.enum(['original', 'display', 'thumbnail']);
+export type PhotoVariant = z.infer<typeof PhotoVariantParam>;
+const photoFields = { phase: z.enum(['before', 'during', 'after']), caption: text.optional(), takenAt: FileTimestamp.nullable().optional() };
+export const PhotoUploadMeta = z.strictObject(photoFields);
+export const PhotoPatch = PhotoUploadMeta.partial().refine(value => Object.keys(value).length > 0, 'Empty patch');
+export const AttachmentUploadMeta = z.strictObject({ title: text.optional(), logEntryId: z.number().int().positive().nullable().optional() });
+export const AttachmentPatch = z.strictObject({ title: text.optional() }).refine(value => Object.keys(value).length > 0, 'Empty patch');
+export type PhotoMeta = z.output<typeof PhotoUploadMeta>;
+export type PhotoPatchInput = z.output<typeof PhotoPatch>;
+export type AttachmentMeta = z.output<typeof AttachmentUploadMeta>;
+export type AttachmentPatchInput = z.output<typeof AttachmentPatch>;
+export interface PhotoOut {
+  id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string;
+}
+export interface AttachmentCapabilities {
+  kind: 'image' | 'pdf' | 'email' | 'video' | 'audio' | 'document';
+  view: 'native' | 'email' | 'download';
+  download: true;
+  mediaType?: string;
+  reader?: 'eml' | 'msg';
+}
+export interface AttachmentOut {
+  capabilities: AttachmentCapabilities;
+  id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
+  logEntry: { id: number; eventAt: string; text: string; private: boolean } | null;
+}
+``````
+
+#### File: `src/domain/sharing.ts`
+
+<!-- replay task=12 phase=implementation sha256=8ac672b84099d1b9ef2aed9af25ab0e9bbb167b757954125c5b50db918770efc -->
+
+``````ts
+import type { AttachmentCapabilities } from './files';
+import { z } from 'zod';
+import { FileTimestamp } from './files';
+import type { PhotoPhase, Subtype, Status, Severity, Priority, ProblemType, Stage, Disposition, Route, MeasurementPhase, Unit, VerificationMethod, VerificationOutcome } from './vocab';
+
+export const ShareCreate = z.strictObject({ label: z.string().max(200).refine(value => value.trim() !== '', 'Required'), expiresAt: FileTimestamp.nullable().optional() });
+export type ShareCreateInput = z.output<typeof ShareCreate>;
+export interface ShareLinkOut {
+  id: number; label: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastViewedAt: string | null; viewCount: number; url: string | null;
+}
+
+export interface SharedRecordFields {
+  humanId: string;
+  subtype: Subtype;
+  status: Status;
+  statusReason: { code: string | null; note: string | null } | null;
+  title: string | null;
+  description: string | null;
+  publicNotes: string | null;
+  reference: string | null;
+  ballInCourtId: number | null;
+  responsibleId: number | null;
+  tradeIds: number[];
+  severity: Severity | null;
+  priority: Priority | null;
+  dueDate: string | null;
+  completion: number | null;
+  safety: boolean;
+  tagIds: number[];
+  locationIds: number[];
+  problemTypes: ProblemType[];
+  stage: Stage | null;
+  disposition: Disposition | null;
+  correction: string | null;
+  question: string | null;
+  route: Route | null;
+  issuedById: number | null;
+  chosenOptionId: number | null;
+  decidedById: number | null;
+  decidedOn: string | null;
+  instructionText: string | null;
+  createdAt: string;
+  updatedAt: string;
+  mustBeDoneBefore: { humanId: string; title: string | null }[];
+  requiresFirst: { humanId: string; title: string | null }[];
+}
+
+export interface SharedActivity {
+  id: number;
+  at: string;
+  action: 'created' | 'status_changed' | 'field_changed';
+  field: string | null;
+  from: string | number | null;
+  to: string | number | null;
+  detail: {
+    reasonCode?: string | null;
+    reasonNote?: string | null;
+    note?: string | null;
+    verification?: { id: number; outcome: VerificationOutcome; method: VerificationMethod; checkedById: number; date: string };
+    fromOption?: { label: string; description: string | null } | null;
+    toOption?: { label: string; description: string | null } | null;
+  } | null;
+}
+
+export interface SharedRecord {
+  record: SharedRecordFields;
+  options: { id: number; label: string; description: string | null }[];
+  measurements: {
+    id: number; date: string; measuredById: number | null; phase: MeasurementPhase; note: string | null;
+    rows: { item: string; quantity: string; value: number; unit: Unit; note: string | null }[];
+  }[];
+  verifications: { id: number; checkedById: number; date: string; method: VerificationMethod; outcome: VerificationOutcome; note: string | null; createdAt: string }[];
+  photos: { id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string }[];
+  attachments: {
+    capabilities: AttachmentCapabilities;
+    id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;
+    logEntry: { id: number; eventAt: string; text: string } | null;
+  }[];
+  log: { id: number; eventAt: string; text: string; loggedBy: string; attachmentIds: number[] }[];
+  activity: SharedActivity[];
+  labels: {
+    people: { id: number; code: string; name: string; role: string }[];
+    trades: { id: number; nameEn: string; nameEl: string }[];
+    tags: { id: number; nameEn: string; nameEl: string }[];
+    locations: { id: number; path: { id: number; nameEn: string; nameEl: string; kind: string; zoneTypeId: number | null }[] }[];
+    zoneTypes: { id: number; nameEn: string; nameEl: string }[];
+  };
+}
+``````
+
+#### File: `src/server/files/downloads.ts`
+
+<!-- replay task=12 phase=implementation sha256=7a94562681cc6f633c0681d59f389e518bb6475b25d7d5eb21b2be80f912176c -->
+
+``````ts
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { PhotoVariant } from '../../domain';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { shareHeaders } from '../http/privacy';
+import { blobPath } from './storage';
+
+export interface FileTarget {
+  hash: string;
+  size: number;
+  contentType: string;
+  filename: string;
+}
+
+function safeFilename(filename: string): string {
+  return (filename.split(/[\\/]/).at(-1) ?? 'file').replace(/[\x00-\x1f\x7f]/g, '') || 'file';
+}
+
+export function resolvePhotoFile(db: Db, recordId: number, photoId: number, variant: PhotoVariant): FileTarget {
+  const column = { original: 'original_hash', display: 'display_hash', thumbnail: 'thumbnail_hash' }[variant];
+  const row = db.prepare(`SELECT b.hash, b.size, b.content_type AS contentType, p.original_filename AS filename
+    FROM photos p JOIN blobs b ON b.hash = p.${column} WHERE p.record_id = ? AND p.id = ?`).get(recordId, photoId) as FileTarget | undefined;
+  if (!row) throw new HttpError(404, 'file_not_found');
+  if (variant !== 'original') row.filename = `${safeFilename(row.filename).replace(/\.[^.]*$/, '')}-${variant}.jpg`;
+  return row;
+}
+
+export function resolveAttachmentFile(db: Db, recordId: number, attachmentId: number, audience: 'owner' | 'shared'): FileTarget {
+  const row = db.prepare(`SELECT b.hash, b.size, b.content_type AS contentType, a.original_filename AS filename,
+    l.private AS private, a.log_entry_id AS logEntryId, l.id AS existingLogId
+    FROM attachments a JOIN blobs b ON b.hash = a.blob_hash
+    LEFT JOIN log_entries l ON l.id = a.log_entry_id AND l.record_id = a.record_id
+    WHERE a.record_id = ? AND a.id = ?`).get(recordId, attachmentId) as (FileTarget & {
+      private: number | null; logEntryId: number | null; existingLogId: number | null;
+    }) | undefined;
+  if (!row || (audience === 'shared' && (row.private === 1 || (row.logEntryId !== null && row.existingLogId === null)))) {
+    throw new HttpError(404, 'file_not_found');
+  }
+  return { hash: row.hash, size: row.size, contentType: row.contentType, filename: row.filename };
+}
+
+/** Authorisation and occurrence resolution must precede this function. HEAD never opens a stream. */
+export async function sendFile(request: FastifyRequest, reply: FastifyReply, filesDir: string, target: FileTarget, disposition: 'inline' | 'attachment'): Promise<void> {
+  const path = blobPath(filesDir, target.hash);
+  let info;
+  try {
+    info = await stat(path);
+  } catch (error) {
+    if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) throw new HttpError(404, 'file_not_found');
+    throw new HttpError(500, 'file_unavailable');
+  }
+  if (!info.isFile() || info.size !== target.size) throw new HttpError(500, 'file_unavailable');
+  let range: { start: number; end: number } | undefined;
+  if (request.method === 'GET' && request.headers.range && !request.headers['if-range']) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range);
+    const failRange = (): never => {
+      shareHeaders(reply);
+      reply.header('Content-Range', `bytes */${info.size}`);
+      throw new HttpError(416, 'range_not_satisfiable');
+    };
+    if (!match || (!match[1] && !match[2])) failRange();
+    const first = match![1]!;
+    const last = match![2]!;
+    let start: number;
+    let end: number;
+    if (first === '') {
+      const length = Number(last);
+      if (!Number.isSafeInteger(length) || length < 1) failRange();
+      start = Math.max(0, info.size - length);
+      end = info.size - 1;
+    } else {
+      start = Number(first);
+      end = last === '' ? info.size - 1 : Number(last);
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) failRange();
+      end = Math.min(end, info.size - 1);
+    }
+    if (start >= info.size || end < start) failRange();
+    range = { start, end };
+  }
+  const filename = safeFilename(target.filename);
+  const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  const encoded = encodeURIComponent(filename).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  shareHeaders(reply);
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('Content-Security-Policy', target.contentType === 'image/svg+xml' ? "sandbox; default-src 'none'; style-src 'unsafe-inline'" : 'sandbox');
+  reply.header('Content-Type', target.contentType);
+  reply.header('Accept-Ranges', 'bytes');
+  reply.header('Content-Length', range ? range.end - range.start + 1 : info.size);
+  if (range) {
+    reply.status(206);
+    reply.header('Content-Range', `bytes ${range.start}-${range.end}/${info.size}`);
+  }
+  reply.header('Content-Disposition', `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`);
+  if (request.method === 'HEAD') {
+    reply.status(200).send();
+    return;
+  }
+  await reply.send(createReadStream(path, range));
+}
+``````
+
+#### File: `src/server/files/formats.ts`
+
+<!-- replay task=12 phase=implementation sha256=9ae0c07ad16a5b6dc963803be5f40f38226242ad905c8b752f27eb69799e33da -->
+
+``````ts
+import { extname } from 'node:path';
+import { ACCEPTED_ATTACHMENT_EXTENSIONS, type AttachmentCapabilities, type FilePurpose } from '../../domain';
+import { HttpError } from '../errors';
+
+/** Named positive vendor formats plus retained v1 formats. Storage acceptance is not document validation. */
+export const ATTACHMENT_EXTENSIONS = new Set(ACCEPTED_ATTACHMENT_EXTENSIONS);
+const extension = (filename: string) => extname(filename).slice(1).toLowerCase();
+const begins = (bytes: Buffer, hex: string) => bytes.subarray(0, hex.length / 2).equals(Buffer.from(hex, 'hex'));
+const native: Record<string, [AttachmentCapabilities['kind'], string, string]> = {};
+function formats(extensions: string, kind: AttachmentCapabilities['kind'], mediaType: string, canonical = mediaType): void {
+  for (const ext of extensions.split(' ')) native[ext] = [kind, mediaType, canonical];
+}
+formats('jpg jpeg jpe jfif','image','image/jpeg');
+formats('png','image','image/png');
+formats('heic heif','image','image/heic');
+formats('gif','image','image/gif');
+formats('bmp','image','image/bmp');
+formats('ico','image','image/x-icon');
+formats('webp','image','image/webp');
+formats('tif tiff','image','image/tiff');
+formats('svg','image','image/svg+xml');
+formats('pdf','pdf','application/pdf');
+formats('mp4','video','video/mp4','application/mp4');
+formats('mov','video','video/quicktime','application/mp4');
+formats('m4a','audio','audio/mp4','application/mp4');
+formats('webm','video','video/webm','application/x-ebml');
+formats('mkv','video','video/x-matroska','application/x-ebml');
+formats('avi','video','video/x-msvideo');
+formats('flv','video','video/x-flv');
+formats('mpeg','video','video/mpeg');
+formats('mp3','audio','audio/mpeg');
+formats('wav','audio','audio/wav');
+formats('ogg','audio','audio/ogg','application/ogg');
+
+function canonicalType(bytes: Buffer): string {
+  if (begins(bytes,'ffd8ff')) return 'image/jpeg';
+  if (begins(bytes,'89504e470d0a1a0a')) return 'image/png';
+  if (/^GIF8[79]a/.test(bytes.toString('ascii',0,6))) return 'image/gif';
+  if (bytes.toString('ascii',0,2) === 'BM') return 'image/bmp';
+  if (begins(bytes,'00000100')) return 'image/x-icon';
+  if (begins(bytes,'49492a00') || begins(bytes,'4d4d002a')) return 'image/tiff';
+  if (bytes.toString('ascii',0,4) === 'RIFF') {
+    const subtype = bytes.toString('ascii',8,12);
+    if (subtype === 'WEBP') return 'image/webp';
+    if (subtype === 'WAVE') return 'audio/wav';
+    if (subtype === 'AVI ') return 'video/x-msvideo';
+  }
+  if (bytes.length >= 16 && bytes.toString('ascii',4,8) === 'ftyp') {
+    const size = bytes.readUInt32BE(0);
+    if (size >= 16 && size <= bytes.length && size % 4 === 0) {
+      const brands = [bytes.toString('ascii',8,12)];
+      for (let at=16; at<size; at+=4) brands.push(bytes.toString('ascii',at,at+4));
+      if (brands.some(brand => ['heic','heix','hevc','hevx'].includes(brand))) return 'image/heic';
+      return 'application/mp4';
+    }
+  }
+  if (begins(bytes,'1a45dfa3')) return 'application/x-ebml';
+  if (bytes.toString('ascii',0,3) === 'FLV') return 'video/x-flv';
+  if (begins(bytes,'000001ba') || begins(bytes,'000001b3')) return 'video/mpeg';
+  if (bytes.toString('ascii',0,3) === 'ID3' || (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0)) return 'audio/mpeg';
+  if (bytes.toString('ascii',0,4) === 'OggS') return 'application/ogg';
+  const text = bytes.toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  if (text.startsWith('%PDF-')) return 'application/pdf';
+  if (/^(?:<\?xml[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>|\s)*<svg(?:\s|\/?>)/i.test(text)) return 'image/svg+xml';
+  if (text.startsWith('{\\rtf')) return 'application/rtf';
+  if (begins(bytes,'d0cf11e0a1b11ae1')) return 'application/x-cfb';
+  if (begins(bytes,'504b0304') || begins(bytes,'504b0506') || begins(bytes,'504b0708')) return 'application/zip';
+  return 'application/octet-stream';
+}
+
+/** Content-derived storage MIME stays identical when the same bytes have different allowed names. */
+export function detectFormat(bytes: Buffer, filename: string, purpose: FilePurpose): string {
+  const ext = extension(filename);
+  const mime = canonicalType(bytes);
+  if (purpose === 'attachment') {
+    if (!ATTACHMENT_EXTENSIONS.has(ext)) throw new HttpError(415,'unsupported_file_type');
+    const expected = native[ext]?.[2];
+    if (expected && expected !== mime) throw new HttpError(415,'unsupported_file_type');
+  } else {
+    const allowed = purpose === 'photo-original' ? ['image/jpeg','image/png','image/heic'] : ['image/jpeg'];
+    if (!allowed.includes(mime) || native[ext]?.[2] !== mime) throw new HttpError(415,'unsupported_file_type');
+  }
+  return mime;
+}
+
+/** A viewer is an attempt, not a codec guarantee. Every viewer must retain an original-download fallback. */
+export function attachmentCapabilities(filename: string, contentType: string): AttachmentCapabilities {
+  const ext = extension(filename);
+  if (ext === 'eml' || ext === 'msg') return {kind:'email',view:'email',reader:ext,download:true};
+  const entry = native[ext];
+  if (entry && entry[2] === contentType) return {kind:entry[0],view:'native',mediaType:entry[1],download:true};
+  return {kind:'document',view:'download',download:true};
+}
+``````
+
+#### File: `src/server/files/occurrences.ts`
+
+<!-- replay task=12 phase=implementation sha256=222c10006863477260dae0d32a819ab2fc0c1d5afa2003c037be6784fa7420b3 -->
+
+``````ts
+import { attachmentCapabilities } from './formats';
+import type { AttachmentMeta, AttachmentOut, AttachmentPatchInput, PhotoMeta, PhotoOut, PhotoPatchInput } from '../../domain';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { requireRecord, touchRecord } from '../records/store';
+import type { StagedFile } from './storage';
+import type { UploadEnvelope } from './uploads';
+
+const PHOTO_SELECT = `SELECT p.id, p.original_filename AS originalFilename, p.phase, p.caption, p.taken_at AS takenAt,
+  u.display_name AS uploadedBy, p.uploaded_at AS uploadedAt FROM photos p JOIN users u ON u.id = p.uploaded_by`;
+
+export function listPhotos(db: Db, recordId: number): PhotoOut[] {
+  return db.prepare(`${PHOTO_SELECT} WHERE p.record_id = ?
+    ORDER BY CASE p.phase WHEN 'before' THEN 0 WHEN 'during' THEN 1 ELSE 2 END, p.uploaded_at DESC, p.id DESC`).all(recordId) as PhotoOut[];
+}
+
+export function listAttachments(db: Db, recordId: number): AttachmentOut[] {
+  const rows = db.prepare(`SELECT a.id, a.original_filename AS originalFilename, a.title, b.size, b.content_type AS contentType,
+    u.display_name AS uploadedBy, a.uploaded_at AS uploadedAt, l.id AS logId, l.event_at AS eventAt, l.text, l.private
+    FROM attachments a JOIN blobs b ON b.hash = a.blob_hash JOIN users u ON u.id = a.uploaded_by
+    LEFT JOIN log_entries l ON l.id = a.log_entry_id AND l.record_id = a.record_id
+    WHERE a.record_id = ? ORDER BY a.uploaded_at DESC, a.id DESC`).all(recordId) as (Omit<AttachmentOut, 'logEntry'> & {
+      logId: number | null; eventAt: string; text: string; private: number;
+    })[];
+  return rows.map(row => ({
+    id: row.id,
+    originalFilename: row.originalFilename,
+    title: row.title,
+    size: row.size,
+    contentType: row.contentType,
+    capabilities: attachmentCapabilities(row.originalFilename, row.contentType),
+    uploadedBy: row.uploadedBy,
+    uploadedAt: row.uploadedAt,
+    logEntry: row.logId === null ? null : { id: row.logId, eventAt: row.eventAt, text: row.text, private: row.private === 1 },
+  }));
+}
+
+export function requireOccurrence(db: Db, kind: 'photos' | 'attachments', recordId: number, id: number): void {
+  if (!db.prepare(`SELECT id FROM ${kind} WHERE record_id = ? AND id = ?`).get(recordId, id)) {
+    throw new HttpError(404, 'file_not_found');
+  }
+}
+
+function insertBlob(db: Db, file: StagedFile): void {
+  db.prepare('INSERT OR IGNORE INTO blobs(hash, size, content_type) VALUES (?, ?, ?)').run(file.hash, file.size, file.contentType);
+  const row = db.prepare('SELECT size, content_type AS contentType FROM blobs WHERE hash = ?').get(file.hash) as { size: number; contentType: string };
+  if (row.size !== file.size || row.contentType !== file.contentType) throw new Error('blob_metadata_collision');
+}
+
+/** Called only after all files are published. Recheck associations inside the synchronous transaction. */
+export function saveUpload(db: Db, projectId: number, recordId: number, userId: number, kind: 'photos' | 'attachments', envelope: UploadEnvelope): PhotoOut | AttachmentOut {
+  return db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    const at = new Date().toISOString();
+    let id: number;
+    if (kind === 'photos') {
+      const meta = envelope.metadata as PhotoMeta;
+      const { original, display, thumbnail } = envelope.files;
+      if (!original || !display || !thumbnail) throw new HttpError(400, 'invalid_upload');
+      for (const file of [original, display, thumbnail]) insertBlob(db, file);
+      id = Number(db.prepare(`INSERT INTO photos(record_id, original_hash, display_hash, thumbnail_hash, original_filename, phase, caption, taken_at, uploaded_by, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(recordId, original.hash, display.hash, thumbnail.hash, original.filename, meta.phase, meta.caption ?? null, meta.takenAt ?? null, userId, at).lastInsertRowid);
+    } else {
+      const meta = envelope.metadata as AttachmentMeta;
+      if (meta.logEntryId != null && !db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ?').get(meta.logEntryId, recordId)) {
+        throw new HttpError(404, 'log_entry_not_found');
+      }
+      const file = envelope.files.file;
+      if (!file) throw new HttpError(400, 'invalid_upload');
+      insertBlob(db, file);
+      id = Number(db.prepare(`INSERT INTO attachments(record_id, blob_hash, original_filename, title, log_entry_id, uploaded_by, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(recordId, file.hash, file.filename, meta.title ?? null, meta.logEntryId ?? null, userId, at).lastInsertRowid);
+    }
+    touchRecord(db, recordId, userId, at);
+    return (kind === 'photos' ? listPhotos(db, recordId) : listAttachments(db, recordId)).find(row => row.id === id)!;
+  })();
+}
+
+export function editOccurrence(db: Db, projectId: number, recordId: number, id: number, userId: number, kind: 'photos' | 'attachments', patch: PhotoPatchInput | AttachmentPatchInput): PhotoOut | AttachmentOut {
+  return db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    requireOccurrence(db, kind, recordId, id);
+    const fields = kind === 'photos' ? { phase: 'phase', caption: 'caption', takenAt: 'taken_at' } : { title: 'title' };
+    for (const [key, column] of Object.entries(fields)) {
+      if (Object.hasOwn(patch, key)) db.prepare(`UPDATE ${kind} SET ${column} = ? WHERE id = ?`).run((patch as Record<string, unknown>)[key], id);
+    }
+    touchRecord(db, recordId, userId, new Date().toISOString());
+    return (kind === 'photos' ? listPhotos(db, recordId) : listAttachments(db, recordId)).find(row => row.id === id)!;
+  })();
+}
+
+export function deleteOccurrence(db: Db, projectId: number, recordId: number, id: number, userId: number, kind: 'photos' | 'attachments'): void {
+  db.transaction(() => {
+    requireRecord(db, projectId, recordId);
+    requireOccurrence(db, kind, recordId, id);
+    db.prepare(`DELETE FROM ${kind} WHERE id = ?`).run(id);
+    touchRecord(db, recordId, userId, new Date().toISOString());
+  })();
+}
+``````
+
+#### File: `src/server/files/previews.ts`
+
+<!-- replay task=12 phase=implementation sha256=0d95dee044d2cfe5068dcd66dbdb4e745e8601e57e4f4f290fdd852df80f849f -->
+
+``````ts
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { resolveAttachmentFile, type FileTarget } from './downloads';
+import { attachmentCapabilities } from './formats';
+
+/** Access to the record must already be authorized. The occurrence and current Log privacy are checked here. */
+export function describeAttachment(db: Db, recordId: number, attachmentId: number, audience: 'owner' | 'shared') {
+  const target = resolveAttachmentFile(db,recordId,attachmentId,audience);
+  return {id:attachmentId,filename:target.filename,size:target.size,contentType:target.contentType,
+    capabilities:attachmentCapabilities(target.filename,target.contentType)};
+}
+export function resolveAttachmentView(db: Db, recordId: number, attachmentId: number, audience: 'owner' | 'shared'): FileTarget {
+  const target = resolveAttachmentFile(db,recordId,attachmentId,audience);
+  const capabilities = attachmentCapabilities(target.filename,target.contentType);
+  if (capabilities.view !== 'native' || !capabilities.mediaType) throw new HttpError(415,'preview_unavailable');
+  return {...target,contentType:capabilities.mediaType};
+}
+``````
+
+#### File: `src/server/files/routes.ts`
+
+<!-- replay task=12 phase=implementation sha256=84511da0d9a2d50e20a8f29ab155c35e6110e2e3ff5a4c18f85c9115da6ea35b -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { AttachmentPatch, PhotoPatch, PhotoVariantParam } from '../../domain';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { ItemParams, RecordItemParams } from '../http/params';
+import { requireUserId } from '../http/user';
+import { requireRecord } from '../records/store';
+import { deleteOccurrence, editOccurrence, listAttachments, listPhotos, saveUpload } from './occurrences';
+import { discardStaged, publishFile } from './storage';
+import { parseUpload } from './uploads';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from './downloads';
+import { describeAttachment, resolveAttachmentView } from './previews';
+
+export function registerFileRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
+  app.get('/api/projects/:projectId/records/:id/attachments/:itemId/preview', { config: { privateResponse: true } }, async request => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    return describeAttachment(db, id, itemId, 'owner');
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/view', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'owner'), 'inline');
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/photos/:itemId/:variant', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+    requireRecord(db, projectId, id);
+    const target = resolvePhotoFile(db, id, itemId, variant);
+    await sendFile(request, reply, config.filesDir, target, variant === 'original' ? 'attachment' : 'inline');
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/projects/:projectId/records/:id/attachments/:itemId/file', config: { privateResponse: true }, handler: async (request, reply) => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'owner'), 'attachment');
+  } });
+  for (const kind of ['photos', 'attachments'] as const) {
+    const url = `/api/projects/:projectId/records/:id/${kind}`;
+    app.post(url, { config: { multipart: true } }, async (request, reply) => {
+      const { projectId, id } = ItemParams.parse(request.params);
+      requireRecord(db, projectId, id);
+      const envelope = await parseUpload(request, config.filesDir, kind);
+      try {
+        for (const file of Object.values(envelope.files)) await publishFile(config.filesDir, file);
+        return reply.status(201).send(saveUpload(db, projectId, id, requireUserId(request), kind, envelope));
+      } finally {
+        await Promise.all(Object.values(envelope.files).map(discardStaged));
+      }
+    });
+    app.get(url, async request => {
+      const { projectId, id } = ItemParams.parse(request.params);
+      requireRecord(db, projectId, id);
+      return kind === 'photos' ? listPhotos(db, id) : listAttachments(db, id);
+    });
+    app.patch(`${url}/:itemId`, async request => {
+      const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+      const patch = kind === 'photos' ? PhotoPatch.parse(request.body) : AttachmentPatch.parse(request.body);
+      return editOccurrence(db, projectId, id, itemId, requireUserId(request), kind, patch);
+    });
+    app.delete(`${url}/:itemId`, async request => {
+      const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+      deleteOccurrence(db, projectId, id, itemId, requireUserId(request), kind);
+      return { ok: true };
+    });
+  }
+}
+``````
+
+#### File: `src/server/files/uploads.ts`
+
+<!-- replay task=12 phase=implementation sha256=b5cccb21d643064952e4ad18a4f6adb3fa8a80610012135e27c475683d094d9d -->
+
+``````ts
+import type { FastifyRequest } from 'fastify';
+import type { Readable } from 'node:stream';
+import { ZodError } from 'zod';
+import { AttachmentUploadMeta, Filename, PhotoUploadMeta, UPLOAD_REQUEST_LIMIT, type AttachmentMeta, type PhotoMeta } from '../../domain';
+import { HttpError } from '../errors';
+import { discardStaged, stageFile, type StagedFile } from './storage';
+
+export interface UploadFile extends StagedFile { filename: string }
+export interface UploadEnvelope {
+  metadata: PhotoMeta | AttachmentMeta;
+  files: Record<string, UploadFile>;
+}
+
+export async function parseUpload(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments'): Promise<UploadEnvelope> {
+  if (!request.isMultipart()) throw new HttpError(415, 'unsupported_content_type');
+  // @fastify/multipart consumes request.raw directly, not Fastify's preParsing payload.
+  // Count that stream before starting its lazy parser, after the route's access check.
+  const declared = request.headers?.['content-length'];
+  if (declared !== undefined && Number(declared) > UPLOAD_REQUEST_LIMIT) {
+    request.raw.resume();
+    throw new HttpError(413, 'upload_too_large');
+  }
+  let bytes = 0;
+  let budgetError: HttpError | undefined;
+  const countBytes = (chunk: Buffer | string): void => {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > UPLOAD_REQUEST_LIMIT && !budgetError) {
+      budgetError = new HttpError(413, 'upload_too_large');
+      // Tell the multipart parser to terminate its active file without destroying
+      // the HTTP socket, so the caller still receives the 413 response.
+      request.raw.emit('error', budgetError);
+    }
+  };
+  request.raw.on('data', countBytes);
+  const photo = kind === 'photos';
+  const expected = photo ? ['original', 'display', 'thumbnail'] : ['file'];
+  const files: Record<string, UploadFile> = {};
+  let metadata: unknown;
+  let hasMetadata = false;
+  let currentFile: Readable | undefined;
+  try {
+    for await (const part of request.parts({
+      limits: {
+        files: photo ? 3 : 1,
+        fields: 1,
+        parts: photo ? 4 : 2,
+        fileSize: UPLOAD_REQUEST_LIMIT,
+        fieldSize: 16_384,
+        fieldNameSize: 100,
+        headerPairs: 100,
+      },
+    })) {
+      if (part.type === 'file') {
+        currentFile = part.file;
+        if (!expected.includes(part.fieldname) || files[part.fieldname]) {
+          part.file.resume();
+          throw new HttpError(400, 'invalid_upload');
+        }
+        const filename = Filename.parse(part.filename);
+        const purpose = photo ? `photo-${part.fieldname}` as 'photo-original' | 'photo-display' | 'photo-thumbnail' : 'attachment';
+        const staged = await stageFile(filesDir, part.file, filename, purpose);
+        files[part.fieldname] = { ...staged, filename };
+        currentFile = undefined;
+      } else {
+        if (part.fieldnameTruncated || part.valueTruncated) throw new HttpError(413, 'upload_too_large');
+        if (part.fieldname !== 'metadata' || hasMetadata) throw new HttpError(400, 'invalid_upload');
+        hasMetadata = true;
+        // Multipart parses application/json fields itself; text fields remain raw JSON strings.
+        metadata = typeof part.value === 'string' ? JSON.parse(part.value) : part.value;
+      }
+    }
+    if (budgetError) throw budgetError;
+    if (!hasMetadata || expected.some(name => !files[name])) throw new HttpError(400, 'invalid_upload');
+    return {
+      metadata: photo ? PhotoUploadMeta.parse(metadata) : AttachmentUploadMeta.parse(metadata),
+      files,
+    };
+  } catch (error) {
+    currentFile?.destroy();
+    // Stop the multipart parser and drain unread request bytes after an early rejection.
+    request.raw.unpipe();
+    request.raw.resume();
+    await Promise.all(Object.values(files).map(discardStaged));
+    if (budgetError) throw budgetError;
+    if (error instanceof HttpError) throw error;
+    const code = (error as { code?: string }).code;
+    if (code && ['FST_REQ_FILE_TOO_LARGE', 'FST_FILES_LIMIT', 'FST_FIELDS_LIMIT', 'FST_PARTS_LIMIT'].includes(code)) {
+      throw new HttpError(413, 'upload_too_large');
+    }
+    const malformed = ['Multipart: Boundary not found', 'Unexpected end of multipart data', 'Premature close'];
+    if (error instanceof ZodError || error instanceof SyntaxError || code === 'FST_INVALID_JSON_FIELD_ERROR' || malformed.includes((error as Error).message)) {
+      throw new HttpError(400, 'invalid_upload');
+    }
+    throw error;
+  } finally {
+    request.raw.off('data', countBytes);
+  }
+}
+``````
+
+#### File: `src/server/sharing/projection.ts`
+
+<!-- replay task=12 phase=implementation sha256=17ab1e1db95125a1d74183c57ceb93bbbee8ad0a9ae135b7f55b045534d0c1a0 -->
+
+``````ts
+import { z } from 'zod';
+import { isCode, type SharedActivity, type SharedRecord, type VerificationMethod, type VerificationOutcome } from '../../domain';
+import type { Db } from '../db/connection';
+import { listAttachments, listPhotos } from '../files/occurrences';
+import { listLocations } from '../lists/locations';
+import { listPeople } from '../lists/people';
+import { listTags } from '../lists/tags';
+import { listTrades } from '../lists/trades';
+import { listZoneTypes } from '../lists/zone-types';
+import { listActivity, type ActivityEntry } from '../records/activity';
+import { listLog } from '../records/log';
+import { listMeasurementSets } from '../records/measurements';
+import { listOptions } from '../records/options';
+import { getRecordDetail } from '../records/records';
+import { listVerifications } from '../records/transitions';
+import type { ShareAccess } from './links';
+
+const scalarFields = new Map<string, 'number' | 'string'>([
+  ['ballInCourtId', 'number'], ['responsibleId', 'number'], ['severity', 'string'], ['priority', 'string'],
+  ['dueDate', 'string'], ['disposition', 'string'], ['chosenOptionId', 'number'], ['decidedById', 'number'],
+  ['decidedOn', 'string'], ['instructionText', 'string'],
+]);
+const snapshot = z.object({ label: z.string(), description: z.string().nullable() }).nullable();
+const optionDetail = z.object({ fromOption: snapshot.optional(), toOption: snapshot.optional() });
+const statusDetail = z.object({
+  reasonCode: z.string().nullable().optional(),
+  reasonNote: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  verification: z.object({
+    id: z.number().int().positive(),
+    outcome: z.custom<VerificationOutcome>(value => isCode('verificationOutcome', value)),
+    method: z.custom<VerificationMethod>(value => isCode('verificationMethod', value)),
+    checkedById: z.number().int().positive(),
+    date: z.iso.date(),
+  }).optional(),
+});
+
+function publicActivity(entry: ActivityEntry): SharedActivity | null {
+  let detail: SharedActivity['detail'] = null;
+  if (entry.action === 'created') {
+    if (entry.from !== null || entry.to !== 'draft') return null;
+  } else if (entry.action === 'status_changed') {
+    if (!isCode('status', entry.from) || !isCode('status', entry.to)) return null;
+    const parsed = statusDetail.safeParse(entry.detail);
+    if (parsed.success) detail = parsed.data;
+  } else if (entry.action === 'field_changed') {
+    const expected = entry.field === null ? undefined : scalarFields.get(entry.field);
+    if (!expected || [entry.from, entry.to].some(value => value !== null && typeof value !== expected)) return null;
+    if (entry.field === 'chosenOptionId') {
+      const parsed = optionDetail.safeParse(entry.detail);
+      if (parsed.success) detail = parsed.data;
+    }
+  } else return null;
+  return {
+    id: entry.id,
+    at: entry.at,
+    action: entry.action,
+    field: entry.action === 'created' ? null : entry.action === 'status_changed' ? 'status' : entry.field,
+    from: entry.from as string | number | null,
+    to: entry.to as string | number | null,
+    detail,
+  };
+}
+
+/** Every public property is copied deliberately; future owner fields are private by default. */
+export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' | 'recordId'>): SharedRecord {
+  const { projectId, recordId } = access;
+  const r = getRecordDetail(db, projectId, recordId);
+  const record: SharedRecord['record'] = {
+    humanId: r.humanId,
+    subtype: r.subtype,
+    status: r.status,
+    statusReason: r.statusReason === null ? null : { code: r.statusReason.code, note: r.statusReason.note },
+    title: r.title,
+    description: r.description,
+    publicNotes: r.publicNotes,
+    reference: r.reference,
+    ballInCourtId: r.ballInCourtId,
+    responsibleId: r.responsibleId,
+    tradeIds: r.tradeIds,
+    severity: r.severity,
+    priority: r.priority,
+    dueDate: r.dueDate,
+    completion: r.completion,
+    safety: r.safety,
+    tagIds: r.tagIds,
+    locationIds: r.locationIds,
+    problemTypes: r.problemTypes,
+    stage: r.stage,
+    disposition: r.disposition,
+    correction: r.correction,
+    question: r.question,
+    route: r.route,
+    issuedById: r.issuedById,
+    chosenOptionId: r.chosenOptionId,
+    decidedById: r.decidedById,
+    decidedOn: r.decidedOn,
+    instructionText: r.instructionText,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    mustBeDoneBefore: r.mustBeDoneBefore.filter(item => item.status !== 'draft').map(item => ({ humanId: item.humanId, title: item.title })),
+    requiresFirst: r.requiresFirst.filter(item => item.status !== 'draft').map(item => ({ humanId: item.humanId, title: item.title })),
+  };
+  const options = listOptions(db, recordId).map(item => ({ id: item.id, label: item.label, description: item.description }));
+  const measurements = listMeasurementSets(db, recordId).map(item => ({
+    id: item.id, date: item.date, measuredById: item.measuredById, phase: item.phase, note: item.note,
+    rows: item.rows.map(row => ({ item: row.item, quantity: row.quantity, value: row.value, unit: row.unit, note: row.note })),
+  }));
+  const verifications = listVerifications(db, recordId).map(item => ({
+    id: item.id, checkedById: item.checkedById, date: item.date, method: item.method, outcome: item.outcome, note: item.note, createdAt: item.createdAt,
+  }));
+  const photos = listPhotos(db, recordId).map(item => ({
+    id: item.id, originalFilename: item.originalFilename, phase: item.phase, caption: item.caption, takenAt: item.takenAt, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
+  }));
+  const attachments = listAttachments(db, recordId).filter(item => !item.logEntry?.private).map(item => ({
+    id: item.id, originalFilename: item.originalFilename, title: item.title, size: item.size, contentType: item.contentType, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
+    capabilities: item.capabilities,
+    logEntry: item.logEntry === null ? null : { id: item.logEntry.id, eventAt: item.logEntry.eventAt, text: item.logEntry.text },
+  }));
+  const log = listLog(db, recordId).filter(item => !item.private).map(item => ({
+    id: item.id, eventAt: item.eventAt, text: item.text, loggedBy: item.loggedBy,
+    attachmentIds: attachments.filter(file => file.logEntry?.id === item.id).map(file => file.id),
+  }));
+  const activity = listActivity(db, recordId).map(publicActivity).filter((item): item is SharedActivity => item !== null);
+  const personIds = new Set<number>();
+  const addPerson = (id: number | null | undefined) => { if (id != null) personIds.add(id); };
+  for (const id of [r.ballInCourtId, r.responsibleId, r.issuedById, r.decidedById]) addPerson(id);
+  measurements.forEach(item => addPerson(item.measuredById));
+  verifications.forEach(item => addPerson(item.checkedById));
+  for (const entry of activity) {
+    if (['ballInCourtId', 'responsibleId', 'decidedById'].includes(entry.field ?? '')) {
+      if (typeof entry.from === 'number') addPerson(entry.from);
+      if (typeof entry.to === 'number') addPerson(entry.to);
+    }
+    addPerson(entry.detail?.verification?.checkedById);
+  }
+  const nodes = new Map(listLocations(db, projectId).map(node => [node.id, node]));
+  const zoneIds = new Set<number>();
+  const locations = r.locationIds.map(id => {
+    const path: SharedRecord['labels']['locations'][number]['path'] = [];
+    let node = nodes.get(id);
+    const seen = new Set<number>();
+    while (node && !seen.has(node.id)) {
+      seen.add(node.id);
+      if (node.zoneTypeId !== null) zoneIds.add(node.zoneTypeId);
+      path.unshift({ id: node.id, nameEn: node.nameEn, nameEl: node.nameEl, kind: node.kind, zoneTypeId: node.zoneTypeId });
+      node = node.parentId === null ? undefined : nodes.get(node.parentId);
+    }
+    return { id, path };
+  });
+  const labels: SharedRecord['labels'] = {
+    people: listPeople(db, projectId).filter(item => personIds.has(item.id)).map(item => ({ id: item.id, code: item.code, name: item.name, role: item.role })),
+    trades: listTrades(db, projectId).filter(item => r.tradeIds.includes(item.id)).map(item => ({ id: item.id, nameEn: item.nameEn, nameEl: item.nameEl })),
+    tags: listTags(db, projectId).filter(item => r.tagIds.includes(item.id)).map(item => ({ id: item.id, nameEn: item.nameEn, nameEl: item.nameEl })),
+    locations,
+    zoneTypes: listZoneTypes(db, projectId).filter(item => zoneIds.has(item.id)).map(item => ({ id: item.id, nameEn: item.nameEn, nameEl: item.nameEl })),
+  };
+  return { record, options, measurements, verifications, photos, attachments, log, activity, labels };
+}
+``````
+
+#### File: `src/server/sharing/routes.ts`
+
+<!-- replay task=12 phase=implementation sha256=7dae736d9224f48f99623ee45f85af05a1852017065402d7c8493a2078e96495 -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z, ZodError } from 'zod';
+import { PhotoVariantParam, ShareCreate } from '../../domain';
+import type { AppConfig } from '../config';
+import type { Db } from '../db/connection';
+import { ItemParams, RecordItemParams } from '../http/params';
+import { requireUserId } from '../http/user';
+import { authorizeShare, createShareLink, listShareLinks, revokeShareLink } from './links';
+import { buildSharedRecord } from './projection';
+import { HttpError } from '../errors';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
+import { describeAttachment, resolveAttachmentView } from '../files/previews';
+
+export function registerSharingRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
+  const url = '/api/projects/:projectId/records/:id/share-links';
+  const options = { config: { privateResponse: true } };
+  app.get(url, options, async request => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    return listShareLinks(db, config, projectId, id);
+  });
+  app.post(url, options, async (request, reply) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    return reply.status(201).send(createShareLink(db, config, projectId, id, requireUserId(request), ShareCreate.parse(request.body)));
+  });
+  app.post(`${url}/:itemId/revoke`, options, async request => {
+    const { projectId, id, itemId } = RecordItemParams.parse(request.params);
+    z.strictObject({}).parse(request.body);
+    revokeShareLink(db, projectId, id, itemId, requireUserId(request));
+    return { ok: true };
+  });
+  app.get('/api/shared/record', { config: { shareRead: true, privateResponse: true } }, async (request, reply) => {
+    return db.transaction(() => {
+      const now = new Date();
+      const access = authorizeShare(db, request.headers.authorization, now);
+      if (request.method === 'HEAD') return reply.status(200).send();
+      const payload = buildSharedRecord(db, access);
+      db.prepare('UPDATE share_links SET view_count = view_count + 1, last_viewed_at = ? WHERE id = ?').run(now.toISOString(), access.linkId);
+      return payload;
+    })();
+  });
+  const publicFileOptions = { config: { shareRead: true, privateResponse: true } };
+  const fileParams = z.object({ itemId: z.coerce.number().int().positive() });
+  const unavailable = (error: unknown): never => {
+    if (error instanceof ZodError || (error instanceof HttpError && error.statusCode === 404)) throw new HttpError(404, 'not_available');
+    throw error;
+  };
+  app.get('/api/shared/attachments/:itemId/preview', publicFileOptions, async request => {
+    try {
+      const access = authorizeShare(db, request.headers.authorization);
+      const { itemId } = fileParams.parse(request.params);
+      return describeAttachment(db, access.recordId, itemId, 'shared');
+    } catch (error) {
+      unavailable(error);
+    }
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/shared/attachments/:itemId/view', ...publicFileOptions, handler: async (request, reply) => {
+    try {
+      const access = authorizeShare(db, request.headers.authorization);
+      const { itemId } = fileParams.parse(request.params);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, access.recordId, itemId, 'shared'), 'inline');
+    } catch (error) {
+      unavailable(error);
+    }
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/shared/photos/:itemId/:variant', ...publicFileOptions, handler: async (request, reply) => {
+    try {
+      const access = authorizeShare(db, request.headers.authorization);
+      const { itemId } = fileParams.parse(request.params);
+      const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+      const target = resolvePhotoFile(db, access.recordId, itemId, variant);
+      await sendFile(request, reply, config.filesDir, target, variant === 'original' ? 'attachment' : 'inline');
+    } catch (error) {
+      unavailable(error);
+    }
+  } });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/shared/attachments/:itemId/file', ...publicFileOptions, handler: async (request, reply) => {
+    try {
+      const access = authorizeShare(db, request.headers.authorization);
+      const { itemId } = fileParams.parse(request.params);
+      const target = resolveAttachmentFile(db, access.recordId, itemId, 'shared');
+      await sendFile(request, reply, config.filesDir, target, 'attachment');
+    } catch (error) {
+      unavailable(error);
+    }
+  } });
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/media-formats.test.ts tests/server/media-preview.test.ts tests/server/file-access.test.ts tests/server/file-storage.test.ts tests/server/upload-budget.test.ts tests/server/shared-record-api.test.ts`, then `npm run typecheck`. Expected: 82 tests in six files pass; TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/domain/files.ts' 'src/domain/sharing.ts' 'src/server/files/downloads.ts' 'src/server/files/formats.ts' 'src/server/files/occurrences.ts' 'src/server/files/previews.ts' 'src/server/files/routes.ts' 'src/server/files/uploads.ts' 'src/server/sharing/projection.ts' 'src/server/sharing/routes.ts' 'tests/server/file-storage.test.ts' 'tests/server/files-api.test.ts' 'tests/server/media-formats.test.ts' 'tests/server/media-preview.test.ts' 'tests/server/shared-record-api.test.ts' 'tests/server/upload-budget.test.ts'
+git commit -m "feat: support broad attachments and protected native previews"
+```
+
+## Task 13: Integrate contributor viewers and independent Log uploads
+
+**Scratch checkpoint:** `4f665a7`. **Depends on:** Task 12.
+
+**Deliverable:** Apply the shared preview and native view handlers to assigned records, preserve occurrence privacy and HEAD/range behavior, and allow Upload-only attachment additions to existing public Log entries.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+#### File: `tests/server/assigned-records.test.ts`
+
+<!-- replay task=13 phase=test sha256=d902341156dfd0043817e6454459bcf12708d2ff2627fbf1431c9a12b9f796ad -->
+
+``````ts
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createContributor, disableContributor } from '../../src/server/auth/contributors';
+import { createSession, deleteUserSessions } from '../../src/server/auth/sessions';
+import * as storage from '../../src/server/files/storage';
+import { addAttachment, JPEG, multipart, PDF } from './file-fixture';
+import { get, OWNER, send } from './helpers';
+import { forceStatus, makeFixture, patchRecord, postRecord, recordUrl, type Fixture } from './record-fixture';
+
+let f: Fixture;
+let userId: number;
+let cookie: string;
+beforeEach(async () => {
+  f = await makeFixture();
+  userId = createContributor(f.ctx.db, 'PRIVATE_LOGIN', 'Alex Builder', OWNER.password);
+  cookie = `bb_session=${createSession(f.ctx.db, userId).token}`;
+});
+afterEach(async () => { vi.restoreAllMocks(); await f.ctx.close(); });
+const assigned = (id: number, suffix = '') => `/api/assigned-records/${id}${suffix}`;
+async function grant(id: number, canUpload = false, canAddLog = false) {
+  const response = await f.ctx.app.inject({ method: 'PUT', url: recordUrl(f, id, `/grants/${userId}`),
+    headers: { cookie: f.cookie, origin: f.ctx.origin }, payload: { canUpload, canAddLog } });
+  expect(response.statusCode, response.body).toBe(200);
+}
+function upload(id: number, metadata: object = {}, photos = false) {
+  const form = multipart([
+    { name: 'metadata', data: JSON.stringify(photos ? { phase: 'before' } : metadata) },
+    ...(photos ? ['original', 'display', 'thumbnail'].map(name => ({ name, filename: 'photo.jpg', data: JPEG }))
+      : [{ name: 'file', filename: 'plan.pdf', data: PDF }]),
+  ]);
+  return f.ctx.app.inject({ method: 'POST', url: assigned(id, photos ? '/photos' : '/attachments'),
+    headers: { cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body });
+}
+
+it('lists only granted non-Draft records and reads public Notes without private content or directory access', async () => {
+  const record = await postRecord(f, { subtype: 'task', title: 'Assigned', notes: 'PRIVATE_NOTES' });
+  const draft = await postRecord(f, { subtype: 'task', title: 'PRIVATE_DRAFT' });
+  await postRecord(f, { subtype: 'task', title: 'PRIVATE_UNASSIGNED' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id);
+  await grant(draft.id);
+  expect((await patchRecord(f, record.id, { publicNotes: 'Public instructions' })).statusCode).toBe(200);
+  const index = await get(f.ctx, cookie, '/api/assigned-records');
+  expect(index.statusCode).toBe(200);
+  expect(index.json()).toEqual([{ id: record.id, humanId: record.humanId, title: 'Assigned' }]);
+  const response = await get(f.ctx, cookie, assigned(record.id));
+  expect(response.statusCode).toBe(200);
+  expect(response.json().record.publicNotes).toBe('Public instructions');
+  expect(response.body).not.toContain('PRIVATE_');
+  expect(response.json().permissions).toEqual({ canUpload: false, canAddLog: false });
+  expect((await get(f.ctx, cookie, assigned(draft.id))).statusCode).toBe(404);
+  expect((await get(f.ctx, cookie, '/api/contributors')).statusCode).toBe(403);
+  expect((await get(f.ctx, f.cookie, '/api/contributors')).json()).toEqual([
+    { id: userId, username: 'PRIVATE_LOGIN', displayName: 'Alex Builder', active: true },
+  ]);
+  expect((await send(f.ctx, cookie, 'PATCH', recordUrl(f, record.id), { notes: 'bad', publicNotes: 'bad' })).statusCode).toBe(403);
+  expect((await upload(record.id)).statusCode).toBe(403);
+  expect((await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'bad' })).statusCode).toBe(403);
+  const share = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/share-links'), { label: 'Reader' });
+  const token = share.json().url.split('#')[1];
+  const shared = await f.ctx.app.inject({ url: '/api/shared/record', headers: { authorization: `Bearer ${token}` } });
+  expect(shared.json().record.publicNotes).toBe('Public instructions');
+  expect(shared.body).not.toContain('PRIVATE_NOTES');
+});
+
+it('permits only public Log creation for addLog-only users and preserves genuine attribution', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id, false, true);
+  const response = await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'Installed' });
+  expect(response.statusCode).toBe(201);
+  expect(response.json().loggedBy).toBe('Alex Builder');
+  expect(f.ctx.db.prepare('SELECT logged_by FROM log_entries WHERE id = ?').pluck().get(response.json().id)).toBe(userId);
+  expect((await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'secret', private: true })).statusCode).toBe(400);
+  expect((await upload(record.id)).statusCode).toBe(403);
+  for (const method of ['PATCH', 'DELETE'] as const) {
+    expect((await send(f.ctx, cookie, method, recordUrl(f, record.id, `/log/${response.json().id}`), { text: 'changed' })).statusCode).toBe(403);
+  }
+});
+
+it('permits upload-only users to attach to public Logs without granting Log creation', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  const publicLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Public' });
+  const privateLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'PRIVATE_LOG', private: true });
+  await grant(record.id, true, false);
+  const response = await upload(record.id);
+  expect(response.statusCode).toBe(201);
+  expect(response.json().uploadedBy).toBe('Alex Builder');
+  expect(f.ctx.db.prepare('SELECT uploaded_by FROM attachments WHERE id = ?').pluck().get(response.json().id)).toBe(userId);
+  expect((await upload(record.id, {}, true)).statusCode).toBe(201);
+  expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(201);
+  expect((await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'Not permitted' })).statusCode).toBe(403);
+  expect((await upload(record.id, { logEntryId: privateLog.json().id })).statusCode).toBe(404);
+  await grant(record.id, true, true);
+  expect((await upload(record.id, { logEntryId: privateLog.json().id })).statusCode).toBe(404);
+  expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(201);
+  expect((await send(f.ctx, cookie, 'DELETE', recordUrl(f, record.id, `/attachments/${response.json().id}`))).statusCode).toBe(403);
+  expect((await get(f.ctx, cookie, assigned(record.id))).body).not.toContain('PRIVATE_');
+});
+
+it('authorizes contributor media descriptors, views and byte ranges without exposing private occurrences', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  const other = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id);
+  const file = await addAttachment(f, record.id);
+  const foreignFile = await addAttachment(f, other.id);
+  const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Hidden', private: true });
+  const hiddenFile = await addAttachment(f, record.id, { logEntryId: log.json().id });
+  const request = (itemId: number, suffix: string, method: 'GET' | 'HEAD' = 'GET', range?: string) =>
+    f.ctx.app.inject({ method, url: assigned(record.id, `/attachments/${itemId}/${suffix}`),
+      headers: { cookie, ...(range ? { range } : {}) } });
+  const descriptor = await request(file.id, 'preview');
+  expect(descriptor.statusCode).toBe(200);
+  expect(descriptor.json().capabilities).toMatchObject({ kind: 'pdf', view: 'native', download: true });
+  expect(descriptor.body).not.toContain('hash');
+  const range = await request(file.id, 'view', 'GET', 'bytes=1-4');
+  expect(range.statusCode).toBe(206);
+  expect(range.rawPayload).toEqual(PDF.subarray(1, 5));
+  expect(range.headers['content-range']).toBe(`bytes 1-4/${PDF.length}`);
+  expect(range.headers['content-disposition']).toMatch(/^inline;/);
+  expect((await request(file.id, 'view', 'GET', 'bytes=999999-')).statusCode).toBe(416);
+  for (const suffix of ['preview', 'view']) {
+    const head = await request(file.id, suffix, 'HEAD', 'bytes=1-4');
+    expect(head.statusCode).toBe(200);
+    expect(head.body).toBe('');
+    expect(head.headers['cache-control']).toBe('no-store');
+    for (const method of ['GET', 'HEAD'] as const) {
+      for (const itemId of [foreignFile.id, hiddenFile.id]) {
+        expect((await request(itemId, suffix, method, 'bytes=1-4')).statusCode).toBe(404);
+      }
+    }
+  }
+  forceStatus(f, record.id, 'draft');
+  expect((await request(file.id, 'view', 'HEAD')).statusCode).toBe(404);
+  forceStatus(f, record.id, 'open');
+  await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, record.id, `/grants/${userId}`));
+  for (const suffix of ['preview', 'view']) {
+    for (const method of ['GET', 'HEAD'] as const) {
+      expect((await request(file.id, suffix, method, 'bytes=1-4')).statusCode).toBe(404);
+    }
+  }
+});
+
+it('rechecks grants on downloads and HEAD while isolating private and other-record occurrences', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  const other = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  const file = await addAttachment(f, record.id);
+  const foreignFile = await addAttachment(f, other.id);
+  const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'private', private: true });
+  const privateFile = await addAttachment(f, record.id, { logEntryId: log.json().id });
+  await grant(record.id);
+  for (const method of ['GET', 'HEAD'] as const) {
+    const response = await f.ctx.app.inject({ method, url: assigned(record.id, `/attachments/${file.id}/file`), headers: { cookie } });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    if (method === 'HEAD') expect(response.body).toBe('');
+    for (const id of [foreignFile.id, privateFile.id]) {
+      expect((await f.ctx.app.inject({ method, url: assigned(record.id, `/attachments/${id}/file`), headers: { cookie } })).statusCode).toBe(404);
+    }
+  }
+  expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, record.id, `/grants/${userId}`))).statusCode).toBe(200);
+  for (const suffix of ['', `/attachments/${file.id}/file`]) {
+    expect((await f.ctx.app.inject({ method: 'HEAD', url: assigned(record.id, suffix), headers: { cookie } })).statusCode).toBe(404);
+  }
+  await grant(record.id);
+  disableContributor(f.ctx.db, 'PRIVATE_LOGIN');
+  expect((await get(f.ctx, cookie, assigned(record.id))).statusCode).toBe(401);
+});
+
+it('rechecks a grant revoked during publication before creating an occurrence', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id, true, false);
+  const publish = storage.publishFile;
+  vi.spyOn(storage, 'publishFile').mockImplementation(async (...args) => {
+    await publish(...args);
+    f.ctx.db.prepare('DELETE FROM record_grants WHERE user_id = ?').run(userId);
+  });
+  expect((await upload(record.id)).statusCode).toBe(404);
+  expect(f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get()).toBe(0);
+});
+
+it.each(['disable', 'logout'] as const)('rejects an upload when %s ends access during publication', async action => {
+  const record = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id, true, false);
+  const publish = storage.publishFile;
+  vi.spyOn(storage, 'publishFile').mockImplementation(async (...args) => {
+    await publish(...args);
+    if (action === 'disable') disableContributor(f.ctx.db, 'PRIVATE_LOGIN');
+    else deleteUserSessions(f.ctx.db, userId);
+  });
+  expect((await upload(record.id)).statusCode).toBe(401);
+  expect(f.ctx.db.prepare('SELECT COUNT(*) FROM attachments').pluck().get()).toBe(0);
+});
+``````
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/assigned-records.test.ts`.
+
+Expected: two cases fail before contributor preview routes and independent existing-Log uploads are available.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `src/server/access/routes.ts`
+
+<!-- replay task=13 phase=implementation sha256=f3e1896ec8c91d9ebe4b33f5fc3bbccdac169eee85d2c86f7cd673eae8f62e9c -->
+
+``````ts
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { LogEntryBody, PhotoVariantParam, type AttachmentMeta } from '../../domain';
+import type { AppConfig } from '../config';
+import { findSessionUser } from '../auth/sessions';
+import type { Db } from '../db/connection';
+import { HttpError } from '../errors';
+import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
+import { saveUpload } from '../files/occurrences';
+import { describeAttachment, resolveAttachmentView } from '../files/previews';
+import { discardStaged, publishFile } from '../files/storage';
+import { parseUpload } from '../files/uploads';
+import { ItemParams } from '../http/params';
+import { SESSION_COOKIE } from '../http/guards';
+import { requireUserId } from '../http/user';
+import { recordActivity } from '../records/activity';
+import { addLogEntry } from '../records/log';
+import { requireRecord } from '../records/store';
+import { buildSharedRecord } from '../sharing/projection';
+import { requireContributorAccess } from './grants';
+
+const Id = z.coerce.number().int().positive();
+const AssignedParams = z.object({ id: Id });
+const FileParams = AssignedParams.extend({ itemId: Id });
+const GrantParams = ItemParams.extend({ userId: Id });
+const GrantBody = z.strictObject({ canUpload: z.boolean(), canAddLog: z.boolean() });
+const PublicLogBody = LogEntryBody.omit({ private: true });
+const contributorConfig = { contributor: true, privateResponse: true };
+
+export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
+  app.get('/api/contributors', { config: { privateResponse: true } }, async () => {
+    const rows = db.prepare(`SELECT id, username, display_name AS displayName, is_active AS active
+      FROM users WHERE is_owner = 0 ORDER BY display_name, id`).all() as { id: number; username: string; displayName: string; active: number }[];
+    return rows.map(row => ({ ...row, active: row.active === 1 }));
+  });
+  const grantsUrl = '/api/projects/:projectId/records/:id/grants';
+  app.get(grantsUrl, { config: { privateResponse: true } }, async request => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireRecord(db, projectId, id);
+    const rows = db.prepare(`SELECT user_id AS userId, can_upload AS canUpload, can_add_log AS canAddLog
+      FROM record_grants WHERE record_id = ? ORDER BY user_id`).all(id) as { userId: number; canUpload: number; canAddLog: number }[];
+    return rows.map(row => ({ ...row, canUpload: row.canUpload === 1, canAddLog: row.canAddLog === 1 }));
+  });
+  app.put(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    const body = GrantBody.parse(request.body);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      if (!db.prepare('SELECT id FROM users WHERE id = ? AND is_owner = 0 AND is_active = 1').get(userId)) {
+        throw new HttpError(404, 'contributor_not_found');
+      }
+      const old = db.prepare('SELECT can_upload, can_add_log FROM record_grants WHERE record_id = ? AND user_id = ?').get(id, userId) as { can_upload: number; can_add_log: number } | undefined;
+      db.prepare(`INSERT INTO record_grants VALUES (?,?,?,?) ON CONFLICT(record_id,user_id)
+        DO UPDATE SET can_upload=excluded.can_upload, can_add_log=excluded.can_add_log`)
+        .run(id, userId, Number(body.canUpload), Number(body.canAddLog));
+      if (!old || old.can_upload !== Number(body.canUpload) || old.can_add_log !== Number(body.canAddLog)) {
+        recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+          action: 'grant_changed', detail: { userId, ...body } });
+      }
+      return { userId, ...body };
+    })();
+  });
+  app.delete(`${grantsUrl}/:userId`, { config: { privateResponse: true } }, async request => {
+    const { projectId, id, userId } = GrantParams.parse(request.params);
+    return db.transaction(() => {
+      requireRecord(db, projectId, id);
+      const result = db.prepare('DELETE FROM record_grants WHERE record_id = ? AND user_id = ?').run(id, userId);
+      if (result.changes) recordActivity(db, { recordId: id, userId: requireUserId(request), at: new Date().toISOString(),
+        action: 'grant_revoked', detail: { userId } });
+      return { ok: true };
+    })();
+  });
+
+  app.get('/api/assigned-records', { config: contributorConfig }, async request => db.prepare(`
+    SELECT r.id, r.human_id AS humanId, r.title FROM record_grants g
+    JOIN records r ON r.id = g.record_id JOIN users u ON u.id = g.user_id
+    WHERE g.user_id = ? AND u.is_active = 1 AND u.is_owner = 0 AND r.status <> 'draft'
+    ORDER BY r.id`).all(requireUserId(request)));
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const access = requireContributorAccess(db, requireUserId(request), id);
+      if (request.method === 'HEAD') return reply.send();
+      return { ...buildSharedRecord(db, access), permissions: { canUpload: access.canUpload, canAddLog: access.canAddLog } };
+    },
+  });
+  app.post('/api/assigned-records/:id/log', { config: contributorConfig }, async (request, reply) => {
+    const { id } = AssignedParams.parse(request.params);
+    const userId = requireUserId(request);
+    const body = PublicLogBody.parse(request.body);
+    const entry = db.transaction(() => {
+      const access = requireContributorAccess(db, userId, id, 'addLog');
+      return addLogEntry(db, access.projectId, id, userId, body);
+    })();
+    return reply.status(201).send({ id: entry.id, eventAt: entry.eventAt, text: entry.text, loggedBy: entry.loggedBy, attachmentIds: [] });
+  });
+  for (const kind of ['photos', 'attachments'] as const) {
+    app.post(`/api/assigned-records/:id/${kind}`, { config: { ...contributorConfig, multipart: true } }, async (request, reply) => {
+      const { id } = AssignedParams.parse(request.params);
+      const userId = requireUserId(request);
+      requireContributorAccess(db, userId, id, 'upload');
+      const envelope = await parseUpload(request, config.filesDir, kind);
+      try {
+        for (const file of Object.values(envelope.files)) await publishFile(config.filesDir, file);
+        const result = db.transaction(() => {
+          const token = request.cookies[SESSION_COOKIE];
+          if (!token || findSessionUser(db, token)?.userId !== userId) throw new HttpError(401, 'unauthenticated');
+          const access = requireContributorAccess(db, userId, id, 'upload');
+          const logEntryId = kind === 'attachments' ? (envelope.metadata as AttachmentMeta).logEntryId : null;
+          if (logEntryId != null) {
+            if (!db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ? AND private = 0').get(logEntryId, id)) {
+              throw new HttpError(404, 'log_entry_not_found');
+            }
+          }
+          const occurrence = saveUpload(db, access.projectId, id, userId, kind, envelope);
+          return buildSharedRecord(db, access)[kind].find(item => item.id === occurrence.id);
+        })();
+        return reply.status(201).send(result);
+      } finally {
+        await Promise.all(Object.values(envelope.files).map(discardStaged));
+      }
+    });
+  }
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/photos/:itemId/:variant', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const variant = PhotoVariantParam.parse((request.params as { variant: unknown }).variant);
+      await sendFile(request, reply, config.filesDir, resolvePhotoFile(db, id, itemId, variant), variant === 'original' ? 'attachment' : 'inline');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/file', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'shared'), 'attachment');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/preview', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const descriptor = describeAttachment(db, id, itemId, 'shared');
+      if (request.method === 'HEAD') return reply.send();
+      return descriptor;
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/view', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'shared'), 'inline');
+    },
+  });
+}
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/assigned-records.test.ts`, then `npm run typecheck`. Expected: eight tests pass; TypeScript reports no errors.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'src/server/access/routes.ts' 'tests/server/assigned-records.test.ts'
+git commit -m "feat: integrate contributor previews and independent log uploads"
+```
+
+## Task 14: Reconcile operating instructions and browser handoff
+
+**Scratch checkpoint:** `8d656bc`. **Depends on:** Task 13.
+
+**Deliverable:** Final account, permission, attachment and viewer guidance; preserve the distinction between approved scope, planning replay and future product implementation.
+
+- [ ] **Step 1: Write these complete test and fixture files.**
+
+This final documentation task adds no tests. Preserve the passing implementation tests.
+
+- [ ] **Step 2: Verify the pre-implementation result.**
+
+Run: `npx vitest run tests/server/share-command.test.ts`.
+
+Expected: existing command tests remain green; this task changes documentation only.
+
+- [ ] **Step 3: Write these complete implementation/configuration files.**
+
+#### File: `README.md`
+
+<!-- replay task=14 phase=implementation sha256=2778af3b8b7da9a78a1bb69ed2658e591ae774826c91f4390860e210a7dd26cc -->
+
+``````markdown
+# BuiltBasis
+
+Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
+
+**Status:** Plans 0–3 are implemented and merged to `main`. Plan 4 covers files, sharing and named contributor access. Its scope is approved; its revised implementation plan remains pending execution and closeout. Scratch implementation and replay evidence do not change that status. Plan 5 supplies the browser screens and viewers.
+
+## Local dependency installation
+
+Use the locked dependencies and shipped SQLite binary:
+
+```sh
+npm ci --ignore-scripts
+npm rebuild esbuild
+```
+
+On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrectly attempted a SQLite source build despite the package declaring `gypfile: false`. Reassess install scripts when dependencies change. Use each completed plan's verification record for current test counts.
+
+## Planned access and evidence contract
+
+There is one owner and separately named contributor accounts. The owner grants access per record. Upload and Add Log are independent permissions. Contributors cannot edit record fields or either Notes field. Public Notes are visible to readers. Private Notes, commercial fields, private Log entries and their attachments remain owner-only. Both Notes fields are edited by the owner. Public share links remain read-only.
+
+Plan 4 adds interactive administrative commands to create, reset, disable and enable contributors. It adds grant APIs and assigned-record APIs. Plan 5 adds screens to display and select existing CLI-provisioned accounts, manage their record grants, and support contributor workflows. Account creation and password administration stay with the CLI. Display names identify contributors on visible evidence; login usernames are not public attribution.
+
+Uploads have a **100,000,000-byte total multipart request-body limit**, including metadata, part headers and boundaries. A file or photo original shares that budget with the rest of the request. Browser-generated photo display and thumbnail copies have separate 5,000,000 and 500,000-byte limits. The 145-extension catalog is exported by `src/domain/files.ts` for server validation and browser file pickers. Office, CAD/BIM and archive files are stored for download.
+
+Image, PDF, audio and video attachments have authorized native-view routes with download fallback. GET supports single byte ranges; HEAD returns headers without opening a file stream. Browser codec support still determines playback. EML/MSG viewing belongs to Plan 5's browser reader, using authorized original bytes. Plan 4 does not parse email on the server.
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [docs/VISION.md](docs/VISION.md) | What we are building and why |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System structure |
+| [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
+| [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
+| [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
+| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Planned key/account operations, access rules and Plan 5/6 handoff |
+| [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
+| [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research |
+
+Documentation follows `X:\1976KN\Dev\Code\DOCS-STANDARD.md` (v1.4).
+
+## Planned share-key setup
+
+Plan 4 requires `SHARE_LINK_KEY`, a dedicated random 32-byte key encoded as 64 hexadecimal characters. Store it in private server configuration outside the repository, data directory and backups. Preserve it across deployments. Offline owner, contributor, seed and share-revocation commands permit an absent key.
+
+After key loss or replacement, stop the application and run `npm run shares:revoke-all` against the intended data directory. Install a newly generated key in private configuration, restart, and issue replacement links. Startup also revokes unrevoked links when the key fingerprint changes. Never publish a key or put it in command logs.
+``````
+
+#### File: `docs/guides/share-key-management.md`
+
+<!-- replay task=14 phase=implementation sha256=faa0f06933a9693210d91101b167bed5887a1846472183f12aabfa710f842d5e -->
+
+``````markdown
+# Share-link key management and API handoff
+
+> **Document type:** Operational guide
+> **Status:** Draft — approved Plan 4 scope; operational procedure awaits implementation and closeout.
+> **Authority:** The approved v1 design and reconciled Plan 4 decisions define scope. This guide describes the planned API and operational contract; scratch replay is not production implementation.
+
+The application stores encrypted copies of share tokens so the owner can resend a link. The dedicated encryption key belongs in private server configuration. Losing or replacing it requires revoking existing links and issuing replacements.
+
+## First setup
+
+Set `BUILTBASIS_DATA_DIR` to the intended data directory and `PUBLIC_BASE_URL` to the application origin. Supply `SHARE_LINK_KEY` through private server configuration. It must encode exactly 32 random bytes as 64 hexadecimal characters. Use a cryptographically secure secret generator. There is no default key and no working key in `.env.example`.
+
+Keep this key outside the repository, data directory and backups. Do not pass it as a command-line argument, print it to application logs, or include it in support material. Preserve it when replacing the application folder during deployment.
+
+The HTTP app refuses a missing or malformed key before registering routes. A first empty database stores only a SHA-256 fingerprint. Normal startup with the same key does not revoke links or write new fingerprint state. Each link's encrypted token is bound to its record through authenticated encryption.
+
+## Lost or replaced key
+
+1. Stop the application so no public request can race administrative maintenance.
+2. Set the intended data-directory configuration. An absent share key is permitted for this offline command. Remove a malformed key setting rather than substituting a guessed value.
+3. From the application directory, run `npm run shares:revoke-all`.
+4. Check that it exits successfully. Its output contains only `share_links_revoked_administratively` and the revoked-link count. Repeating it reports zero once every link is revoked.
+5. Install a newly generated key in private configuration and restart the application.
+6. Create replacement links through owner link management. Previously sent links remain unavailable.
+
+The command opens and migrates the configured database through the existing bootstrap, revokes every unrevoked link, and closes the database. It never builds the HTTP app and does not require the lost key. Command failures return a nonzero exit code and the controlled event `share_links_revocation_failed`.
+
+Startup also revokes all unrevoked links when the key fingerprint changes. Missing fingerprint state with existing links is treated as a change. Revocation and fingerprint replacement form one SQLite transaction. A failure rolls both back and prevents startup.
+
+Old link rows are retained. The owner sees `url:null` when a row was encrypted with an unavailable old key. A corrupt copy under the matching current key fails with `share_copy_failed`; it never yields a fabricated URL. Owner-requested revocation is idempotent and appends one activity entry. Administrative revocation emits only a safe aggregate event and does not fabricate an owner actor. This aggregate maintenance event does not invent a record author.
+
+## Restore requirements for Plan 6
+
+Keep the application stopped throughout a restore. Restore the database and complete immutable file bytes together. Delete all sessions and revoke every share link before reopening access, even if the encryption key is unchanged. Restored links must never become usable merely because a backup predates their revocation. Disable every non-owner account and delete all record grants before reopening access. A backup can restore previously disabled users, revoked grants and old passwords. The owner must reset each retained contributor password before enabling that account, then deliberately regrant record access. Enabling alone is insufficient.
+
+Backup enumeration must cover every hash in `blobs`, or at minimum all three photo references and all attachment references. Stored blobs are never deleted in v1, including completed unreferenced blobs left by a failed occurrence transaction. Exclude unpublished `.tmp` files and private configuration from backups. The key is preserved separately from backups.
+
+Reverse-proxy and Cloudflare rules must preserve `no-store` and avoid logging Authorization or request bodies. The application uses registered route patterns and controlled errors in its logs, but upstream logging policy remains deployment work. Validate the full 100,000,000-byte multipart request-body path, including overhead, streaming memory use and Linux file/directory sync behaviour on hosting. Windows tests do not establish Linux crash durability. The recovery drill and production rollout remain Plan 6 work.
+
+## Named accounts and record grants
+
+These commands become available when Plan 4 is implemented. Run them against the intended `BUILTBASIS_DATA_DIR`. Account administration does not require a share-link encryption key.
+
+```sh
+npm run owner -- owner "Project owner"
+npm run user -- create contractor "Contractor name"
+npm run user -- reset contractor
+npm run user -- disable contractor
+npm run user -- enable contractor
+```
+
+Create and reset prompt for a password twice in an interactive terminal. Passwords are never command arguments or piped input. Reset ends that account's sessions. Disable blocks login and ends sessions. Enable requires a fresh login and leaves existing record grants in place. The contributor command cannot change the owner. A reset does not implicitly enable a disabled account.
+
+The owner selects an active contributor and grants access to individual records. A grant with both write permissions false provides read access. `canUpload` permits photos and attachments. `canAddLog` permits new public Log entries. Either permission can be enabled independently. Upload alone also permits a new attachment on an existing public Log entry of the same record. Creating a new entry with files needs both permissions. Contributors cannot add private entries, edit record fields, manage grants or change existing evidence. Draft records remain unavailable.
+
+The owner APIs list contributors and manage `/api/projects/:projectId/records/:id/grants`. Contributor access uses `/api/assigned-records`. Every request checks the current account and grant. An upload checks them again before committing after its bytes arrive. Removing a grant or disabling an account stops subsequent access. Already delivered bytes cannot be recalled. Public share links remain read-only and never grant contributor permissions.
+
+Plan 5 supplies screens to display and select existing CLI-provisioned accounts, manage record grants, show separate Upload and Add Log controls, and follow assigned records. It does not imply an account-creation or password-management API. It must not infer one permission from the other. Current command/API availability and future screens must be labelled accurately during implementation.
+
+## Plan 5 evidence and viewer contract
+
+The browser uploads one attachment or one photo bundle per request. A bundle supplies an original plus JPEG display and thumbnail copies. The entire multipart request body may contain at most **100,000,000 bytes**, including preamble, metadata, part headers, boundaries and epilogue. Original files share this budget with the other parts; do not advertise a 100 MB file plus overhead. Generated display and thumbnail copies remain limited to 5,000,000 and 500,000 bytes. The server counts actual streamed bytes and rejects oversize requests with 413, including chunked bodies.
+
+`ACCEPTED_ATTACHMENT_EXTENSIONS` in `src/domain/files.ts` is the shared 145-extension catalog. Browser pickers reuse it. Storage-only Office, CAD/BIM, archive and specialist formats are screened by suffix and never executed or converted. DWG version signatures do not limit storage admission. Native-view formats receive bounded signature screening before selecting their response MIME. This is not document validation or malware scanning. The `.a` and `.mat` entries are intentionally download-only.
+
+EXIF extraction, explicit-offset date handling, HEIC decoding and fallback belong to the browser. Missing or ambiguous capture dates stay null. Photo bundles retain immutable original bytes. Server tests do not establish browser image-decoder support.
+
+Attachment collections expose `capabilities`, with a viewer kind, view mode, download fallback and optional media type or email reader. Authorized `/preview` returns the same descriptor. Authorized `/file` returns the original as a download. Authorized `/view` returns image, PDF, audio or video bytes inline. Unsupported view modes return `preview_unavailable`. Owner, shared and assigned-record routes enforce their own access before resolving the occurrence.
+
+GET file/view routes support one byte range, including suffix and open ranges. Unsatisfiable or unsupported multiple ranges return 416. HEAD ignores Range and opens no file stream. If-Range falls back to a full 200 response because this no-store API supplies no validator. Media playback remains dependent on browser/container/codec support. Keep a visible original-download option when decoding fails. Render SVG only as an image; never inject its source or use an iframe/object. SVG responses block scripts and external resources through CSP and nosniff.
+
+### Email reader
+
+EML/MSG upload and original download are part of Plan 4. Their readable preview is a Plan 5 browser feature. The descriptor identifies `reader: eml|msg`; the server does not parse the email or extract embedded attachments.
+
+Use the [synthetic email-viewer probe](../research/fixtures/2026-10-03-email-viewer-probe) as implementation evidence and a starting fixture. It verifies browser-target parser bundles, not a completed browser UI. The researched pins are postal-mime 4.0.2, @kenjiuno/msgreader 1.28.0 and htmlparser2 12.0.0. Plan 5 owns installation, integration and browser tests.
+
+Fetch the authorized original into a cancellable Worker. Transfer its ArrayBuffer rather than cloning it. Render a reviewed selection of headers and readable body text through escaped text/textContent. HTML-only messages use inert text extraction. Never insert email HTML into a live document or fetch remote images, styles or scripts. List embedded attachments and download selected bytes locally as cleaned-filename, application/octet-stream Blob downloads. Do not automatically preview or recursively parse them.
+
+Close/cancel must terminate the Worker and revoke Blob URLs. Malformed, encrypted, unsupported RTF-only or memory-constrained messages need an explicit unavailable-preview message and original download. A successful synthetic parser probe does not guarantee every 100 MB message can be decoded on a phone. Plan 5 must test parser failure, cancellation, encoded headers, embedded attachments, HTML-only messages and zero external fetches.
+
+## Privacy and public-link browser contract
+
+Public Notes are visible to contributors and public-link readers. Private Notes are owner-only. The owner edits both fields; contributors cannot change either. Contributor and public-link responses also exclude Outside contract scope, estimated cost, private Log entries and their attachments. Visible Log entries and uploads use human display names for attribution. Login usernames, automatic internal audit identities, share metadata and storage paths/hashes remain outside the shared projection. Referenced retired business people remain available as labels. Relationships expose visible human IDs and titles without granting access to another record.
+
+Share URLs have the form `${publicOrigin}/share#${token}`. The `/share` shell reads the fragment locally and sends the token only in an Authorization bearer header. Fetch images, viewer bytes and downloads through those APIs, create Blob URLs as needed, and revoke them after use. Native player requests cannot add bearer headers directly; use authorized fetches rather than putting a share token in a player URL. Owner/contributor cookie routes can use native ranged requests. Do not place tokens in queries, route parameters, redirects or image URLs. Greek is the default share-page language. The shell sends noindex and no-referrer and loads no third-party scripts.
+
+Only a successful public record GET updates view count and last-viewed time. HEAD, descriptors and all file reads are read-only. Each file request rechecks the link and current Log privacy by occurrence. Identical bytes never grant access to a private occurrence. State-changing session requests require the matching Origin. Upstream logs and caches must preserve these protections.
+
+## Plan 6 PDF and documentation contract
+
+PDF generation reuses an owner-selected existing share URL and never creates a link on GET. Its QR code may contain that selected URL. Private content remains excluded from PDF as required by the design.
+
+The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and documentation closeout. Plan 4 and this guide remain Draft until execution and closeout. Approved scope and scratch verification do not mark a release implemented.
+
+## Verification evidence
+
+The key-command integration test runs the same script entrypoint as `npm run shares:revoke-all` in a separate process, with a temporary working directory and database. It covers missing and replacement keys, aggregate safe output, retained activity counts and idempotent repeat runs. Crypto tests cover tampering, wrong key, wrong record, nonce uniqueness and authenticated but noncanonical plaintext. API tests cover owner guards, private projection, early rejection headers, occurrence access and explicit HEAD handling.
+``````
+
+#### File: `docs/plans/2026-10-02-v1-roadmap.md`
+
+<!-- replay task=14 phase=implementation sha256=fd3d89f554b0555b41e97fd4734108f00c0acbc748b7e6adcd4b9a878c0995ec -->
+
+``````markdown
+# BuiltBasis v1 — Implementation Roadmap
+
+> **Document type:** Implementation plan (index)
+> **Status:** Approved
+> **Retention:** Active until v1 is delivered; historical afterwards. Do not execute directly — execute the numbered plans.
+> **Implements:** `docs/designs/2026-10-02-v1-records-design.md` (commit `f9ddaed` and later)
+
+v1 is delivered through sequential plans. Each plan produces working, tested software on its own and is written **just before it is executed**, against the code that exists by then. Plans 0 and 1 were written first; Plans 2–4 on 2026-10-03.
+
+| # | Plan | Delivers | Design sections | Depends on | Status |
+|---|---|---|---|---|---|
+| 0 | [Webhosting L trial](2026-10-02-plan-0-webhosting-trial.md) | Go/no-go evidence for hosting: Node on the addon domain, SQLite driver (better-sqlite3 or node:sqlite — decides Plan 2's driver), local-disk data folder, restart, memory, Playwright, cron | §11.6, §11.8, §11.9 | — | **Completed — GO** (2026-10-03) |
+| 1 | [Domain core](2026-10-02-plan-1-domain-core.md) | Repo scaffold; `src/domain`: bilingual value lists (generated from §7) with completeness test, human IDs, status sets, required fields, transition rules, measurement comparisons | §4.2, §5, §6, §7, §8, §5.7 | — | Completed |
+| 2 | [Server foundation](2026-10-03-plan-2-server-foundation.md) | Fastify app and config; SQLite schema and migrations (with pre-migration backup); owner account command, login/logout, hashed sessions, Origin checks; managed lists API (people, trades, tags with rename/merge/delete, zone types, location tree with copy branch); seed import for Gennadi 822A | §9, §11.1–11.3, §11.5 (login), §15 | 0, 1 | Completed |
+| 3 | [Records API](2026-10-03-plan-3-records-api.md) | Records CRUD for all subtypes; server-side validation with shared schemas; atomic status changes with verification and activity; decision and options; measurements; Log; Notes; must-be-done-before with cycle rejection; list filters, search, totals | §4, §5, §6, §8, §10 (data needs) | 2 | Completed (merged to main) |
+| 4 | [Files, sharing and contributor access](2026-10-03-plan-4-files-and-sharing.md) | Immutable blobs and occurrences; 100,000,000-byte total multipart request budget; photo bundles; 145-extension attachment policy; authorized native views, ranges and HEAD; share links and private projections; named account create/reset/disable/enable; independent per-record Upload and Add Log grants; owner-edited Public Notes and owner-only Private Notes | §5.8–5.11, §11.4–11.5, approved Plan 4 access amendments | 3 | Draft — scope approved; pending execution and closeout |
+| 5 | Web interface | React/Vite; English/Greek UI; list/record/status/location/measurement screens; lists management; existing CLI-provisioned account selection and grant screens; assigned-record workflows; independent Upload and Add Log controls; owner-edited Public Notes and owner-only Private Notes; shared view; browser photo copies and EXIF; image/PDF/media viewers with download fallback; safe EML/MSG browser reader and embedded attachment downloads | §3, §10, Plan 4 browser handoff | 4 | To write |
+| 6 | Print, PDF and operations | A3 print view with QR; PDF by browser print (Plan 0: Chromium cannot run on Webhosting L); deploy script; nightly backups (VACUUM INTO, integrity check, rotation); PC pull (pin → files → verify); restore guide and drill; go-live; **documentation closeout**: maintained v1 specification in `docs/specs/`, Architecture reconciled, implementation evidence recorded, design marked Historical | §11.6–11.8, §12, §13 (recovery drill); DOCS-STANDARD §2 (closeout) | 5, 0 | To write |
+
+**Sequencing:** Plan 1 is hosting-independent and may run before Plan 0 completes (exception recorded in design §11.9). Every later plan waits for Plan 0's go result.
+
+**Rules for every plan:** test-first (Vitest; Playwright for browser flows); one commit per task; the design is the reference — if a plan must deviate, record the deviation in the plan and update the design.
+
+**Plan 4 lifecycle:** Scope approval includes named contributors and the revised file/viewer policy. Code authored in isolated scratch worktrees and replayed for plan verification remains planning evidence. Plans 0–3 are the implemented main-branch baseline until Plan 4 is executed, reviewed and closed out. The roadmap must not describe browser viewers or contributor screens as implemented before Plan 5.
+
+**Plan 5 handoff:** Reuse the shared 145-extension catalog from `src/domain/files.ts`. The 100,000,000-byte upload limit covers the whole multipart request, so UI help must include overhead and photo copies. Consume capability descriptors and authorized original/view endpoints. Native browser codecs decide image/media decoding. EML/MSG parsing stays in a cancellable browser Worker with escaped headers/text and local embedded attachment downloads. The [synthetic browser-parser probe](../research/fixtures/2026-10-03-email-viewer-probe) supplies fixtures and build evidence; it is not completed viewer UI. Grant screens select existing CLI-provisioned accounts and expose Upload and Add Log independently. Public Notes are visible to readers; Private Notes remain owner-only. Only the owner edits either field. Account creation and password administration remain CLI operations.
+
+**Plan 6 handoff:** Verify the full upload budget and streaming behavior behind Cloudflare, range/HEAD behavior, private/no-store responses and Linux durability on hosting. Restore revokes every session and share link before access reopens. Restore also disables all non-owner accounts and clears every record grant. Before restoring contributor access, the owner resets passwords, enables selected accounts and grants records again. Include these rules in the restore drill. Complete the browser, operational and documentation checks before marking the release delivered.
+``````
+
+- [ ] **Step 4: Verify the completed task.**
+
+Run: `npx vitest run tests/server/share-command.test.ts`, then `npm run typecheck`. Expected: command tests remain green and TypeScript reports no errors. Run the complete suite for final closeout.
+
+- [ ] **Step 5: Commit only the task files.**
+
+```powershell
+git add 'README.md' 'docs/guides/share-key-management.md' 'docs/plans/2026-10-02-v1-roadmap.md'
+git commit -m "docs: reconcile accounts attachments and browser handoff"
+```
+
 ## Implementation closeout
 
-- [ ] Run the entire suite and TypeScript check after Task 8. Record actual implementation commits and counts. Run `git diff --check`.
+- [ ] Run the entire suite and TypeScript check after the final task. Record actual implementation commits and counts. Run `git diff --check`.
 - [ ] Review the implementation against the approved design and the security cases in this plan. Complete the Plan 5/6 handoffs in the key guide.
 - [ ] Update this plan, the roadmap and the key guide status only when implementation is complete. Record implementation verification and merge state separately from this planning replay. Preserve the approved design as active until Plan 6 consolidates the maintained specification and Architecture.
 - [ ] Commit those lifecycle updates with the completed implementation. The scratch checkpoints in this document are provenance, not a substitute for implementation commits.
 
 ## Preflight and execution checks
 
-Before Task 1, verify the completed scratch-replay evidence and reconcile proposed decisions 11–12 with the approved design. Inspect clean status and read the approved design plus this plan. Create the execution worktree at that time. Confirm `main` includes `8324b2e`, or assess later changes by interface rather than assuming an old line number. Baseline `npm test` is 237 tests/29 files and `npm run typecheck` passes on that commit. Installation uses the documented `npm ci --ignore-scripts` / `npm rebuild esbuild` sequence. Do not run the server against the real local database just to test migrations.
+Before Task 1, verify the final revised scratch-replay evidence and read the revised approved design. Tasks 1–8 establish the already-tested foundation; the subsequent revision tasks replace its narrower type/size and single-user assumptions. Do not deploy an intermediate task as the completed Plan 4. Inspect clean status and read the approved design plus this plan. Create the execution worktree at that time. Confirm `main` includes `8324b2e`, or assess later changes by interface rather than assuming an old line number. Baseline `npm test` is 237 tests/29 files and `npm run typecheck` passes on that commit. Installation uses the documented `npm ci --ignore-scripts` / `npm rebuild esbuild` sequence. Do not run the server against the real local database just to test migrations.
 
 Current named integration checks: `getRecordDetail`, `listOptions`, `listMeasurementSets`, `listVerifications`, `listLog`, `listActivity`; the multipart route-config flag; Log deletion's transaction; migration registration; config consumers in owner/seed scripts. Changes to authentication apply globally: rerun the original auth suite after Tasks 5–7.
 
 ## Replay and review evidence
 
-On 2026-10-03, the complete code blocks were extracted into a second detached checkout starting at `50ac37a` (Plan 3 merged at `8324b2e`). The baseline had 237 tests in 29 files. No product implementation was added to main.
+On 2026-10-03 the complete code was extracted from the Markdown file blocks into a separate disposable checkout. Tasks 1–8 retain the previously replayed foundation. The revised Tasks 9–13 each failed as expected before their implementation blocks, then passed their focused tests and TypeScript check. Task 14 changes documentation only. Every task's exact staging paths and commit commands were exercised.
 
-The replay applied each task's test blocks before its implementation blocks. Tasks 1–7 produced the expected failures, then passed. Task 8 deliberately began green because it adds integration verification for existing behavior. Each task passed `npm run typecheck`; every listed `git add` path was exercised successfully.
+Final independent code replay at `bf840ae` passed `npm test -- --reporter=dot`: **365 tests in 47 files**. `npm run typecheck` passed. The replay's final source, tests, scripts, dependency files and handoff documents match the authoring checkpoint `8d656bc`, ignoring line endings. This is planning evidence; the product on main remains the Plan 3 baseline.
 
-| Task | Focused replay result |
-|---|---|
-| 1 | 4 tests / 2 files |
-| 2 | 43 tests / 2 files |
-| 3 | 12 tests / 1 file |
-| 4 | 9 tests / 3 files |
-| 5 | 5 tests / 2 files |
-| 6 | 9 tests / 2 files |
-| 7 | 6 tests / 1 file |
-| 8 | 17 tests / 3 files |
+The browser email-parser probe also passed its pinned browser-target build and isolated synthetic EML/MSG assertions, with zero attempted network requests. Its source and reproducible commands are retained in [the research fixture](../research/fixtures/2026-10-03-email-viewer-probe). This proves parser feasibility, not completed browser UI or reliable 100 MB email decoding on every phone.
 
-Final replay command `npm test -- --reporter=dot`: **319 tests passed in 40 files**. `npm run typecheck` and `git diff --check` passed. The final replay tree matches authoring checkpoint `c1de260`, ignoring CRLF/LF line endings. The document's code-block hashes were checked during extraction. The full locked dependency file is included; installation used `npm ci --ignore-scripts` followed by `npm rebuild esbuild`.
+Independent security review found no remaining actionable issue in the account foundation, record grants, media routes or contributor integration. It checked default-deny routing, public projections, occurrence-level privacy, session/grant rechecks after streaming, independent permissions, canonical MIME, SVG restrictions, ranges, HEAD and whole-request accounting. The review identified a restore consequence of named accounts: Task 14 and design §11.7 now require disabling non-owner accounts, clearing grants and resetting passwords before re-enabling access. The final documentation correction was replayed at `c51c292`; runtime code is unchanged from the tested `bf840ae`.
 
-An Astra Medium reviewer examined uploads, cryptography/key management/logging, public projection and file access. The review found and resolved rejected-stream cleanup, multipart error normalization, explicit NOT NULL on the blob primary key and privacy headers on early guard failures. Upload fixes are folded into Tasks 1–3. The header correction and regression are in Task 6. The final scoped reviews reported no remaining actionable findings. These reviews are separate from the execution evidence above; they did not independently rerun the whole suite.
-
-The command integration test starts the documented revocation script in a subprocess against temporary data with a missing or replacement key. It verifies safe output and idempotence. Other tests use synthetic multipart streams, temporary databases/files and enabled log capture. No real project data, live credentials or production environment was used.
-
-**Limits:** verification ran on Windows with Node 24.12.0. Linux directory sync/crash durability, hosting upload limits and memory, upstream logging, browser image conversion/HEIC, the share shell, PDF and restore remain the explicit Plan 5/6 handoffs. Runtime dependency audit during authoring reported zero advisories; four pre-existing moderate development advisories were unchanged. Proposed design decisions 11–12 still need reconciliation before implementation approval. This replay establishes that the plan's proposed code runs; it does not mark Plan 4 implemented or merged.
+Remaining execution checks: browser viewers/HEIC/cancellation and language UI in Plan 5; hosting upload/proxy limits, memory behavior, Linux directory durability, PDF, restore drill and specification closeout in Plan 6. No real project files, credentials or production data were used for the replay.
 
 ## Technical references checked while planning
 
@@ -8032,4 +14278,4 @@ The command integration test starts the documented revocation script in a subpro
 - [Fastify logging](https://fastify.dev/docs/latest/Reference/Logging/): configure logging/serializers when constructing the app; test with logging enabled.
 - [Node crypto](https://nodejs.org/api/crypto.html): built-in random bytes, SHA-256 and authenticated AES-GCM.
 - [Node 24 filesystem APIs](https://nodejs.org/docs/latest-v24.x/api/fs.html): stream temporary bytes and publish using same-filesystem links without replacing an existing file.
-- [Autodesk drawing-version codes](https://www.autodesk.com/es/support/technical/article/caas/sfdcarticles/sfdcarticles/ESP/drawing-version-codes-for-autocad.html): the DWG version signatures used for download-only format screening. This does not validate a drawing's contents.
+- [Attachment formats and viewer research](../research/2026-10-03-attachment-formats-and-viewers.md): exact 145-extension policy, vendor provenance and browser email parser probe. Download-only CAD is not gated on a drawing version.

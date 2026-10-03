@@ -2,6 +2,7 @@
 
 > **Document type:** Design document
 > **Status:** Approved (2026-10-02, project owner). Revised 2026-10-02 after independent design review (sharing, required fields, verification, security, backups, files, measurements, severity, Greek labels).
+> **Revision:** 2026-10-03 — owner approved named users with per-record upload/Log grants; owner-edited Public/Private Notes; broader attachments with viewing/playback; 100 MB upload-request ceiling. Implementation details are in the revised Plan 4.
 > **Scope:** BuiltBasis v1 — records (Quality Issue, Detail Clarification, Task), their fields, value lists, rules, screens, sharing, PDF, hosting and operations.
 > **Retention:** Implementation baseline for the v1 specification and implementation plan. Becomes historical after v1 delivery and reconciliation (DOCS-STANDARD §2).
 > **Governed by:** `docs/VISION.md` (intent), `docs/adr/0001-v1-stack-and-hosting.md` (stack).
@@ -18,7 +19,7 @@ BuiltBasis is a lightweight construction-control application for an owner-run pr
 
 Plus ordinary work items that are neither (purchases, arrangements, checks).
 
-v1 lets the owner record, classify, measure, decide, evidence and track these items in one place, on desktop and phone, in English and Greek, and share individual records read-only with the architect, contractors and subcontractors.
+v1 lets the owner record, classify, measure, decide, evidence and track these items in one place, on desktop and phone, in English and Greek, and share individual records with the architect, contractors and subcontractors. Anonymous links remain read-only; named users may contribute evidence or Log entries when the owner grants permission on that record.
 
 The first project using it is Gennadi 822A (three villas, Rhodes). Nothing in the design is specific to that project; project-specific content (locations, trades, tags, people) is data.
 
@@ -27,10 +28,15 @@ The first project using it is Gennadi 822A (three villas, Rhodes). Nothing in th
 | Who | How | Can |
 |---|---|---|
 | **Owner** (one account) | Logs in | Everything: create, edit, classify, decide, share, configure lists |
+| **Named user** | Logs in | View granted records; upload evidence and/or add Log entries only when separately permitted on that record |
 | **Anyone holding a share link** | Opens a link, no account | View one record, read-only, without private content |
 
-- There are no other accounts in v1. Nobody but the owner writes to the system.
-- **Private content** is visible only to the logged-in owner and is never included in share links or PDFs: the _Outside contract scope_ flag, _Estimated cost_, the _Notes_ field (§5.1), and log entries marked private together with their attachments (§5.11).
+- The owner alone creates/edits records, makes decisions, changes status, manages lists and access, and edits/deletes existing content. Named users receive access **per record**, never automatically across a project.
+- Each record grant has two independent permissions: **Upload photos and attachments** (Μεταφόρτωση φωτογραφιών και συνημμένων) and **Add Log entries** (Προσθήκη καταχωρίσεων στο ημερολόγιο). A grant also permits reading that record's non-private content. Both permissions off gives read-only access; removing the grant removes authenticated access. Draft records remain unavailable to named users. Anonymous share-link access remains independent.
+- A user with Add Log permission may create public entries, but cannot edit/delete any existing entry, even their own, or make an entry private. Upload permission does not grant Add Log permission. Files may be attached only to accessible, public entries. Private content is never disclosed through a write operation or its error response.
+- **Both Notes fields are owner-editable only.** Users contribute text through the Log. There is no Notes permission.
+- Login usernames are credentials and are not published in record content. Evidence and Log contributions identify their author by a separate display name; storage retains the user ID. Owner and contributor account administration remains owner-controlled.
+- **Private content** is visible only to the logged-in owner and is never included in share links or PDFs: the _Outside contract scope_ flag, _Estimated cost_, the _Private Notes_ field (§5.1), and log entries marked private together with their attachments (§5.11).
 
 ## 3. Language
 
@@ -94,7 +100,8 @@ Field privacy: **P** = private (owner only). Shared record pages show every non-
 | Status | Κατάσταση | code (§7.2) | Required. Rules in §8. |
 | Status reason | Αιτιολογία κατάστασης | code (§7.3 / §7.4) + note | Required when status is On hold or Cancelled. |
 | Reference | Αναφορά | text | Free text: drawings, documents, other record IDs. |
-| Notes | Σημειώσεις | long text | Optional. **P.** Free-text working notes, separate from the Log (§5.11). |
+| Public Notes | Δημόσιες σημειώσεις | long text | Optional. Visible to authorised record readers; editable only by the owner. |
+| Private Notes | Ιδιωτικές σημειώσεις | long text | Optional. **P.** Visible and editable only by the owner. Existing Notes content migrates to this field without becoming public; Public Notes starts empty. |
 | Created / updated | Δημιουργία / ενημέρωση | timestamps + user | Automatic. |
 
 ### 5.2 People and responsibility
@@ -199,7 +206,16 @@ The record shows photos grouped by phase. The original file is always kept uncha
 
 ### 5.9 Attachments
 
-Documents and drawings (PDF, images, office documents, DWG): file + title (optional) + original filename + upload date. Any number per record. DWG is download-only; no drawing viewer or conversion is included. DWG support was approved by the owner on 2026-10-03 during Plan 4 review. Storage and access rules in §11.4.
+Attachments have a file, optional title, original filename and upload date. Any number per record. The explicit accepted-format list is based on the combined supported formats of comparable construction tools, with provenance and any exclusions documented in Plan 4. Capabilities are separate from user permissions:
+
+| Format category | Upload | View / play | Download |
+|---|---|---|---|
+| Images and PDF | Yes | Yes | Yes |
+| Email (EML, MSG) | Yes | Yes — readable message | Yes — original file |
+| Video and audio | Yes | Yes | Yes |
+| Office documents, CAD, BIM and archives | Yes | No in v1 | Yes |
+
+Email viewing shows sender/recipients, subject, date and message content. The original remains unchanged. Email rendering must not execute embedded active content or fetch remote tracking resources. Media viewing uses supported browser encodings; the original remains downloadable when a browser cannot play an encoding. Plan 4 provides authorised bytes/capabilities and Plan 5 implements the readers and players. No CAD/BIM viewer, Office conversion or server video transcoding is included. Storage and access rules are in §11.4.
 
 Attachments are added in two ways: **directly** to the record, or **through a log entry** (§5.11). The **Attachments pane lists all of the record's attachments**; those added through a log entry also show that entry's date and text (e.g. "Plans.pdf · 2026-05-01 · Architect sent plans"). Attachments of private log entries are private.
 
@@ -229,11 +245,11 @@ A manual, dated record of what happened, entered by the user — e.g. "2026-05-0
 | Attachments | Συνημμένα | zero or more files | Optional. Stored as record attachments linked to this entry (§5.9). |
 | Private | Ιδιωτικό | checkbox | **P** when ticked: the entry and its attachments never appear in share links or PDFs. |
 
-Entries can be edited and deleted by the owner. **Deleting an entry also deletes its attachment occurrences in the same transaction** (stored blobs and other occurrences of the same blob are untouched, §11.4), so deleting a private entry can never turn its attachments public. Removing an attachment from either the Log or the Attachments pane removes the same occurrence from both. The Log is separate from the automatic Activity log (§5.12), which records system changes.
+The owner may add public or private entries and edit/delete entries. A named user with the record’s Add Log grant may add public entries only; adding files also requires that record’s Upload grant. Upload alone permits adding an attachment to an existing public entry on that record; it does not permit editing the entry text or existing attachments. **Deleting an entry also deletes its attachment occurrences in the same transaction** (stored blobs and other occurrences of the same blob are untouched, §11.4), so deleting a private entry can never turn its attachments public. Removing an attachment from either the Log or the Attachments pane removes the same occurrence from both. The Log is separate from the automatic Activity log (§5.12), which records system changes.
 
 ### 5.12 Activity log
 
-Automatic, append-only, per record. Logs: creation; every status change (with reason where required); changes to ball in court, responsible, severity, priority, due date, disposition, chosen option, decided by/on; every change to the instruction text (previous and new text); verification entries; share links created or revoked. Each entry: what changed, from → to, who, when. Activity entries about private fields are visible only to the owner.
+Automatic, append-only, per record. Logs: creation; every status change (with reason where required); changes to ball in court, responsible, severity, priority, due date, disposition, chosen option, decided by/on; every change to the instruction text (previous and new text); verification entries; share links created or revoked. Each entry: what changed, from → to, who, when. Activity entries about private fields and access management are visible only to the owner. Administrative bulk share-link revocation after key loss/change or restore emits a system reason and affected count instead of attributing an owner action to each record; owner-requested link revocation is still recorded per record.
 
 ## 6. Subtype-specific fields
 
@@ -529,12 +545,12 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
    - Totals: count; sum of estimated cost for the filtered set, counting only records currently marked _Outside contract scope_ (owner only).
 3. **New record** — quick capture: subtype, title, optional photo(s) and location; saved as **Draft**; completed later.
 4. **Record page** — header (ID, title, subtype, status with allowed actions, ball in court, due date, severity, priority, completion bar, safety badge) and sections/tabs:
-   - **Overview** — description, location paths, responsible, trades, tags, reference, must be done before / requires first; Notes field and private commercial fields (owner only).
+   - **Overview** — description, location paths, responsible, trades, tags, reference, must be done before / requires first; Public Notes; Private Notes and commercial fields (owner only). Both Notes fields are editable only by the owner.
    - **Classification** — subtype-specific fields (§6).
    - **Decision** — options considered, chosen option, decided by/on, instruction text (QI, DC).
    - **Measurements** — sets and rows; comparison views.
    - **Photos** — grouped by phase; full-screen viewer.
-   - **Attachments.**
+   - **Attachments** — view/play supported images, PDFs, email, video and audio; download originals for every accepted format.
    - **Verification** — entries.
    - **Log** — dated entries with attachments; private marker.
    - **Activity.**
@@ -543,6 +559,7 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
 6. **Lists management** — people, trades, tags, location tree (with copy branch), zone types.
 7. **Shared record view** (no login) — read-only record page without private content, language switch, "not available" for revoked/expired/draft. _Must be done before / Requires first_ entries show only the other record's ID and title, omit Draft records, and are not links (§11.5).
 8. **A3 print view** (§12).
+9. **Named-user access** — owner account setup and per-record grant controls; each user sees only granted, non-Draft records and the actions permitted there. A contributor screen uses the same private-content exclusions as a share page.
 
 ## 11. Architecture and operations
 
@@ -577,21 +594,21 @@ All database access is confined to `src/server` data-access modules, so a later 
 - **Occurrence:** each photo or attachment on a record is its own row, holding the record, the blob reference, the original filename, title/caption, uploaded by/at and — for attachments added through the Log — the log entry. The same file uploaded to two records gives two occurrences sharing one blob.
 - **Photos** reference three blobs: original, display copy and thumbnail. The browser produces the display copy and thumbnail at upload, so the server needs no image-processing module.
 - **Originals are never modified or overwritten.** Corrections add new files.
-- **Access:** files are served only through an authorised application route, addressed by **occurrence**, never by blob. The owner's session can fetch any occurrence. A share-token request must name a **non-private occurrence belonging to the linked record** (not attached to a private log entry); authorisation and the returned metadata (filename, title, log entry) come from that occurrence only. A private occurrence stays inaccessible even if another, public occurrence references the same blob. This applies to originals, display copies and thumbnails. Knowing a content hash grants no access.
-- Limits: photos up to 25 MB, attachments up to 50 MB. Accepted: images (JPEG, PNG, HEIC), PDF, common office documents and DWG (download-only).
+- **Access:** files are served only through an authorised application route, addressed by **occurrence**, never by blob. The owner's session can fetch any occurrence. A named user must have a current grant for the non-Draft record and may fetch only its public occurrences. A share-token request must name a **non-private occurrence belonging to the linked record** (not attached to a private log entry); authorisation and the returned metadata (filename, title, log entry) come from that occurrence only. A private occurrence stays inaccessible even if another, public occurrence references the same blob. This applies to originals, display copies and thumbnails. Knowing a content hash grants no access.
+- Upload ceiling: **100 MB = 100,000,000 bytes for the entire upload request**, including multipart boundaries, metadata and all files in a photo bundle. The UI accounts for envelope overhead; this is not a promise that a 100 MB file plus metadata fits. The server counts streamed bytes and rejects oversized requests, including requests without Content-Length, without leaving incomplete occurrences. Accepted formats and viewing capabilities follow §5.9. Total account storage is separate from this per-request limit.
 
 ### 11.5 Authentication and sharing
 
-**Owner login**
+**Account login**
 
 - Username + password; password hashed with Node's built-in `scrypt`; login rate-limited; HTTPS only.
-- The owner account is **created and its password reset by a server-side command** (no sign-up or reset screen). **A password reset deletes all sessions.**
+- Accounts are provisioned/reset by server-side commands (no self-registration or email reset service). The owner account is unique; named-user administration cannot replace or disable it. Disabling a named user or resetting their password ends that user’s sessions. Disabled users cannot log in. Enabling an account requires a fresh login and does not restore its old sessions. Per-record grants are owner-controlled and checked on every read/write; login alone grants no owner rights.
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, **host-only** (no `Domain` attribute, so it is never sent to `ktimanet.com` or other subdomains).
 - The session identifier is a random token; the server stores only its **SHA-256 hash**, so a database or backup never contains a usable session. Sessions expire **30 days after login** (absolute) and are deleted on logout.
 - **Forged-request protection** (`SameSite` alone is not relied on, because `ktimanet.com` (WordPress) counts as the same site). Every request below must carry an `Origin` header equal to the configured public base URL (`https://builtbasis.ktimanet.com` in production):
   - **Login:** valid credentials, matching `Origin`, JSON body.
-  - **Owner data changes:** valid session, matching `Origin`, JSON body.
-  - **File uploads:** valid session, matching `Origin`, multipart form body.
+  - **Data changes:** valid session, matching `Origin`, JSON body, and owner authority or the specific contributor grant required by that route.
+  - **File uploads:** valid session, matching `Origin`, multipart form body, and owner authority or the record's Upload grant. Recheck the session and grant before committing the upload.
 - **Reads:** GET requests never modify records, evidence or access permissions (including share links). The only exception: a successful, authorised share-page read updates that link's view count and last-viewed time.
 
 **Share links**
@@ -625,7 +642,7 @@ All database access is confined to `src/server` data-access modules, so a later 
   1. **Select and pin one completed database backup** and copy it.
   2. **Copy the files.** Files are content-addressed, immutable and never deleted (§11.3), so every file the pinned backup references still exists on the server; only new files are copied.
   3. **Verify** that every file referenced by the pinned backup is present locally; only then mark that off-site copy complete.
-- **Restore requirements** (the operator guide, written at delivery, must satisfy them): stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; **before access resumes, delete all sessions and revoke all share links** (a restored database can bring back links revoked after the backup was taken); then issue new links where needed.
+- **Restore requirements** (the operator guide, written at delivery, must satisfy them): stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; **before access resumes, delete all sessions and revoke all share links** (a restored database can bring back links revoked after the backup was taken); disable all non-owner accounts and delete all record grants before access resumes; then issue new links where needed. Before restoring contributor access, the owner must reset their passwords, enable selected accounts and deliberately regrant records. Enabling alone must not revive credentials or permissions from an old backup.
 - **One restore drill** from an off-site copy is performed before v1 is declared delivered.
 
 ### 11.8 PDF
@@ -663,7 +680,7 @@ One A3-landscape page per record (continuing to further pages if needed), in the
 - **QR code** to an existing active, non-expired share link of the record, chosen by the owner. If the record has none, the print view offers a button to create one first (an explicit action, §11.5).
 - Footer: generated date-time, record last-updated date-time.
 
-The Notes field, the Log and the Activity log are not printed.
+The Public Notes and Private Notes fields, the Log and the Activity log are not printed in the A3 layout. Public Notes remains visible on shared record pages; PDF layout changes are a separate Plan 6 decision.
 
 ## 13. Tests
 
@@ -672,16 +689,18 @@ The Notes field, the Log and the Activity log are not printed.
   - CRUD for records and managed lists; tag rename/merge/delete across records, including the two-tag collision rejection; location filter includes descendants and counts once; must-be-done-before cycle rejection.
   - **Security:** owner data changes and uploads without a valid session are rejected, while a valid login succeeds without an existing session; login, data changes and uploads with a wrong or missing `Origin` are rejected; GET requests change no records, evidence or access (only the share-page view count and last-viewed time); invalid direct API writes (rule violations) are rejected by the server; a password reset ends all sessions; session identifiers and share tokens are never stored in plain text, and raw share tokens never appear in activity entries or logs.
   - **Log and attachments:** attachments added through a log entry appear in the record's attachments list with the entry's date and text; directly added attachments appear without one.
-  - **Sharing:** private fields (including the Notes field and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; **same blob, two occurrences:** with one public and one private occurrence of the same file on the shared record, the public one downloads and the private one is denied, and no private filename or log metadata is returned; **deleting a private log entry** deletes its attachment occurrences and never makes them public; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
+  - **Sharing:** private fields (including Private Notes and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; **same blob, two occurrences:** with one public and one private occurrence of the same file on the shared record, the public one downloads and the private one is denied, and no private filename or log metadata is returned; **deleting a private log entry** deletes its attachment occurrences and never makes them public; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
 - **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content.
 - **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7), including session deletion and share-link revocation.
+
+Additional tests for the 2026-10-03 revision: existing Notes stays private through migration; Public Notes is shared but owner-editable only; each contributor permission works independently; no grant, removed grant, disabled account and Draft status deny access; contributors cannot reach owner APIs, lists, private fields/files or other records; genuine contributor attribution; 100 MB request accounting with/without Content-Length; accepted-format capability matrix; authorised view/download/range paths; browser EML/MSG rendering and video/audio playback in Plan 5.
 
 ## 14. Out of scope for v1
 
 - Links between records other than _Must be done before_.
 - A structure or taxonomy of physical elements.
-- Accounts for anyone other than the owner; others editing, acknowledging or uploading.
+- General record editing by other users. Their contributions are limited to explicitly granted uploads and new public Log entries on individual records.
 - Notifications (email, messaging).
 - Pins on drawings; drawing viewer.
 - Offline mode; native apps.

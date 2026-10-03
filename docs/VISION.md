@@ -18,11 +18,11 @@ Distinctive from generic snag-list apps: structured **measurements** with automa
 
 ## Audience
 
-v1: the project owner, who edits; architect, contractors and subcontractors view individual records through read-only links. Later: owner-side project managers and consultancy clients.
+v1: the project owner controls records. Architects, contractors and subcontractors view individual records through read-only links, or log in with per-record permission to upload evidence and/or add Log entries. Later: owner-side project managers and consultancy clients.
 
 ## Scope of v1
 
-See `docs/designs/2026-10-02-v1-records-design.md`. Out of scope: other users editing, offline mode, AI, procurement and commercial workflows, inspections and checklists.
+See `docs/designs/2026-10-02-v1-records-design.md`. Out of scope: other users editing record fields or existing content, offline mode, AI, procurement and commercial workflows, inspections and checklists.
 
 ## Success for v1
 
