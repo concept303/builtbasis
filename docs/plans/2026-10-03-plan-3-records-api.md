@@ -1960,7 +1960,7 @@ git commit -m "feat(server): create, read and save records with references, link
 
 Plan 1's `checkTransition` decides whether a change is allowed and what it needs. This task writes the result: the status, the status before a hold, the reason, the verification entry and the activity entry, in one transaction (design §8.2). The atomicity test makes the last write fail on purpose, using a temporary SQLite trigger.
 
-- [ ] **Step 1: Write the failing test `tests/server/transitions-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/transitions-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2132,12 +2132,12 @@ describe('status changes (design §8)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/transitions-api.test.ts`
 Expected: FAIL — all 10 tests fail with `404` from `POST …/transitions`, which does not exist yet.
 
-- [ ] **Step 3: Create `src/server/records/transitions.ts`**
+- [x] **Step 3: Create `src/server/records/transitions.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2269,7 +2269,7 @@ export function registerTransitionRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 4: Replace `src/server/records/routes.ts`**
+- [x] **Step 4: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2286,11 +2286,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/transitions-api.test.ts` → PASS (10 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/records/transitions.ts src/server/records/routes.ts tests/server/transitions-api.test.ts
