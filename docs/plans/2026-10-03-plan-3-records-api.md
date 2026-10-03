@@ -1,7 +1,7 @@
 # Plan 3 — Records API Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** Written — awaiting review
+> **Status:** In progress — execution approved
 > **Retention:** Active until executed; historical afterwards.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §4 (record model, human IDs, must be done before), §5 (shared fields, decision, measurements, verification, Log, activity), §6 (subtype fields), §8 (status rules), §9.3–§9.4 (tag and location operations that involve records), §10.2 (list filters, sorting, totals) — data and API only.
 > **Not in this plan:** photos, attachments, files and share links (Plan 4); screens (Plan 5); print view and PDF (Plan 6).
@@ -92,12 +92,12 @@ The `details.errors` of `rule_violation` and `transition_rejected` are Plan 1's 
 
 This plan edits Plan 2's code. Check first that the code you start from is the merged Plan 2 that this plan was checked against.
 
-- [ ] **Step 1: Confirm Plan 2 is merged and green**
+- [x] **Step 1: Confirm Plan 2 is merged and green**
 
 Run: `git log --oneline -15` — the Plan 2 commits (`feat(server): …`, `docs: record Plan 2 completion …`) are on the branch you start from.
 Run: `npm test` → `Test Files  18 passed (18)` and `Tests  155 passed (155)`. Run: `npm run typecheck` → no output.
 
-- [ ] **Step 2: Confirm the text this plan replaces exists**
+- [x] **Step 2: Confirm the text this plan replaces exists**
 
 Run:
 
@@ -119,7 +119,7 @@ If any result differs, or Step 1 fails: **stop and report**. The code differs fr
 - Modify: `src/domain/lists.ts` (`tagKey` uses `foldText`), `src/domain/index.ts`
 - Test: `tests/domain/records.test.ts`
 
-- [ ] **Step 1: Write the failing test `tests/domain/records.test.ts`**
+- [x] **Step 1: Write the failing test `tests/domain/records.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -237,12 +237,12 @@ describe('text folding', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/domain/records.test.ts`
 Expected: FAIL — all 10 tests fail with `TypeError: Cannot read properties of undefined (reading 'parse')`: the new exports do not exist yet.
 
-- [ ] **Step 3: Create `src/domain/text.ts`**
+- [x] **Step 3: Create `src/domain/text.ts`**
 
 ```ts
 import { normalizeLabel } from './measurements';
@@ -256,7 +256,7 @@ export function foldText(text: string): string {
 }
 ```
 
-- [ ] **Step 4: Create `src/domain/records.ts`**
+- [x] **Step 4: Create `src/domain/records.ts`**
 
 Note: as in Plan 2, the schemas have **no defaults**, so a save never fills in fields that were not sent.
 
@@ -422,7 +422,7 @@ export type LogEntryInput = z.output<typeof LogEntryBody>;
 export type LogEntryPatchInput = z.output<typeof LogEntryPatch>;
 ```
 
-- [ ] **Step 5: Modify `src/domain/lists.ts`**
+- [x] **Step 5: Modify `src/domain/lists.ts`**
 
 `tagKey` keeps its behaviour and now uses the shared folding. Replace:
 
@@ -448,7 +448,7 @@ with:
   const key = foldText(name);
 ```
 
-- [ ] **Step 6: Modify `src/domain/index.ts`**
+- [x] **Step 6: Modify `src/domain/index.ts`**
 
 Replace:
 
@@ -464,11 +464,11 @@ export * from './text';
 export * from './records';
 ```
 
-- [ ] **Step 7: Run to verify it passes**
+- [x] **Step 7: Run to verify it passes**
 
 Run: `npx vitest run tests/domain` → PASS (9 files, 84 tests: Plans 1–2 plus `records.test.ts` with 10). Then `npm run typecheck` → no output.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/domain/text.ts src/domain/records.ts src/domain/lists.ts src/domain/index.ts tests/domain/records.test.ts
