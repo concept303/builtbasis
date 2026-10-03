@@ -1,7 +1,7 @@
 # Share-link key management and API handoff
 
 > **Document type:** Operational guide
-> **Status:** Active for the implemented Plan 4 backend on `feat/plan-4-files-sharing`; not yet merged or deployed.
+> **Status:** Active for the implemented Plan 4 backend, merged to `main` at `01a4477`; not deployed.
 > **Authority:** The approved v1 design defines scope. This guide documents the implemented key/account procedures and API contract, with browser and deployment work explicitly assigned to Plans 5–6.
 > **Verified:** 2026-10-03 — implementation suite passed 423 tests across 53 files; TypeScript passed. Implementation range: `a442939..55da13a`.
 
@@ -102,7 +102,7 @@ Only a successful public record GET updates view count and last-viewed time. HEA
 
 PDF generation reuses an owner-selected existing share URL and never creates a link on GET. Its QR code may contain that selected URL. Private content remains excluded from PDF as required by the design.
 
-The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented and verified on its feature branch. This does not establish browser delivery, merge or production deployment. No maintained specification exists to update at this stage; the approved design remains the requirements baseline until Plan 6 consolidates it.
+The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented, verified and merged to main. Browser delivery and production deployment remain future work. No maintained specification exists to update at this stage; the approved design remains the requirements baseline until Plan 6 consolidates it.
 
 ## Verification evidence
 

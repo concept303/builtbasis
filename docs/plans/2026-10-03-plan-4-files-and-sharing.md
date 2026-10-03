@@ -8,7 +8,7 @@
 > **Implemented by:** `a442939..55da13a` on `feat/plan-4-files-sharing`; Tasks 1–19 committed separately.
 > **Verified:** 2026-10-03 — implementation passed 423 tests across 53 files, `npm run typecheck`, and `git diff a442939..HEAD --check`. See implementation evidence below; planning replay is separate.
 > **Planning check:** 2026-10-03 — complete code and tests replayed from this document in a separate disposable checkout. See the replay evidence for commands, results and limits.
-> **Merged to main:** Not merged. Implementation remains on `feat/plan-4-files-sharing`; not deployed.
+> **Merged to main:** 2026-10-03 — fast-forward to `01a4477`; not deployed.
 > **Checklist note:** Tasks 1–19 are complete. Their original checkboxes and code snapshots are preserved as historical execution instructions, not outstanding work.
 > **For agentic workers:** Use `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Preserve the owner's selected method and Astra Medium model preference. Follow the checkboxes task by task.
 
@@ -17400,7 +17400,7 @@ A fresh Astra Medium review of `a442939..55da13a` found no actionable Critical, 
 
 The completed backend includes the Plan 5/6 handoffs in [the operational guide](../guides/share-key-management.md). No maintained specification exists yet; the approved design stays active until Plan 6 consolidates the specification and Architecture. Browser viewers, hosting capacity values, production checks and the restore drill remain assigned to their existing later plans. No real project database, credentials or production files were used.
 
-Merge state is separate from implementation verification: this branch has not been merged to main or deployed. The scratch replay section below records earlier planning evidence and is retained unchanged.
+Merged to main on 2026-10-03 by fast-forward to `01a4477`. The merged result passed 423 tests across 53 files and `npm run typecheck`. Not deployed. The scratch replay section below records earlier planning evidence and is retained unchanged.
 
 ## Preflight and execution checks
 

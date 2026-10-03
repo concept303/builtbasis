@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–3 are implemented and merged to `main`. Plan 4, including Tasks 17–19, is implemented on `feat/plan-4-files-sharing` and is not yet merged or deployed. Implementation verification passed 423 tests across 53 files and the TypeScript check. Plan 5 supplies the browser screens and viewers.
+**Status:** Plans 0–4 are implemented and merged to `main`. Plan 4, including Tasks 17–19, was merged by fast-forward at `01a4477`. Verification passed 423 tests across 53 files and the TypeScript check. Plan 5 supplies the browser screens and viewers. Plan 4 is not deployed.
 
 ## Local dependency installation
 
