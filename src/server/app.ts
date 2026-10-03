@@ -15,6 +15,7 @@ import { registerTagRoutes } from './lists/tags';
 import { registerLocationRoutes } from './lists/locations';
 import { registerRecordRoutes } from './records/routes';
 import { registerFileRoutes } from './files/routes';
+import { openStorageCapacity } from './files/capacity';
 import { requireShareKey } from './sharing/crypto';
 import { reconcileShareKey } from './sharing/links';
 import { registerSharingRoutes } from './sharing/routes';
@@ -34,6 +35,10 @@ export interface AppDeps {
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, db } = deps;
   requireShareKey(config.shareKey);
+  const capacity = await openStorageCapacity(config.filesDir, {
+    budgetBytes: config.filesStorageBudgetBytes ?? 0,
+    freeReserveBytes: config.filesFreeReserveBytes ?? 0,
+  });
   const revokedLinks = reconcileShareKey(db, config.shareKey);
   const app = Fastify({ logger: safeLogger(deps.logger), bodyLimit: 1024 * 1024 });
   if (revokedLinks > 0) app.log.info({ event: 'share_key_changed', revokedLinks });
@@ -75,8 +80,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTagRoutes(app, db);
   registerLocationRoutes(app, db);
   registerRecordRoutes(app, db);
-  registerFileRoutes(app, db, config);
+  registerFileRoutes(app, db, config, capacity);
   registerSharingRoutes(app, db, config);
-  registerAccessRoutes(app, db, config);
+  registerAccessRoutes(app, db, config, capacity);
   return app;
 }

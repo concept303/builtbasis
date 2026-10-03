@@ -15,7 +15,7 @@ export function blobPath(filesDir: string, hash: string): string {
 export async function discardStaged(staged: Pick<StagedFile, 'path'>): Promise<void> {
   try { await unlink(staged.path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 }
-export async function stageFile(filesDir: string, source: Readable, filename: string, purpose: FilePurpose): Promise<StagedFile> {
+export async function stageFile(filesDir: string, source: Readable, filename: string, purpose: FilePurpose, onCleanupFailure?: () => void): Promise<StagedFile> {
   let file: FileHandle | undefined;
   let path: string | undefined;
   try {
@@ -50,12 +50,12 @@ export async function stageFile(filesDir: string, source: Readable, filename: st
   } catch (error) {
     source.destroy();
     // Try both cleanup operations even if close itself fails; retain the original error.
-    if (file) await file.close().catch(() => undefined);
-    if (path) await discardStaged({ path }).catch(() => undefined);
+    if (file) await file.close().catch(() => onCleanupFailure?.());
+    if (path) await discardStaged({ path }).catch(() => onCleanupFailure?.());
     throw error;
   }
 }
-export async function publishFile(filesDir: string, staged: StagedFile): Promise<void> {
+export async function publishFile(filesDir: string, staged: StagedFile, onRetained?: (file: StagedFile) => void): Promise<void> {
   const destination = blobPath(filesDir, staged.hash);
   const dir = dirname(destination);
   await mkdir(dir, { recursive: true });
@@ -67,6 +67,8 @@ export async function publishFile(filesDir: string, staged: StagedFile): Promise
     for await (const chunk of createReadStream(destination)) hash.update(chunk);
     if (hash.digest('hex') !== staged.hash) throw new Error('blob_collision');
   }
+  // Charge retained bytes before sync or cleanup can fail. Database rollback never removes this blob.
+  onRetained?.(staged);
   if (process.platform !== 'win32') {
     // Persist newly created directory entries as well as the published file entry.
     for (const path of [dirname(filesDir), filesDir, dir]) {

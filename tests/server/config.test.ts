@@ -39,3 +39,12 @@ describe('loadConfig (design §11.6)', () => {
     expect(config.port).toBe('3000');
   });
 });
+
+it('accepts explicit positive storage budgets, permits missing settings offline and rejects invalid values', () => {
+  const base={BUILTBASIS_DATA_DIR:'/data'};
+  expect(loadConfig(base)).toMatchObject({filesStorageBudgetBytes:null,filesFreeReserveBytes:null});
+  expect(loadConfig({...base,FILES_STORAGE_BUDGET_BYTES:'500000000',FILES_FREE_RESERVE_BYTES:'10000000'})).toMatchObject({filesStorageBudgetBytes:500_000_000,filesFreeReserveBytes:10_000_000});
+  for(const key of ['FILES_STORAGE_BUDGET_BYTES','FILES_FREE_RESERVE_BYTES']) {
+    for(const value of ['0','-1','1.5','NaN','9007199254740992','']) expect(()=>loadConfig({...base,[key]:value})).toThrow(key);
+  }
+});

@@ -10,8 +10,12 @@ export interface UploadEnvelope {
   metadata: PhotoMeta | AttachmentMeta;
   files: Record<string, UploadFile>;
 }
+export interface UploadControls {
+  maxBodyBytes?: number;
+  cleanupFailed?: () => void;
+}
 
-export async function parseUpload(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments'): Promise<UploadEnvelope> {
+export async function parseUpload(request: FastifyRequest, filesDir: string, kind: 'photos' | 'attachments', controls: UploadControls = {}): Promise<UploadEnvelope> {
   if (!request.isMultipart()) throw new HttpError(415, 'unsupported_content_type');
   // @fastify/multipart consumes request.raw directly, not Fastify's preParsing payload.
   // Count that stream before starting its lazy parser, after the route's access check.
@@ -24,7 +28,7 @@ export async function parseUpload(request: FastifyRequest, filesDir: string, kin
   let budgetError: HttpError | undefined;
   const countBytes = (chunk: Buffer | string): void => {
     bytes += Buffer.byteLength(chunk);
-    if (bytes > UPLOAD_REQUEST_LIMIT && !budgetError) {
+    if (bytes > Math.min(UPLOAD_REQUEST_LIMIT, controls.maxBodyBytes ?? UPLOAD_REQUEST_LIMIT) && !budgetError) {
       budgetError = new HttpError(413, 'upload_too_large');
       // Tell the multipart parser to terminate its active file without destroying
       // the HTTP socket, so the caller still receives the 413 response.
@@ -58,7 +62,7 @@ export async function parseUpload(request: FastifyRequest, filesDir: string, kin
         }
         const filename = Filename.parse(part.filename);
         const purpose = photo ? `photo-${part.fieldname}` as 'photo-original' | 'photo-display' | 'photo-thumbnail' : 'attachment';
-        const staged = await stageFile(filesDir, part.file, filename, purpose);
+        const staged = await stageFile(filesDir, part.file, filename, purpose, controls.cleanupFailed);
         files[part.fieldname] = { ...staged, filename };
         currentFile = undefined;
       } else {
@@ -80,7 +84,7 @@ export async function parseUpload(request: FastifyRequest, filesDir: string, kin
     // Stop the multipart parser and drain unread request bytes after an early rejection.
     request.raw.unpipe();
     request.raw.resume();
-    await Promise.all(Object.values(files).map(discardStaged));
+    await Promise.all(Object.values(files).map(file => discardStaged(file).catch(() => controls.cleanupFailed?.())));
     if (budgetError) throw budgetError;
     if (error instanceof HttpError) throw error;
     const code = (error as { code?: string }).code;

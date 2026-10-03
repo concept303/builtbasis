@@ -1,9 +1,9 @@
 import type { FastifyRequest, FastifyServerOptions } from 'fastify';
 
-const filesystemCodes = new Set(['ENOENT', 'EACCES', 'EPERM', 'ENOSPC', 'EMFILE', 'ENFILE', 'EIO', 'EROFS', 'ENOTDIR', 'EISDIR', 'EEXIST', 'ENOTEMPTY']);
+const filesystemCodes = new Set(['ENOENT', 'EACCES', 'EPERM', 'ENOSPC', 'EDQUOT', 'EMFILE', 'ENFILE', 'EIO', 'EROFS', 'ENOTDIR', 'EISDIR', 'EEXIST', 'ENOTEMPTY']);
 const sqliteCodes = new Set(['SQLITE_BUSY', 'SQLITE_LOCKED', 'SQLITE_FULL', 'SQLITE_READONLY', 'SQLITE_CORRUPT', 'SQLITE_NOTADB', 'SQLITE_IOERR', 'SQLITE_CANTOPEN', 'SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT_UNIQUE', 'SQLITE_CONSTRAINT_FOREIGNKEY', 'SQLITE_CONSTRAINT_NOTNULL', 'SQLITE_CONSTRAINT_CHECK']);
 const systemCodes = new Set(['ENOMEM', 'ECONNRESET', 'ECONNABORTED', 'EPIPE', 'ETIMEDOUT', 'EADDRINUSE', 'ERR_STREAM_PREMATURE_CLOSE']);
-const applicationCodes = new Set(['file_unavailable', 'share_copy_failed']);
+const applicationCodes = new Set(['file_unavailable', 'share_copy_failed', 'storage_capacity']);
 
 /** Never copy a name, message, stack, path or arbitrary code supplied by an error. */
 export function safeErrorDiagnostic(error: unknown): { type: string; code?: string } {

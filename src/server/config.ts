@@ -6,6 +6,9 @@ export interface AppConfig {
   backupsDir: string;
   filesDir: string;
   shareKey: Buffer | null;
+  /** Explicit HTTP upload capacity settings; offline commands may omit them. */
+  filesStorageBudgetBytes: number | null;
+  filesFreeReserveBytes: number | null;
   /** Scheme + host (+ port) that browsers send as Origin, e.g. https://builtbasis.ktimanet.com */
   publicOrigin: string;
   secureCookies: boolean;
@@ -23,12 +26,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (encodedKey !== undefined && !/^[a-fA-F0-9]{64}$/.test(encodedKey)) {
     throw new Error('SHARE_LINK_KEY must contain exactly 64 hexadecimal characters');
   }
+  const positiveBytes = (key: string): number | null => {
+    const value = env[key];
+    if (value === undefined) return null;
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
+      throw new Error(`${key} must be a positive safe integer byte count`);
+    }
+    return Number(value);
+  };
   return {
     dataDir,
     dbPath: join(dataDir, 'builtbasis.db'),
     backupsDir: join(dataDir, 'backups'),
     filesDir: join(dataDir, 'files'),
     shareKey: encodedKey === undefined ? null : Buffer.from(encodedKey, 'hex'),
+    filesStorageBudgetBytes: positiveBytes('FILES_STORAGE_BUDGET_BYTES'),
+    filesFreeReserveBytes: positiveBytes('FILES_FREE_RESERVE_BYTES'),
     publicOrigin,
     secureCookies: publicOrigin.startsWith('https://'),
     behindCloudflare: env.BEHIND_CLOUDFLARE === '1',

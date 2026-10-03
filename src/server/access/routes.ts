@@ -8,8 +8,8 @@ import { HttpError } from '../errors';
 import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
 import { saveUpload } from '../files/occurrences';
 import { describeAttachment, resolveAttachmentView } from '../files/previews';
-import { discardStaged, publishFile } from '../files/storage';
-import { parseUpload } from '../files/uploads';
+import { withUpload } from '../files/admission';
+import type { StorageCapacity } from '../files/capacity';
 import { ItemParams } from '../http/params';
 import { SESSION_COOKIE } from '../http/guards';
 import { requireUserId } from '../http/user';
@@ -27,7 +27,7 @@ const GrantBody = z.strictObject({ canUpload: z.boolean(), canAddLog: z.boolean(
 const PublicLogBody = LogEntryBody.omit({ private: true });
 const contributorConfig = { contributor: true, privateResponse: true };
 
-export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppConfig): void {
+export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppConfig, capacity: StorageCapacity): void {
   app.get('/api/contributors', { config: { privateResponse: true } }, async () => {
     const rows = db.prepare(`SELECT id, username, display_name AS displayName, is_active AS active
       FROM users WHERE is_owner = 0 ORDER BY display_name, id`).all() as { id: number; username: string; displayName: string; active: number }[];
@@ -99,10 +99,7 @@ export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppCo
       const { id } = AssignedParams.parse(request.params);
       const userId = requireUserId(request);
       requireContributorAccess(db, userId, id, 'upload');
-      const envelope = await parseUpload(request, config.filesDir, kind);
-      try {
-        for (const file of Object.values(envelope.files)) await publishFile(config.filesDir, file);
-        const result = db.transaction(() => {
+      const result = await withUpload(request, config.filesDir, kind, capacity, envelope => db.transaction(() => {
           const token = request.cookies[SESSION_COOKIE];
           if (!token || findSessionUser(db, token)?.userId !== userId) throw new HttpError(401, 'unauthenticated');
           const access = requireContributorAccess(db, userId, id, 'upload');
@@ -114,11 +111,8 @@ export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppCo
           }
           const occurrence = saveUpload(db, access.projectId, id, userId, kind, envelope);
           return buildSharedRecord(db, access)[kind].find(item => item.id === occurrence.id);
-        })();
-        return reply.status(201).send(result);
-      } finally {
-        await Promise.all(Object.values(envelope.files).map(discardStaged));
-      }
+      })());
+      return reply.status(201).send(result);
     });
   }
   app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/photos/:itemId/:variant', config: contributorConfig,

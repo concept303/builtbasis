@@ -1,9 +1,13 @@
 import { request as httpRequest } from 'node:http';
 import { Readable } from 'node:stream';
 import { readdir } from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
+import { buildApp } from '../../src/server/app';
+
+vi.mock('node:fs/promises', async original => ({ ...await original<typeof import('node:fs/promises')>() }));
 
 let f: Fixture;
 let address: string;
@@ -16,7 +20,7 @@ beforeEach(async () => {
   id = (await postRecord(f, { subtype: 'task' })).id;
   address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
 });
-afterEach(async () => { await f.ctx.close(); });
+afterEach(async () => { await f.ctx.app.close(); await f.ctx.close(); });
 
 function body(total: number): Readable {
   return Readable.from((function* () {
@@ -105,7 +109,11 @@ it('returns 413 for declared oversize without requiring the client to send the d
   expect(await stagedNames()).toEqual([]);
 });
 
-it('removes a partial staged file after client disconnect and continues serving requests', async () => {
+it('removes partial staging and releases the sole upload reservation after client disconnect', async () => {
+  await f.ctx.app.close();
+  f.ctx.config = { ...f.ctx.config, filesStorageBudgetBytes: 100_000_000, filesFreeReserveBytes: 1 };
+  f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db });
+  address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
   const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
     method: 'POST', headers: headers(), agent: false,
   });
@@ -117,7 +125,48 @@ it('removes a partial staged file after client disconnect and continues serving 
     req.destroy();
     await vi.waitFor(async () => { expect(await stagedNames()).toEqual([]); }, { timeout: 5000 });
     expect(occurrenceCount()).toBe(0);
-    const response = await upload(1024, 1024);
+    // A leaked 100 MB reservation would reject this second chunked request.
+    const response = await upload(1024);
     expect(response.status, response.body).toBe(201);
   } finally { req.destroy(); }
+}, 15_000);
+
+it('releases capacity when the client disconnects during the pending free-space check', async () => {
+  await f.ctx.app.close();
+  f.ctx.config = { ...f.ctx.config, filesStorageBudgetBytes: 100_000_000, filesFreeReserveBytes: 1 };
+  f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db });
+  let observedAbort = false;
+  f.ctx.app.addHook('onRequest', async request => {
+    request.raw.once('aborted', () => { observedAbort = true; });
+  });
+  address = await f.ctx.app.listen({ port: 0, host: '127.0.0.1' });
+  const original = fsPromises.statfs;
+  let releaseProbe: (() => void) | undefined;
+  let waiting = false;
+  vi.spyOn(fsPromises, 'statfs').mockImplementationOnce(async (...args: Parameters<typeof original>) => {
+    const result = await original(...args);
+    waiting = true;
+    await new Promise<void>(resolve => { releaseProbe = resolve; });
+    return result;
+  });
+  const req = httpRequest(new URL(recordUrl(f, id, '/attachments'), address), {
+    method: 'POST', headers: headers(), agent: false,
+  });
+  req.on('error', () => {});
+  try {
+    req.write(prefix);
+    await vi.waitFor(() => expect(waiting).toBe(true), { timeout: 3000 });
+    req.destroy();
+    await vi.waitFor(() => expect(observedAbort).toBe(true), { timeout: 3000 });
+    releaseProbe!();
+    // A new socket request follows the resumed admission microtask.
+    const response = await upload(1024);
+    expect(response.status, response.body).toBe(201);
+    expect(occurrenceCount()).toBe(1);
+    expect(await stagedNames()).toEqual([]);
+  } finally {
+    req.destroy();
+    releaseProbe?.();
+    vi.restoreAllMocks();
+  }
 }, 15_000);

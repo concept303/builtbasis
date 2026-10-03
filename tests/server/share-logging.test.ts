@@ -2,7 +2,7 @@ import { Writable } from 'node:stream';
 import * as fsPromises from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import { buildApp } from '../../src/server/app';
-import { addAttachment } from './file-fixture';
+import { addAttachment, multipart, PDF } from './file-fixture';
 import { get, send } from './helpers';
 import { makeFixture, postRecord, recordUrl } from './record-fixture';
 
@@ -92,4 +92,23 @@ it('logs only controlled diagnostic types and codes even when error properties c
     expect(captured).not.toContain('SECRET');
     expect(captured).not.toContain(f.cookie.split('=')[1]!);
   } finally { await f.ctx.close(); }
+});
+
+it.each(['ENOSPC', 'EDQUOT'])('preserves %s when upload capacity errors wrap a filesystem failure', async code => {
+  const f = await makeFixture();
+  let captured = '';
+  const stream = new Writable({ write(chunk, _encoding, callback) { captured += chunk.toString(); callback(); } });
+  try {
+    const record = await postRecord(f, { subtype: 'task' });
+    await f.ctx.app.close();
+    f.ctx.app = await buildApp({ config: f.ctx.config, db: f.ctx.db, logger: { level: 'info', stream } });
+    vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(Object.assign(new Error('SECRET_DISK_PATH'), { code }));
+    const form = multipart([{ name: 'metadata', data: '{}' }, { name: 'file', filename: 'a.pdf', data: PDF }]);
+    const response = await f.ctx.app.inject({ method: 'POST', url: recordUrl(f, record.id, '/attachments'),
+      headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': form.contentType }, payload: form.body });
+    expect(response.statusCode).toBe(507);
+    expect(response.json()).toEqual({ error: 'storage_capacity' });
+    expect(captured).toContain(JSON.stringify(code));
+    expect(captured).not.toContain('SECRET');
+  } finally { vi.restoreAllMocks(); await f.ctx.close(); }
 });

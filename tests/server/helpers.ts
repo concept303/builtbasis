@@ -27,6 +27,8 @@ export async function makeContext(
   const config = loadConfig({
     BUILTBASIS_DATA_DIR: dataDir,
     SHARE_LINK_KEY: '07'.repeat(32),
+    FILES_STORAGE_BUDGET_BYTES: '1000000000',
+    FILES_FREE_RESERVE_BYTES: '1000000',
     PUBLIC_BASE_URL: options.publicBaseUrl ?? 'http://localhost:3000',
     ...(options.behindCloudflare ? { BEHIND_CLOUDFLARE: '1' } : {}),
   });
