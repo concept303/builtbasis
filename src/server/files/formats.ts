@@ -1,6 +1,7 @@
 import { extname } from 'node:path';
 import { ACCEPTED_ATTACHMENT_EXTENSIONS, type AttachmentCapabilities, type FilePurpose } from '../../domain';
 import { HttpError } from '../errors';
+import { hasSvgRoot } from './svg-prefix';
 
 /** Named positive vendor formats plus retained v1 formats. Storage acceptance is not document validation. */
 export const ATTACHMENT_EXTENSIONS = new Set(ACCEPTED_ATTACHMENT_EXTENSIONS);
@@ -32,7 +33,7 @@ formats('mp3','audio','audio/mpeg');
 formats('wav','audio','audio/wav');
 formats('ogg','audio','audio/ogg','application/ogg');
 
-function canonicalType(bytes: Buffer): string {
+function canonicalType(bytes: Buffer, svg: boolean): string {
   if (begins(bytes,'ffd8ff')) return 'image/jpeg';
   if (begins(bytes,'89504e470d0a1a0a')) return 'image/png';
   if (/^GIF8[79]a/.test(bytes.toString('ascii',0,6))) return 'image/gif';
@@ -61,7 +62,7 @@ function canonicalType(bytes: Buffer): string {
   if (bytes.toString('ascii',0,4) === 'OggS') return 'application/ogg';
   const text = bytes.toString('utf8').replace(/^\uFEFF/, '').trimStart();
   if (text.startsWith('%PDF-')) return 'application/pdf';
-  if (/^(?:<\?xml[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>|\s)*<svg(?:\s|\/?>)/i.test(text)) return 'image/svg+xml';
+  if (svg) return 'image/svg+xml';
   if (text.startsWith('{\\rtf')) return 'application/rtf';
   if (begins(bytes,'d0cf11e0a1b11ae1')) return 'application/x-cfb';
   if (begins(bytes,'504b0304') || begins(bytes,'504b0506') || begins(bytes,'504b0708')) return 'application/zip';
@@ -69,9 +70,9 @@ function canonicalType(bytes: Buffer): string {
 }
 
 /** Content-derived storage MIME stays identical when the same bytes have different allowed names. */
-export function detectFormat(bytes: Buffer, filename: string, purpose: FilePurpose): string {
+export function detectFormat(bytes: Buffer, filename: string, purpose: FilePurpose, svg = hasSvgRoot(bytes)): string {
   const ext = extension(filename);
-  const mime = canonicalType(bytes);
+  const mime = canonicalType(bytes, svg);
   if (purpose === 'attachment') {
     if (!ATTACHMENT_EXTENSIONS.has(ext)) throw new HttpError(415,'unsupported_file_type');
     const expected = native[ext]?.[2];

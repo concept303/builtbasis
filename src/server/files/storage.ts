@@ -6,6 +6,7 @@ import type { Readable } from 'node:stream';
 import { FILE_LIMITS, Filename, type FilePurpose } from '../../domain';
 import { HttpError } from '../errors';
 import { detectFormat } from './formats';
+import { SvgPrefix } from './svg-prefix';
 
 export interface StagedFile { path: string; hash: string; size: number; contentType: string }
 export function blobPath(filesDir: string, hash: string): string {
@@ -28,11 +29,13 @@ export async function stageFile(filesDir: string, source: Readable, filename: st
     const hash = createHash('sha256');
     let size = 0;
     let prefix = Buffer.alloc(0);
+    const svg = new SvgPrefix();
     for await (const chunk of source) {
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       size += bytes.length;
       if (size > FILE_LIMITS[purpose]) throw new HttpError(413, 'upload_too_large');
       if (prefix.length < 512) prefix = Buffer.concat([prefix, bytes.subarray(0, 512 - prefix.length)]);
+      svg.write(bytes);
       hash.update(bytes);
       for (let offset = 0; offset < bytes.length;) {
         const result = await file.write(bytes, offset, bytes.length - offset);
@@ -42,7 +45,7 @@ export async function stageFile(filesDir: string, source: Readable, filename: st
     }
     if ((source as Readable & { truncated?: boolean }).truncated) throw new HttpError(413, 'upload_too_large');
     if (size === 0) throw new HttpError(415, 'unsupported_file_type');
-    const contentType = detectFormat(prefix, name, purpose);
+    const contentType = detectFormat(prefix, name, purpose, svg.isSvg);
     await file.sync();
     await file.close();
     file = undefined;

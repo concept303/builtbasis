@@ -102,9 +102,12 @@ it('serves media with an occurrence-specific player MIME and protects SVG docume
   expect((await read(video.id,'preview')).json().capabilities).toMatchObject({kind:'video',view:'native',mediaType:'video/mp4'});
   expect((await read(audio.id,'view')).headers['content-type']).toBe('audio/mp4');
   expect((await read(video.id,'view','shared','GET',{range:'bytes=8-11'})).rawPayload).toEqual(Buffer.from('isom'));
-  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><image href="https://external.invalid/tracker"/></svg>');
+  const svg = Buffer.from('<!--' + 'export comment '.repeat(500) + '--><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><image href="https://external.invalid/tracker"/></svg>');
   const generic = await addAttachment(f,id,{},'vector.txt',svg);
   const image = await addAttachment(f,id,{},'vector.svg',svg);
+  expect(f.ctx.db.prepare('SELECT count(*) FROM blobs WHERE content_type = ?').pluck().get('image/svg+xml')).toBe(1);
+  expect((await read(generic.id,'preview')).json().capabilities.view).toBe('download');
+  expect((await read(image.id,'preview')).json().capabilities).toMatchObject({kind:'image',view:'native'});
   expect((await read(generic.id,'view')).statusCode).toBe(415);
   const view = await read(image.id,'view','shared');
   expect(view.headers['content-type']).toBe('image/svg+xml');
