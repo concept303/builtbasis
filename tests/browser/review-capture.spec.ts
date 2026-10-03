@@ -1,0 +1,56 @@
+import { test, expect, login, seed } from './fixture';
+import { resolve } from 'node:path';
+
+test('capture blocks another creation after the server commits but the POST response is lost', async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const endpoint = `/api/projects/${projectId}/records`;
+  const title = 'Capture committed before response loss';
+  await page.goto(`/projects/${projectId}/records`);
+  await page.getByRole('button', { name: 'New record', exact: true }).click();
+  const capture = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'New record', exact: true }) });
+  await capture.getByLabel('Subtype', { exact: true }).selectOption('task');
+  await capture.getByLabel('Title', { exact: true }).fill(title);
+  await capture.getByText('Location and photos (optional)', { exact: true }).click();
+  await capture.getByLabel('Photos', { exact: true }).setInputFiles(resolve('tests/browser/fixtures/media-synthetic.png'));
+  await capture.getByLabel('Photo phase', { exact: true }).selectOption('during');
+  await capture.locator('.location-picker summary').filter({ hasText: 'Villa 1' }).click();
+  await capture.getByRole('checkbox', { name: 'Villa 1', exact: true }).check();
+  let creates = 0;
+  let failReload = true;
+  let committedId = 0;
+  await page.route(`**${endpoint}*`, async route => {
+    if (route.request().method() === 'POST') {
+      creates++;
+      const response = await route.fetch({ maxRetries: 0 });
+      expect(response.status()).toBe(201);
+      committedId = (await response.json()).id;
+      await route.abort('failed');
+    } else if (failReload) await route.fulfill({ status: 503, json: { error: 'request_failed' } });
+    else await route.continue();
+  });
+  await capture.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(capture.getByRole('alert')).toBeVisible();
+  const actual = await page.request.get(endpoint);
+  const records = (await actual.json()).records as { id: number; title: string }[];
+  expect(records.filter(item => item.title === title)).toHaveLength(1);
+  expect(committedId).toBeGreaterThan(0);
+  await expect(capture.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+  await expect(capture.getByLabel('Title', { exact: true })).toHaveValue(title);
+  await expect(capture.getByLabel('Subtype', { exact: true })).toHaveValue('task');
+  await expect(capture.getByLabel('Photo phase', { exact: true })).toHaveValue('during');
+  await expect(capture.getByRole('checkbox', { name: 'Villa 1', exact: true })).toBeChecked();
+  expect(await capture.getByLabel('Photos', { exact: true }).evaluate(el => (el as HTMLInputElement).files?.[0]?.name)).toBe('media-synthetic.png');
+  await capture.getByRole('button', { name: 'Reload saved records', exact: true }).click();
+  await expect(capture.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+  await expect(capture.getByRole('region', { name: 'Saved records to review', exact: true })).toHaveCount(0);
+  failReload = false;
+  await capture.getByRole('button', { name: 'Reload saved records', exact: true }).click();
+  const review = capture.getByRole('region', { name: 'Saved records to review', exact: true });
+  await expect(review.locator(`a[href="/projects/${projectId}/records/${committedId}"]`)).toContainText(title);
+  await expect(review).toContainText('Public sample task');
+  await expect(capture.getByRole('button', { name: 'Create another draft', exact: true })).toBeEnabled();
+  expect(creates).toBe(1);
+  const final = (await (await page.request.get(endpoint)).json()).records as { title: string }[];
+  expect(final.filter(item => item.title === title)).toHaveLength(1);
+});
