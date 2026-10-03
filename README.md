@@ -34,6 +34,7 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
 | [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
+| [Plan 5 — Web interface](docs/plans/2026-10-04-plan-5-web-interface.md) | Full-code implementation plan and separate planning replay; browser implementation remains future work |
 | [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Key/account operations, access rules and Plan 5/6 handoff |
 | [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
 | [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research |
