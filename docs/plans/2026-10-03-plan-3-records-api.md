@@ -5,10 +5,11 @@
 > **Retention:** Active until executed; historical afterwards.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §4 (record model, human IDs, must be done before), §5 (shared fields, decision, measurements, verification, Log, activity), §6 (subtype fields), §8 (status rules), §9.3–§9.4 (tag and location operations that involve records), §10.2 (list filters, sorting, totals) — data and API only.
 > **Not in this plan:** photos, attachments, files and share links (Plan 4); screens (Plan 5); print view and PDF (Plan 6).
-> **Depends on:** Plan 2 (server foundation). Written against Plan 2's plan text at `f0fca70`, while Plan 2 was being executed; Task 0 checks that the merged code matches.
+> **Depends on:** Plan 2 (server foundation), merged to `main` at `48c50ef` (18 test files, 155 tests). Task 0 checks the starting point.
 > **Implemented by:** Not implemented
 > **Verified:** Not verified
-> **Plan check:** 2026-10-03 — written against Plan 2's plan text (`f0fca70`) materialised in a scratch clone (136 tests passing). Every step of this plan was then replayed in order in a fresh clone: each "verify it fails" step failed as stated, each "verify it passes" step passed, `npm run typecheck` was clean after every task, and every commit staged its files with nothing left over. Final `npm test`: 29 files, 207 tests passed. The clones were deleted.
+> **Plan check:** 2026-10-03 — checked against the merged Plan 2 on `main` (`48c50ef`, 155 tests). Every step of this plan was replayed in order in a fresh clone of `main`: each "verify it fails" step failed as stated, each "verify it passes" step passed, `npm run typecheck` was clean after every task, and every commit staged its files with nothing left over. Final `npm test`: 29 files, 229 tests passed. The clones were deleted.
+> **Review:** 2026-10-03, second agent, on `a88af6f` — five findings, all reproduced and fixed: (1) the choice history kept only option ids, which SQLite could reuse after a delete — option ids are now never reused, and each choice entry keeps the option's label and description (Tasks 2, 3, 5); (2) a zone-type filter also matched differently typed nodes inside a typed node — it now matches only nodes carrying the type (Task 8); (3) tag merge and delete changed records without marking them updated — they now do, in the same transaction (Task 9); (4) the starting-point and final counts used Plan 2's planned 136 tests instead of the merged 155 (Tasks 0, 11); (5) the sort-by-update test could depend on timing — every record now gets its own update time (Task 8).
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
 
@@ -25,12 +26,13 @@
 3. **Text is stored exactly as typed** (design §3): nothing is trimmed or rewritten. Optional text that is empty or only spaces is stored as empty (`null`); required text must contain more than spaces.
 4. **Fields a subtype does not have are rejected** (`400 field_not_applicable`), not silently ignored.
 5. **Retired people, trades and locations** stay valid on records that already have them but cannot be newly selected (design §9.1, §9.2, §9.4). The rule applies to every person field, including the verifier and the measurer.
-6. **Activity log** (design §5.12): one `created` entry; one entry per change of a tracked field, with old and new value; one entry per status change, carrying its reason, note and verification. Values are stored as codes and ids; the browser shows the labels. None of the tracked fields is private, so no activity entry is private yet; Plan 4 adds the share-link entries.
+6. **Activity log** (design §5.12): one `created` entry; one entry per change of a tracked field, with old and new value; one entry per status change, carrying its reason, note and verification. Values are stored as codes and ids; the browser shows the labels. A change of the chosen option also keeps the label and description of both options, because an option can later be edited or deleted; option ids are never reused. None of the tracked fields is private, so no activity entry is private yet; Plan 4 adds the share-link entries.
 7. **Status notes:** the _Superseded_ note names the replacing record, so it stays on the record as its status note; the _Reopen_ note is kept in the activity entry.
 8. **A verification sent with any other transition is ignored** (design §5.10: no other transition creates a verification entry).
 9. **Estimated cost:** the owner API returns the stored value even while _Outside contract scope_ is unticked; the browser hides it (design §5.4); list totals exclude it.
 10. **Measurement comparisons and label suggestions are computed in the browser** from the sets, with the shared domain functions (`compareItems`, `compareOverTime`, `normalizeLabel`). The API has no comparison routes.
-11. **List filters:** `before=X` = records that must be done before X; `after=X` = records that require X first; `blocking=true` = unfinished records that must be done before at least one unfinished record (unfinished = not Closed, Cancelled or Superseded). Text search covers title, description and human ID, ignoring case and accents. The list returns every match without paging: a project has hundreds of records, not thousands.
+11. **List filters:** `before=X` = records that must be done before X; `after=X` = records that require X first; `blocking=true` = unfinished records that must be done before at least one unfinished record (unfinished = not Closed, Cancelled or Superseded). A location filter includes the nodes inside the selected ones (design §5.5); a zone-type filter matches only nodes that carry the type (design §9.5). Text search covers title, description and human ID, ignoring case and accents. The list returns every match without paging: a project has hundreds of records, not thousands.
+13. **Tag operations count as changes to the records they affect:** a merge or delete marks each record whose tags change as updated (time and user). A rename changes no record: records refer to the tag, not to its name.
 12. **Concurrent edits: the last save wins.** There is one owner; edit-conflict detection is not built in v1. *Assumption.* Task 11 adds this to design §14.
 
 ---
@@ -88,12 +90,12 @@ The `details.errors` of `rule_violation` and `transition_rejected` are Plan 1's 
 
 ### Task 0: Check the starting point
 
-This plan edits Plan 2's code. Plan 2 was still being executed when this plan was written, so check first that the merged code is what this plan expects.
+This plan edits Plan 2's code. Check first that the code you start from is the merged Plan 2 that this plan was checked against.
 
 - [ ] **Step 1: Confirm Plan 2 is merged and green**
 
 Run: `git log --oneline -15` — the Plan 2 commits (`feat(server): …`, `docs: record Plan 2 completion …`) are on the branch you start from.
-Run: `npm test` → `Tests  136 passed (136)`. Run: `npm run typecheck` → no output.
+Run: `npm test` → `Test Files  18 passed (18)` and `Tests  155 passed (155)`. Run: `npm run typecheck` → no output.
 
 - [ ] **Step 2: Confirm the text this plan replaces exists**
 
@@ -107,7 +109,7 @@ grep -c "normalizeLabel(name).normalize('NFD')" src/domain/lists.ts
 
 Expected: `src/server/lists/tags.ts:2`, `src/server/lists/locations.ts:1`, then `1`, then `1`.
 
-If any result differs, or Step 1 fails: **stop and report**. The merged Plan 2 differs from its plan text, and this plan must be adjusted first.
+If any result differs, or Step 1 fails: **stop and report**. The code differs from what this plan was checked against, and the plan must be adjusted first.
 
 ### Task 1: Record input schemas and text folding (domain)
 
@@ -635,8 +637,9 @@ export const MIGRATION_0002_RECORDS: Migration = {
     );
     CREATE INDEX record_precedence_later ON record_precedence(later_id);
 
+    -- AUTOINCREMENT: an option id is never reused, so the activity log can never point to a different option.
     CREATE TABLE decision_options (
-      id INTEGER PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
       label TEXT NOT NULL,
       description TEXT,
@@ -1691,6 +1694,16 @@ const PERSON_FIELDS = ['ballInCourtId', 'responsibleId', 'issuedById', 'decidedB
 
 const toFlag = (value: boolean | undefined): number | undefined => (value === undefined ? undefined : Number(value));
 
+/** The option as it was when chosen or unchosen, so the history stays readable after the option changes or is deleted. */
+function optionSnapshot(db: Db, optionId: number | null): { label: string; description: string | null } | null {
+  if (optionId === null) return null;
+  return (
+    (db.prepare('SELECT label, description FROM decision_options WHERE id = ?').get(optionId) as
+      | { label: string; description: string | null }
+      | undefined) ?? null
+  );
+}
+
 export function getRecordDetail(db: Db, projectId: number, recordId: number): RecordDetail {
   const row = requireRecord(db, projectId, recordId);
   const hasReason = row.statusReasonCode !== null || row.statusReasonNote !== null;
@@ -1806,9 +1819,12 @@ function applyPatch(db: Db, current: RecordRow, userId: number, patch: RecordPat
   if (errors.length > 0) throw new HttpError(422, 'rule_violation', { errors });
 
   for (const field of TRACKED_FIELDS) {
-    if (current[field] !== updated[field]) {
-      recordActivity(db, { recordId, userId, at, action: 'field_changed', field, from: current[field], to: updated[field] });
-    }
+    if (current[field] === updated[field]) continue;
+    const detail =
+      field === 'chosenOptionId'
+        ? { fromOption: optionSnapshot(db, current.chosenOptionId), toOption: optionSnapshot(db, updated.chosenOptionId) }
+        : undefined;
+    recordActivity(db, { recordId, userId, at, action: 'field_changed', field, from: current[field], to: updated[field], detail });
   }
 }
 
@@ -2341,6 +2357,25 @@ describe('options considered (design §5.6)', () => {
     expect(activity[0]).toMatchObject({ field: 'chosenOptionId', from: null, to: option.id });
   });
 
+  it('keeps the choice history readable after the option is deleted, and never reuses option ids', async () => {
+    const qi = await postRecord(f, { subtype: 'quality_issue' });
+    const grind = (
+      await send(f.ctx, f.cookie, 'POST', optionsUrl(qi.id), { label: 'Grind', description: 'Grind 3 mm off' })
+    ).json();
+    await patchRecord(f, qi.id, { chosenOptionId: grind.id });
+    await patchRecord(f, qi.id, { chosenOptionId: null });
+    expect((await send(f.ctx, f.cookie, 'DELETE', optionsUrl(qi.id, grind.id))).statusCode).toBe(200);
+    const rebuild = (await send(f.ctx, f.cookie, 'POST', optionsUrl(qi.id), { label: 'Rebuild' })).json();
+    expect(rebuild.id).not.toBe(grind.id);
+    const activity = (await get(f.ctx, f.cookie, recordUrl(f, qi.id, '/activity'))).json();
+    const choices = activity.filter((entry: { field: string }) => entry.field === 'chosenOptionId');
+    const snapshot = { label: 'Grind', description: 'Grind 3 mm off' };
+    expect(choices.map(({ from, to, detail }: Record<string, unknown>) => ({ from, to, detail }))).toEqual([
+      { from: grind.id, to: null, detail: { fromOption: snapshot, toOption: null } },
+      { from: null, to: grind.id, detail: { fromOption: null, toOption: snapshot } },
+    ]);
+  });
+
   it('refuses to delete the chosen option; deletes others', async () => {
     const qi = await postRecord(f, { subtype: 'quality_issue' });
     const a = (await send(f.ctx, f.cookie, 'POST', optionsUrl(qi.id), { label: 'A' })).json();
@@ -2379,7 +2414,7 @@ describe('options considered (design §5.6)', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/options-api.test.ts`
-Expected: FAIL — all 5 tests fail with `404` (there are no option routes yet) or, for the choice test, `200` where `400` is expected (no option of another record can be checked yet).
+Expected: FAIL — all 6 tests fail with `404` (there are no option routes yet) or, for the choice test, `200` where `400` is expected (no option of another record can be checked yet).
 
 - [ ] **Step 3: Replace `src/server/http/params.ts`**
 
@@ -2549,7 +2584,7 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 
 - [ ] **Step 6: Run to verify it passes**
 
-Run: `npx vitest run tests/server/options-api.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
+Run: `npx vitest run tests/server/options-api.test.ts` → PASS (6 tests). Then `npm test` and `npm run typecheck`.
 
 - [ ] **Step 7: Commit**
 
@@ -3174,7 +3209,7 @@ Query parameters of `GET /records` (all optional; several values of one filter a
 |---|---|
 | `subtype`, `status`, `severity`, `priority`, `stage`, `problemType` | Codes |
 | `locationId` | Location nodes; includes everything inside them (design §5.5) |
-| `zoneTypeId` | Zone types; records on any node of that type, or inside one (design §9.5) |
+| `zoneTypeId` | Zone types; records on a node that carries the type (design §9.5). Unlike `locationId`, nodes inside it count only if they carry the type themselves. |
 | `tradeId`, `tagId`, `ballInCourtId`, `responsibleId` | Ids |
 | `safety`, `outsideScope` | `true` or `false` |
 | `before`, `after`, `blocking` | Must-be-done-before filters (Decision 11) |
@@ -3187,6 +3222,8 @@ Query parameters of `GET /records` (all optional; several values of one filter a
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createLocation } from '../../src/server/lists/locations';
+import { createZoneType } from '../../src/server/lists/zone-types';
 import { get } from './helpers';
 import { forceStatus, makeFixture, patchRecord, postRecord, type Fixture } from './record-fixture';
 
@@ -3217,6 +3254,20 @@ describe('record list filters (design §5.5, §10.2)', () => {
       count: 2,
     });
     expect(await list(`locationId=${f.locations.v1Ground}`)).toMatchObject({ ids: ['T-0001'] });
+  });
+
+  it('matches a zone type only on nodes that carry it, not on differently typed nodes inside them', async () => {
+    const bathroom = createZoneType(f.ctx.db, f.projectId, { nameEn: 'Bathroom' }).id;
+    const wc = createLocation(f.ctx.db, f.projectId, {
+      kind: 'space',
+      nameEn: 'WC',
+      parentId: f.locations.v1Kitchen,
+      zoneTypeId: bathroom,
+    }).id;
+    await postRecord(f, { subtype: 'task', locationIds: [wc] });
+    expect((await list(`zoneTypeId=${f.zones.kitchen}`)).ids).toEqual([]);
+    expect((await list(`zoneTypeId=${bathroom}`)).ids).toEqual(['T-0001']);
+    expect((await list(`locationId=${f.locations.v1Kitchen}`)).ids).toEqual(['T-0001']);
   });
 
   it('filters on a zone type across buildings', async () => {
@@ -3273,7 +3324,10 @@ describe('record list order and totals (design §10.2)', () => {
     expect((await list('sort=priority')).ids).toEqual(['T-0003', 'T-0001', 'T-0002']);
     expect((await list('sort=priority&dir=desc')).ids).toEqual(['T-0001', 'T-0003', 'T-0002']);
     expect((await list('sort=due')).ids).toEqual(['T-0002', 'T-0001', 'T-0003']);
-    f.ctx.db.prepare("UPDATE records SET updated_at = '2026-01-01T00:00:00.000Z' WHERE human_id = 'T-0003'").run();
+    const setUpdated = f.ctx.db.prepare('UPDATE records SET updated_at = ? WHERE human_id = ?');
+    setUpdated.run('2026-01-02T00:00:00.000Z', 'T-0001');
+    setUpdated.run('2026-01-03T00:00:00.000Z', 'T-0002');
+    setUpdated.run('2026-01-01T00:00:00.000Z', 'T-0003');
     expect((await list('sort=updated')).ids).toEqual(['T-0002', 'T-0001', 'T-0003']);
   });
 
@@ -3318,7 +3372,7 @@ describe('record list order and totals (design §10.2)', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/records-list.test.ts`
-Expected: FAIL — all 9 tests fail with `list failed: 404 {"error":"not_found"}`: `GET /records` does not exist yet.
+Expected: FAIL — all 10 tests fail with `list failed: 404 {"error":"not_found"}`: `GET /records` does not exist yet.
 
 - [ ] **Step 3: Create `src/server/records/list.ts`**
 
@@ -3468,11 +3522,12 @@ export function listRecords(db: Db, projectId: number, query: RecordListQueryInp
   linkedTo('record_tags', 'tag_id', query.tagId);
   if (query.locationId) locatedIn(query.locationId);
   if (query.zoneTypeId) {
-    const zoneNodes = db
-      .prepare(`SELECT id FROM location_nodes WHERE project_id = ? AND zone_type_id IN (${placeholders(query.zoneTypeId)})`)
-      .pluck()
-      .all(projectId, ...query.zoneTypeId) as number[];
-    locatedIn(zoneNodes);
+    // Only nodes that carry the zone type; unlike a location filter, nodes inside them do not count (design §9.5).
+    where.push(
+      `EXISTS (SELECT 1 FROM record_locations l JOIN location_nodes n ON n.id = l.location_id
+        WHERE l.record_id = r.id AND n.project_id = ? AND n.zone_type_id IN (${placeholders(query.zoneTypeId)}))`,
+    );
+    params.push(projectId, ...query.zoneTypeId);
   }
   if (query.safety !== undefined) {
     where.push('r.safety = ?');
@@ -3574,7 +3629,7 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 
 - [ ] **Step 5: Run to verify it passes**
 
-Run: `npx vitest run tests/server/records-list.test.ts` → PASS (9 tests). Then `npm test` and `npm run typecheck`.
+Run: `npx vitest run tests/server/records-list.test.ts` → PASS (10 tests). Then `npm test` and `npm run typecheck`.
 
 - [ ] **Step 6: Commit**
 
@@ -3590,12 +3645,13 @@ git commit -m "feat(server): record list with filters, accent-insensitive search
 - Modify: `src/server/lists/tags.ts`, `src/server/lists/locations.ts`
 - Test: `tests/server/lists-with-records.test.ts`
 
-This completes the Plan 2 hand-over items: a tag merge moves record links, a tag delete reports its usage first, and a location that records use cannot be deleted (the owner retires it instead).
+This completes the Plan 2 hand-over items: a tag merge moves record links, a tag delete reports its usage first, and a location that records use cannot be deleted (the owner retires it instead). A merge or delete also marks each record whose tags change as updated (Decision 13), so the record moves up when the list is sorted by update time.
 
 - [ ] **Step 1: Write the failing test `tests/server/lists-with-records.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createTag } from '../../src/server/lists/tags';
 import { get, send } from './helpers';
 import { getRecord, makeFixture, patchRecord, postRecord, type Fixture } from './record-fixture';
 
@@ -3635,6 +3691,22 @@ describe('tags on records (design §9.3)', () => {
   });
 });
 
+describe('record update time after tag operations', () => {
+  it('a merge or delete marks the records whose tags change as updated, and only those', async () => {
+    const pool = createTag(f.ctx.db, f.projectId, { nameEl: 'Πισίνα', nameEn: 'Pool' }).id;
+    const merged = await postRecord(f, { subtype: 'task', tagIds: [f.tags.windows] });
+    const deleted = await postRecord(f, { subtype: 'task', tagIds: [pool] });
+    const untouched = await postRecord(f, { subtype: 'task', tagIds: [f.tags.stone] });
+    const old = '2000-01-01T00:00:00.000Z';
+    f.ctx.db.prepare('UPDATE records SET updated_at = ?').run(old);
+    await send(f.ctx, f.cookie, 'POST', tagUrl(f.tags.windows, '/merge'), { intoId: f.tags.stone });
+    await send(f.ctx, f.cookie, 'DELETE', tagUrl(pool));
+    expect((await getRecord(f, merged.id)).updatedAt).not.toBe(old);
+    expect((await getRecord(f, deleted.id)).updatedAt).not.toBe(old);
+    expect((await getRecord(f, untouched.id)).updatedAt).toBe(old);
+  });
+});
+
 describe('locations on records (design §9.4)', () => {
   it('refuses to delete a node that a record uses, directly or inside it', async () => {
     const record = await postRecord(f, { subtype: 'task', locationIds: [f.locations.v1Kitchen] });
@@ -3654,9 +3726,24 @@ describe('locations on records (design §9.4)', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/lists-with-records.test.ts`
-Expected: FAIL — 3 tests fail and 1 passes. The merge leaves the record without tags (`expected [] to deeply equal [ 1 ]`), `/usage` answers `404`, and deleting a used location hits the database's foreign-key check (`500` where `409` is expected). The rename test already passes: a rename never touched records; it guards that behaviour.
+Expected: FAIL — 4 tests fail and 1 passes. The merge leaves the record without tags (`expected [] to deeply equal [ 1 ]`), `/usage` answers `404`, the merged and deleted records keep their old update time, and deleting a used location hits the database's foreign-key check (`500` where `409` is expected). The rename test already passes: a rename never touched records; it guards that behaviour.
 
 - [ ] **Step 3: Modify `src/server/lists/tags.ts`**
+
+Replace:
+
+```ts
+import { ItemParams, ProjectParams } from '../http/params';
+
+```
+
+with:
+
+```ts
+import { ItemParams, ProjectParams } from '../http/params';
+import { requireUserId } from '../http/user';
+
+```
 
 Replace:
 
@@ -3677,20 +3764,38 @@ export function mergeTag(db: Db, projectId: number, sourceId: number, intoId: nu
 
 /** Plan 3 adds: the number of affected records, shown to the owner before confirming (design §9.3). */
 export function deleteTag(db: Db, projectId: number, id: number): void {
+  getTag(db, projectId, id);
+  db.prepare('DELETE FROM tags WHERE project_id = ? AND id = ?').run(projectId, id);
+}
 ```
 
 with:
 
 ```ts
+/** Every record carrying the tag is about to change: mark it as updated by the owner. */
+function touchRecordsWithTag(db: Db, tagId: number, userId: number, now: Date): void {
+  db.prepare(
+    'UPDATE records SET updated_at = ?, updated_by = ? WHERE id IN (SELECT record_id FROM record_tags WHERE tag_id = ?)',
+  ).run(now.toISOString(), userId, tagId);
+}
+
 /**
  * Merges a tag into another, which keeps its own names (design §9.3). Records carrying the source tag
- * carry the target instead; a record that already has both keeps one link.
+ * carry the target instead (a record that already has both keeps one link) and are marked as updated.
  */
-export function mergeTag(db: Db, projectId: number, sourceId: number, intoId: number): Tag {
+export function mergeTag(
+  db: Db,
+  projectId: number,
+  sourceId: number,
+  intoId: number,
+  userId: number,
+  now: Date = new Date(),
+): Tag {
   if (sourceId === intoId) throw new HttpError(400, 'merge_into_self');
   getTag(db, projectId, sourceId);
   const target = getTag(db, projectId, intoId);
   db.transaction(() => {
+    touchRecordsWithTag(db, sourceId, userId, now);
     db.prepare(
       'INSERT OR IGNORE INTO record_tags (record_id, tag_id) SELECT record_id, ? FROM record_tags WHERE tag_id = ?',
     ).run(intoId, sourceId);
@@ -3706,19 +3811,36 @@ export function tagUsage(db: Db, projectId: number, id: number): { records: numb
   return { records: db.prepare('SELECT COUNT(*) FROM record_tags WHERE tag_id = ?').pluck().get(id) as number };
 }
 
-/** Removes the tag from every record (ON DELETE CASCADE) and deletes it (design §9.3). */
-export function deleteTag(db: Db, projectId: number, id: number): void {
+/** Removes the tag from every record (ON DELETE CASCADE), marking those records as updated, and deletes it. */
+export function deleteTag(db: Db, projectId: number, id: number, userId: number, now: Date = new Date()): void {
+  getTag(db, projectId, id);
+  db.transaction(() => {
+    touchRecordsWithTag(db, id, userId, now);
+    db.prepare('DELETE FROM tags WHERE project_id = ? AND id = ?').run(projectId, id);
+  })();
+}
 ```
 
 Replace:
 
 ```ts
+    return mergeTag(db, projectId, id, TagMergeBody.parse(request.body).intoId);
+  });
+
   app.delete('/api/projects/:projectId/tags/:id', async (request) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    deleteTag(db, projectId, id);
+    return { ok: true };
+  });
 ```
 
 with:
 
 ```ts
+    return mergeTag(db, projectId, id, TagMergeBody.parse(request.body).intoId, requireUserId(request));
+  });
+
   app.get('/api/projects/:projectId/tags/:id/usage', async (request) => {
     const { projectId, id } = ItemParams.parse(request.params);
     requireProject(db, projectId);
@@ -3726,6 +3848,11 @@ with:
   });
 
   app.delete('/api/projects/:projectId/tags/:id', async (request) => {
+    const { projectId, id } = ItemParams.parse(request.params);
+    requireProject(db, projectId);
+    deleteTag(db, projectId, id, requireUserId(request));
+    return { ok: true };
+  });
 ```
 
 - [ ] **Step 4: Modify `src/server/lists/locations.ts`**
@@ -3769,7 +3896,7 @@ export function deleteLocation(db: Db, projectId: number, id: number): void {
 
 - [ ] **Step 5: Run to verify it passes**
 
-Run: `npx vitest run tests/server/lists-with-records.test.ts` → PASS (4 tests). Then `npm test` and `npm run typecheck`.
+Run: `npx vitest run tests/server/lists-with-records.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
 
 - [ ] **Step 6: Commit**
 
@@ -3865,7 +3992,7 @@ git commit -m "test(server): GET requests on records never write; records routes
 - [ ] **Step 1: Run the full suite and the type check**
 
 Run: `npm test`
-Expected: `Test Files  29 passed (29)` and `Tests  207 passed (207)` (Plans 1–2: 136; Plan 3: 71 — records 10, records-db 3, records-api 12, record-links 6, transitions-api 10, options-api 5, measurements-api 5, log-api 5, records-list 9, lists-with-records 4, records-reads 2).
+Expected: `Test Files  29 passed (29)` and `Tests  229 passed (229)` (Plans 1–2: 155; Plan 3: 74 — records 10, records-db 3, records-api 12, record-links 6, transitions-api 10, options-api 6, measurements-api 5, log-api 5, records-list 10, lists-with-records 5, records-reads 2).
 Run: `npm run typecheck` → no output.
 
 - [ ] **Step 2: Update design §14 (Decisions 2 and 12)**
