@@ -11,6 +11,7 @@
     "dev": "tsx watch src/server/main.ts",
     "start": "tsx src/server/main.ts",
     "owner": "tsx scripts/owner.ts",
+    "user": "tsx scripts/user.ts",
     "seed:gennadi": "tsx scripts/seed-gennadi.ts",
     "shares:revoke-all": "tsx scripts/revoke-share-links.ts",
     "test": "vitest run",

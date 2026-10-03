@@ -31,7 +31,7 @@ export function registerAuthRoutes(
     const body = LoginBody.parse(request.body);
     const user = findUserByUsername(db, body.username);
     const passwordOk = verifyPassword(body.password, user?.passwordHash ?? dummyHash);
-    if (user === null || !passwordOk) {
+    if (user === null || !user.isActive || !passwordOk) {
       limiter.recordFailure(ip, now);
       throw new HttpError(401, 'invalid_credentials');
     }
@@ -48,14 +48,14 @@ export function registerAuthRoutes(
     return { username: user.username };
   });
 
-  app.post('/api/auth/logout', async (request, reply) => {
+  app.post('/api/auth/logout', { config: { sessionOnly: true } }, async (request, reply) => {
     const token = request.cookies[SESSION_COOKIE];
     if (token) deleteSession(db, token);
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };
   });
 
-  app.get('/api/auth/me', async (request) => {
+  app.get('/api/auth/me', { config: { sessionOnly: true } }, async (request) => {
     if (request.user === null) throw new HttpError(401, 'unauthenticated');
     return { username: request.user.username };
   });

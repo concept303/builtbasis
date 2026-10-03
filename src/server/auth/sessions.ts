@@ -30,7 +30,7 @@ export function findSessionUser(db: Db, token: string, now: Date = new Date()): 
     .prepare(
       `SELECT u.id AS userId, u.username AS username, s.expires_at AS expiresAt
        FROM sessions s JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ?`,
+       WHERE s.token_hash = ? AND u.is_active = 1`,
     )
     .get(hashToken(token)) as { userId: number; username: string; expiresAt: string } | undefined;
   if (!row || row.expiresAt <= now.toISOString()) return null;

@@ -18,6 +18,8 @@ declare module 'fastify' {
     multipart?: boolean;
     shareRead?: boolean;
     privateResponse?: boolean;
+    sessionOnly?: boolean;
+    contributor?: boolean;
   }
 }
 
@@ -52,5 +54,8 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
     const route = request.routeOptions.url ?? request.url;
     if (!route.startsWith('/api/') || PUBLIC_API_ROUTES.has(route)) return;
     if (request.user === null) throw new HttpError(401, 'unauthenticated');
+    if (request.routeOptions.config.sessionOnly || request.routeOptions.config.contributor) return;
+    const owner = db.prepare('SELECT is_owner FROM users WHERE id = ?').pluck().get(request.user.userId);
+    if (owner !== 1) throw new HttpError(403, 'owner_required');
   });
 }

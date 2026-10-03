@@ -7,7 +7,7 @@ import { migrate } from '../../src/server/db/migrate';
 import { MIGRATIONS } from '../../src/server/db/migrations';
 
 function seed(db: Db) {
-  db.exec("INSERT INTO users VALUES (1,'u','h','t','t'); INSERT INTO projects VALUES (1,'p','P','t')");
+  db.exec("INSERT INTO users (id,username,password_hash,created_at,updated_at) VALUES (1,'u','h','t','t'); INSERT INTO projects VALUES (1,'p','P','t')");
   for (const n of [1, 2]) db.prepare("INSERT INTO records (project_id,subtype,sequence,human_id,status,created_at,created_by,updated_at,updated_by) VALUES (1,'task',?,?,'draft','t',1,'t',1)").run(n, `T-${n}`);
 }
 

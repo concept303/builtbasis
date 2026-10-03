@@ -1,46 +1,13 @@
-import { stdin, stdout } from 'node:process';
+import { readHidden } from './hidden-input';
+import { stdin } from 'node:process';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../src/server/auth/passwords';
 import { setOwnerPassword } from '../src/server/auth/users';
 import { loadEnvFile, openMigratedDatabase } from '../src/server/bootstrap';
 import { loadConfig } from '../src/server/config';
 
-/** Reads a line from the terminal without echoing it. */
-function readHidden(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let value = '';
-    const finish = (): void => {
-      stdin.off('data', onData);
-      stdin.setRawMode(false);
-      stdin.pause();
-      stdout.write('\n');
-    };
-    const onData = (chunk: string): void => {
-      for (const char of chunk) {
-        if (char === '\r' || char === '\n') {
-          finish();
-          resolve(value);
-          return;
-        }
-        if (char === '\u0003') {
-          finish();
-          reject(new Error('Cancelled'));
-          return;
-        }
-        if (char === '\u007f' || char === '\b') value = value.slice(0, -1);
-        else value += char;
-      }
-    };
-    stdout.write(prompt);
-    stdin.setEncoding('utf8');
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.on('data', onData);
-  });
-}
-
 const username = process.argv[2];
-if (!username) {
-  console.error('Usage: npm run owner -- <username>');
+if (!username || process.argv.length > 4) {
+  console.error('Usage: npm run owner -- <username> [displayName]');
   process.exit(2);
 }
 if (!stdin.isTTY) {
@@ -59,7 +26,7 @@ if ((await readHidden('Repeat the password: ')) !== password) {
 loadEnvFile();
 const { db } = openMigratedDatabase(loadConfig());
 try {
-  const result = setOwnerPassword(db, username, password);
+  const result = setOwnerPassword(db, username, password, new Date(), process.argv[3]);
   console.log(
     result.created
       ? `Owner account "${username}" created.`
