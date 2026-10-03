@@ -6,3 +6,5 @@ export * from './measurements';
 export * from './lists';
 export * from './text';
 export * from './records';
+export * from './files';
+export * from './sharing';

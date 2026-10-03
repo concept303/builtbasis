@@ -1,4 +1,5 @@
 import { MIGRATION_0002_RECORDS } from './migration-0002-records';
+import { MIGRATION_0003_FILES_SHARING } from './migration-0003-files-sharing';
 
 export interface Migration {
   id: string;
@@ -95,4 +96,5 @@ export const MIGRATIONS: readonly Migration[] = [
     `,
   },
   MIGRATION_0002_RECORDS,
+  MIGRATION_0003_FILES_SHARING,
 ];
