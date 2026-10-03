@@ -35,9 +35,18 @@ export function registerAuthRoutes(
       limiter.recordFailure(ip, now);
       throw new HttpError(401, 'invalid_credentials');
     }
+    // Password verification is expensive and holds no write lock. Re-read the
+    // verified identity under the short write lock shared with administrative resets.
+    const session = db.transaction(() => {
+      const current = findUserByUsername(db, body.username);
+      if (!current || current.id !== user.id || !current.isActive || current.passwordHash !== user.passwordHash) {
+        limiter.recordFailure(ip, now);
+        throw new HttpError(401, 'invalid_credentials');
+      }
+      deleteExpiredSessions(db);
+      return createSession(db, current.id);
+    }).immediate();
     limiter.recordSuccess(ip);
-    deleteExpiredSessions(db);
-    const session = createSession(db, user.id);
     reply.setCookie(SESSION_COOKIE, session.token, {
       path: '/',
       httpOnly: true,
