@@ -27,9 +27,9 @@ Authoring used an isolated checkout of `e27a535`. That commit has the same runti
 3. Use compact record cards at both widths. Show human ID, title, subtype, status, next actor, due date, priority, severity, completion and safety. Search, sorting, result count and owner-only cost total remain visible. Secondary filters expand on demand. Applied filters have labeled removal buttons and persist in the URL. Returning from a record restores that query.
 4. Keep explicit Save and Cancel. Dirty forms warn before leaving; language changes preserve entered values. Fixed values reuse the domain vocabulary and definitions. Other interface strings use adjacent English/Greek pairs, which makes missing translations a type error at each `t` call. Server validation remains authoritative, with localized known errors and a safe generic fallback. Do not translate or display raw server messages as interface text.
 5. Save record fields and status transitions separately. Do not promise an atomic combined save. Ask only for transition-specific reason, note or verification fields. Verification outcome follows the transition. Existing inactive references stay readable; filters can still select retired locations.
-6. Quick capture creates a Draft before uploading each selected photo. A later file failure retains the record and earlier successful files. Log creation and attachment uploads are also separate operations. Never automatically retry a creation or upload after an uncertain response. Show the saved state before a user-directed retry.
-7. Use the existing measurement comparison functions without rounding inputs or differences. Tables provide the exact numeric comparison; signed bars have a zero baseline. Date-only values remain calendar dates. Timestamp entry identifies its time zone. Missing or ambiguous EXIF capture dates remain empty.
-8. Keep the three access paths separate. Owner routes load owner detail. Assigned-record and share routes consume only public projections. Public and Private Notes are owner-edited. Upload and Add Log grants are independent. Account creation, passwords and account activation remain CLI operations.
+6. Quick capture creates a Draft before uploading each selected photo. A later file failure retains the record and earlier successful files. Log creation and attachment uploads are also separate operations. Never automatically retry a creation or upload after an uncertain response. Network failures, unreadable successful responses and generic server errors leave the outcome unknown. Preserve input and block another submission until a successful reload presents the saved records, entries or attachments. A failed reload leaves the block in place. Known validation/capacity rejections are distinct from unknown outcomes. Do not infer request identity from a title or add an idempotency system in this plan.
+7. Use the existing measurement comparison functions without rounding inputs or differences. Tables display the shortest round-trip representation of each JavaScript number, with a Greek decimal comma where applicable; small nonzero differences stay nonzero. Signed bars have a zero baseline. Date-only values remain calendar dates. Editing Log text/privacy preserves its exact original event timestamp, including seconds and milliseconds. Deliberate time edits use an explicit UTC offset, so repeated daylight-saving hours can be distinguished. Missing or ambiguous EXIF capture dates remain empty.
+8. Keep the three access paths separate. Owner routes load owner detail. Assigned-record and share routes consume only public projections. Public and Private Notes are owner-edited. Upload and Add Log grants are independent. Owners may prepare links for Draft records and copy any stored non-null URL, including expired/revoked links. Label their availability clearly; recipient access stays denied for Draft, expired or revoked links. Account creation, passwords and account activation remain CLI operations.
 9. Keep share tokens in the original fragment and request headers only. No tokens in resource URLs, storage, analytics or logs. Fresh shares start in Greek. Language and section changes reuse loaded data. Failed access refreshes clear record content and pending viewers; delivered bytes cannot be recalled.
 10. Preserve original photo bytes and prepare JPEG display/thumbnail copies in the browser. Decode HEIC in a local worker. The complete multipart body, including copies and metadata, stays within 100,000,000 bytes. Display preparation/progress, cancellation, partial results, 413 and 507. No new quotas or file deletion policy.
 11. Reuse the 145-extension catalog and server capabilities. Authorized native URLs serve owner/contributor image and media views. Shared media uses bearer fetches. Shared SVG is rasterized before a generated PNG enters the DOM. Original upload Blob URLs are never opened as documents or frames. Downloads are explicit and preserve original bytes.
@@ -319,12 +319,21 @@ it('keeps the backend usable before a browser build exists', async () => {
 
 #### File: `tests/web/core.test.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=138b4683830b164872010fbf64de2e25af477b8ca5662a4bc70029e21e2c4435 -->
+<!-- replay task=1 phase=test encoding=text sha256=cbc8d6fef54bd6b607734a4598ceafe22bcc61eeb9c1601cda167f48c1f39178 -->
 
 ``````ts
 import { afterEach, expect, it, vi } from 'vitest';
-import { api, ApiError, errorText } from '../../src/web/core/api';
+import { api, ApiError, errorText, isUnknownOutcome } from '../../src/web/core/api';
 afterEach(() => vi.unstubAllGlobals());
+it('treats an unreadable successful response as an unknown outcome', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{', { status: 201 })));
+  await expect(api('/api/projects/1/records', { method: 'POST', body: { subtype: 'task' } })).rejects.toMatchObject({ status: 0, code: 'response_unknown' });
+});
+it('distinguishes unknown write outcomes from confirmed request rejections', () => {
+  for (const failure of [new TypeError('Failed to fetch'), new DOMException('Aborted', 'AbortError'), new ApiError(0, 'request_failed'), new ApiError(500, 'internal_error'), new ApiError(503, 'request_failed')]) expect(isUnknownOutcome(failure)).toBe(true);
+  for (const status of [400, 401, 403, 404, 409, 413, 415, 429]) expect(isUnknownOutcome(new ApiError(status, 'rejected'))).toBe(false);
+  expect(isUnknownOutcome(new ApiError(507, 'storage_capacity'))).toBe(false);
+});
 it('sends JSON for logout and deletes to satisfy the authenticated write contract', async () => {
   const fetcher = vi.fn().mockImplementation(async () => new Response('{}'));
   vi.stubGlobal('fetch', fetcher);
@@ -495,12 +504,17 @@ export function LocationPicker({ nodes, value, onChange, label, allowInactive = 
 
 #### File: `src/web/core/api.ts`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=a428a6346d1b342a51cca9c22f0336e606082cae8f327a907c08d8f15f3a9768 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=45c25943fc3d62dd99554e455e861f7d17f09a5c3488b710e2141d410c389ea5 -->
 
 ``````ts
 import type { Lang } from '../../domain';
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, readonly details?: unknown) { super(code); }
+}
+// A transport failure or server failure does not prove that a write was rolled back.
+export function isUnknownOutcome(error: unknown): boolean {
+  if (error instanceof ApiError && error.status === 507 && error.code === 'storage_capacity') return false;
+  return !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
 }
 export interface ApiOptions { method?: string; body?: unknown; token?: string; signal?: AbortSignal }
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -512,7 +526,10 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   const response = await fetch(path, { method: options.method ?? 'GET', headers,
     credentials: options.token ? 'omit' : 'same-origin', cache: 'no-store', signal: options.signal,
     body: body === undefined ? undefined : JSON.stringify(body) });
-  const data: unknown = await response.json().catch(() => null);
+  const data: unknown = method === 'HEAD' || response.status === 204 ? undefined : await response.json().catch(() => {
+    if (response.ok) throw new ApiError(0, 'response_unknown');
+    return null;
+  });
   if (!response.ok) {
     const problem = data as { error?: string; details?: unknown } | null;
     throw new ApiError(response.status, problem?.error ?? 'request_failed', problem?.details);
@@ -1017,6 +1034,27 @@ describe('email parsing', () => {
 });
 ``````
 
+#### File: `tests/web/media-transport.test.ts`
+
+<!-- replay task=3 phase=test encoding=text sha256=8d696fd84345a5219ad6e68c8d5193b46d8e5aeac1be63f2c4a050483f3eac4e -->
+
+``````ts
+import { afterEach, expect, it, vi } from 'vitest';
+import { uploadEvidence } from '../../src/web/media/transport';
+
+afterEach(() => vi.unstubAllGlobals());
+it('keeps a successful upload with unreadable JSON in the unknown-outcome path', async () => {
+  class TruncatedResponse {
+    upload = { onprogress: null }; status = 201; responseText = '{';
+    onload?: () => void;
+    open() {} setRequestHeader() {} abort() {}
+    send() { queueMicrotask(() => this.onload?.()); }
+  }
+  vi.stubGlobal('XMLHttpRequest', TruncatedResponse);
+  await expect(uploadEvidence({ mode: 'owner', base: '/api/projects/1/records/1' }, 'attachments', { file: new File(['synthetic'], 'note.txt') }, {})).rejects.toMatchObject({ status: 0, code: 'response_unknown' });
+});
+``````
+
 #### File: `tests/web/media.test.ts`
 
 <!-- replay task=3 phase=test encoding=text sha256=ec555289518e02f1073f388c2204a8c0819f10ae9fdc0614927904baa460e993 -->
@@ -1500,19 +1538,19 @@ GAAYWC/0AAiFKACjloEDcADRAQABEBAAGAAYWC/0AAiFKACjloEDmADRAQABEBAAGAAYWC/0AAiFKACj
 WC/0AAiFKAAcU7trAQAAAAAAABG7j7OBALeK94EB8YICNfCBAw==
 ``````
 
-- [ ] **Check the pre-implementation result.** Run `npx vitest run tests/web/media.test.ts tests/web/media-email.test.ts`. Media helper/parser modules are missing. Browser decoding, CSP, transport and viewer behavior are exercised against real browser engines in Task 5; unit tests alone are not that evidence.
+- [ ] **Check the pre-implementation result.** Run `npx vitest run tests/web/media`. Media helper/parser modules are missing. Browser decoding, CSP, transport and viewer behavior are exercised against real browser engines in Task 5; unit tests alone are not that evidence.
 
 - [ ] **Write the complete implementation below.**
 
 #### File: `src/web/media/EvidencePane.tsx`
 
-<!-- replay task=3 phase=implementation encoding=text sha256=192fcbcdf3e91bd9cd909a35914fa660815aee5394a03268bd119a22c261d41a -->
+<!-- replay task=3 phase=implementation encoding=text sha256=cd57eeeb50c78a091a6114f8e30ea518d4ee3bf1d74ec3c1d278519ecd3bb284 -->
 
 ``````tsx
 import { useEffect, useRef, useState } from 'react';
 import { ACCEPTED_ATTACHMENT_EXTENSIONS, entriesOf, labelOf, type PhotoOut, type PhotoPhase } from '../../domain';
 import type { ViewContext } from '../core/types';
-import { api, ApiError } from '../core/api';
+import { api, isUnknownOutcome } from '../core/api';
 import { ErrorNotice, Field, VocabSelect, useDirtyGuard } from '../core/forms';
 import { useI18n } from '../core/i18n';
 import { EvidenceViewer, PhotoThumbnail, type EvidenceSelection } from './EvidenceViewer';
@@ -1569,7 +1607,7 @@ function EvidenceContent({ context, photos, attachments, canUpload, owner, onCha
       setCaption('');
       setMessage('complete');
     } catch (value) {
-      if (!controller.signal.aborted) { if (value instanceof ApiError && value.status === 0) setRetryBlocked(true); failed(value); }
+      if (!controller.signal.aborted) { if (isUnknownOutcome(value)) setRetryBlocked(true); failed(value); }
       else { setRetryBlocked(true); setMessage('stopped'); }
     } finally {
       if (!lifetime.current.signal.aborted) {
@@ -1995,7 +2033,7 @@ export async function preparePhoto(file: File, signal?: AbortSignal): Promise<{ 
 
 #### File: `src/web/media/transport.ts`
 
-<!-- replay task=3 phase=implementation encoding=text sha256=e0a586ddf7aeb68d97874cf43f8bb9bec677e0304e51c60965def8861285cef2 -->
+<!-- replay task=3 phase=implementation encoding=text sha256=abf70a619452eb3b909084d9994f757b7951cbb909f0c16ffcbade1e69ee4130 -->
 
 ``````ts
 import { ApiError } from '../core/api';
@@ -2042,7 +2080,10 @@ export async function uploadEvidence(context: ViewContext, kind: 'photos' | 'att
     xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress?.(Math.round(event.loaded / event.total * 100)); };
     xhr.onload = () => {
       done(); let data: { error?: string } = {};
-      try { data = JSON.parse(xhr.responseText); } catch { /* Controlled generic failure below. */ }
+      try { data = JSON.parse(xhr.responseText); } catch {
+        if (xhr.status >= 200 && xhr.status < 300) { reject(new ApiError(0, 'response_unknown')); return; }
+        // A non-success status still supplies a controlled rejection below.
+      }
       if (xhr.status >= 200 && xhr.status < 300) { onProgress?.(100); resolve(data); }
       else reject(new ApiError(xhr.status, data.error ?? 'request_failed'));
     };
@@ -2072,12 +2113,12 @@ export { preparePhoto } from './photos';
 export { uploadEvidence } from './transport';
 ``````
 
-- [ ] **Verify this task.** Run `npx vitest run tests/web/media.test.ts tests/web/media-email.test.ts`, then `npm run typecheck`. The focused tests and TypeScript check must pass.
+- [ ] **Verify this task.** Run `npx vitest run tests/web/media`, then `npm run typecheck`. The focused tests and TypeScript check must pass.
 
 - [ ] **Commit the task.** Stage only the task files. For Task 6, also stage the maintained-document and lifecycle edits named above.
 
 ```powershell
-git add 'tests/web/media-email.test.ts' 'tests/web/media.test.ts' 'tests/browser/fixtures/media-LICENSE.md' 'tests/browser/fixtures/media-active.svg' 'tests/browser/fixtures/media-audio.wav' 'tests/browser/fixtures/media-compound.msg' 'tests/browser/fixtures/media-design.dwg' 'tests/browser/fixtures/media-document.pdf' 'tests/browser/fixtures/media-harness.html' 'tests/browser/fixtures/media-harness.tsx' 'tests/browser/fixtures/media-html.eml' 'tests/browser/fixtures/media-oriented.jpg' 'tests/browser/fixtures/media-synthetic.heic' 'tests/browser/fixtures/media-synthetic.png' 'tests/browser/fixtures/media-video.webm' 'src/web/media/EvidencePane.tsx' 'src/web/media/EvidenceViewer.tsx' 'src/web/media/PdfViewer.tsx' 'src/web/media/email.ts' 'src/web/media/email.worker.ts' 'src/web/media/emailText.ts' 'src/web/media/heic.worker.ts' 'src/web/media/helpers.ts' 'src/web/media/index.ts' 'src/web/media/photos.ts' 'src/web/media/transport.ts' 'src/web/media/types.ts' 'src/web/media/upload.ts'
+git add 'tests/web/media-email.test.ts' 'tests/web/media-transport.test.ts' 'tests/web/media.test.ts' 'tests/browser/fixtures/media-LICENSE.md' 'tests/browser/fixtures/media-active.svg' 'tests/browser/fixtures/media-audio.wav' 'tests/browser/fixtures/media-compound.msg' 'tests/browser/fixtures/media-design.dwg' 'tests/browser/fixtures/media-document.pdf' 'tests/browser/fixtures/media-harness.html' 'tests/browser/fixtures/media-harness.tsx' 'tests/browser/fixtures/media-html.eml' 'tests/browser/fixtures/media-oriented.jpg' 'tests/browser/fixtures/media-synthetic.heic' 'tests/browser/fixtures/media-synthetic.png' 'tests/browser/fixtures/media-video.webm' 'src/web/media/EvidencePane.tsx' 'src/web/media/EvidenceViewer.tsx' 'src/web/media/PdfViewer.tsx' 'src/web/media/email.ts' 'src/web/media/email.worker.ts' 'src/web/media/emailText.ts' 'src/web/media/heic.worker.ts' 'src/web/media/helpers.ts' 'src/web/media/index.ts' 'src/web/media/photos.ts' 'src/web/media/transport.ts' 'src/web/media/types.ts' 'src/web/media/upload.ts'
 git commit -m "feat: add evidence uploads and protected viewers"
 ```
 
@@ -2142,6 +2183,51 @@ it('does not render arbitrary error-detail payload as record content', () => {
 });
 ``````
 
+#### File: `tests/web/record-format.test.ts`
+
+<!-- replay task=4 phase=test encoding=text sha256=252fab527a8296ea56d071c44ef117ace93d6d26cc88f5f5c0c4d6f07715986c -->
+
+``````ts
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it } from 'vitest';
+import { LanguageProvider } from '../../src/web/core/i18n';
+import { Measurements } from '../../src/web/record/Measurements';
+import type { SharedRecord } from '../../src/domain';
+import { measurementNumber } from '../../src/web/record/number-format';
+import { Sharing } from '../../src/web/record/Sharing';
+
+it('permits the owner to create a link for a Draft record', () => {
+  const html = renderToStaticMarkup(createElement(LanguageProvider, { children: createElement(Sharing, { base: '/api/projects/1/records/1', draft: true, onAccessLost() {}, onDirty() {} }) }));
+  expect(html).toContain('Create link');
+  expect(html).not.toContain('<fieldset disabled');
+});
+
+describe('measurement numeric display', () => {
+  for (const lang of ['en', 'el'] as const) {
+    it(`round trips finite doubles, including subnormal values and exponents, in ${lang}`, () => {
+      for (const value of [0, -0, Number.MIN_VALUE, -Number.MIN_VALUE, Number.MAX_VALUE, 1e-12, -1e-12, 1e21, 1.000000001, 1.000000001 - 1, 0.12345678901234568]) {
+        const text = measurementNumber(value, lang);
+        expect(Number(text.replace(',', '.'))).toBe(value === 0 ? 0 : value);
+        if (lang === 'el') expect(text).not.toContain('.');
+      }
+      expect(measurementNumber(0.12345678901234568, lang)).toBe(lang === 'el' ? '0,12345678901234568' : '0.12345678901234568');
+    });
+    it(`preserves small nonzero differences and precise values in ${lang}`, () => {
+      const sets: SharedRecord['measurements'] = [{ id: 1, date: '2026-01-01', phase: 'before', measuredById: null, note: null, rows: [
+        { item: 'First', quantity: 'Width', unit: 'mm', value: 1, note: null },
+        { item: 'Second', quantity: 'Width', unit: 'mm', value: 1.000000001, note: null },
+        { item: 'Small', quantity: 'Depth', unit: 'mm', value: 1e-12, note: null },
+      ] }];
+      const html = renderToStaticMarkup(createElement(LanguageProvider, { shared: lang === 'el', children: createElement(Measurements, { sets, people: [], owner: false, onEdit() {}, onDelete() {} }) }));
+      expect(html).toContain(lang === 'el' ? '1,000000001' : '1.000000001');
+      expect(html).toContain(lang === 'el' ? '1,000000082740371e-9' : '1.000000082740371e-9');
+      expect(html).toContain('1e-12');
+    });
+  }
+});
+``````
+
 #### File: `tests/web/record-helpers.test.ts`
 
 <!-- replay task=4 phase=test encoding=text sha256=8551279821e6549ebfd6a55672eb1b6e9351d4e513020869f9e26001a669480e -->
@@ -2179,7 +2265,29 @@ describe('record form boundaries', () => {
 });
 ``````
 
-- [ ] **Check the pre-implementation result.** Run `npx vitest run tests/web/record-helpers.test.ts tests/web/record-data.test.ts tests/web/record-errors.test.ts`. Record helper and loader modules are missing. Existing domain rules are reused rather than redefined in the UI. Task 5 exercises complete record flows.
+#### File: `tests/web/record-log.test.ts`
+
+<!-- replay task=4 phase=test encoding=text sha256=5b29461b3a8531203cd56915b309b555b34e4be352747f08f83e90687d881ce3 -->
+
+``````ts
+import { expect, it } from 'vitest';
+import { logDateFields, logTimestamp } from '../../src/web/record/helpers';
+
+it.each(['2026-04-04T16:30:47.123Z', '2026-10-04T02:15:16.789Z'])('preserves exact original milliseconds when displayed event time is unchanged: %s', original => {
+  const fields = logDateFields(original);
+  expect(logTimestamp(fields.local, fields.offset, { original, ...fields })).toBe(original);
+});
+it('distinguishes both Melbourne repeated-hour instants using an explicit offset', () => {
+  expect(logTimestamp('2026-04-05T02:30:47.123', '+11:00')).toBe('2026-04-04T15:30:47.123Z');
+  expect(logTimestamp('2026-04-05T02:30:47.123', '+10:00')).toBe('2026-04-04T16:30:47.123Z');
+});
+it('rejects missing, invalid and impossible offsets or calendar dates', () => {
+  for (const offset of ['', '+25:00', '+14:01', '+10:65']) expect(() => logTimestamp('2026-04-05T02:30', offset)).toThrow(RangeError);
+  expect(() => logTimestamp('2026-02-30T02:30', '+10:00')).toThrow(RangeError);
+});
+``````
+
+- [ ] **Check the pre-implementation result.** Run `npx vitest run tests/web/record-`. Record helper and loader modules are missing. Existing domain rules are reused rather than redefined in the UI. Task 5 exercises complete record flows.
 
 - [ ] **Write the complete implementation below.**
 
@@ -2214,7 +2322,7 @@ export function Activity({ data }: { data: RecordData }) {
 
 #### File: `src/web/record/Log.tsx`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=befd47311cc33374215db98541a438655a6031933ad0688897be87aff302f088 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=822f98395d5805494531a637f02b68f5a8f8e6ebbf0ccf41a7f75746e9cd724c -->
 
 ``````tsx
 import { useState } from 'react';
@@ -2222,22 +2330,38 @@ import type { LogEntryInput } from '../../domain';
 import { BusyButton, Field } from '../core/forms';
 import { useI18n } from '../core/i18n';
 import type { Log } from './data';
-import { localInput } from './helpers';
+import { logDateFields, logTimestamp } from './helpers';
 
-export function LogEditor({ initial, owner, busy, onSave, onCancel, onDirty }: { initial?: Log; owner: boolean; busy: boolean; onSave: (body: LogEntryInput) => Promise<void>; onCancel: () => void; onDirty: () => void }) {
-  const { t } = useI18n(); const [eventAt, setEventAt] = useState(localInput(initial ? new Date(initial.eventAt) : undefined)); const [text, setText] = useState(initial?.text ?? ''); const [privateEntry, setPrivate] = useState(initial?.private ?? false);
-  return <form onChange={onDirty} onSubmit={e => { e.preventDefault(); void onSave({ eventAt: new Date(eventAt).toISOString(), text, ...(owner ? { private: privateEntry } : {}) }); }}><fieldset disabled={busy}><legend>{t('Log entry', 'Καταχώριση ημερολογίου')}</legend><Field label={t('Event date and time', 'Ημερομηνία και ώρα γεγονότος')}><input required type="datetime-local" value={eventAt} onChange={e => setEventAt(e.target.value)} /></Field><Field label={t('Entry', 'Καταχώριση')}><textarea required maxLength={20000} value={text} onChange={e => setText(e.target.value)} /></Field>{owner && <label><input type="checkbox" checked={privateEntry} onChange={e => setPrivate(e.target.checked)} />{t('Private · owner only', 'Ιδιωτική · μόνο για τον ιδιοκτήτη')}</label>}<p>{t('Save the entry, then attach files to it.', 'Αποθηκεύστε την καταχώριση και μετά προσθέστε τα αρχεία της.')}</p><BusyButton busy={busy} type="submit">{t('Save entry', 'Αποθήκευση καταχώρισης')}</BusyButton><button type="button" onClick={onCancel}>{t('Cancel', 'Ακύρωση')}</button></fieldset></form>;
+export function LogEditor({ initial, owner, busy, retryBlocked, reviewed, onReload, onSave, onCancel, onDirty }: { initial?: Log; owner: boolean; busy: boolean; retryBlocked: boolean; reviewed: boolean; onReload: () => Promise<boolean>; onSave: (body: LogEntryInput) => Promise<void>; onCancel: () => void; onDirty: () => void }) {
+  const { t } = useI18n();
+  const [original] = useState(() => initial?.eventAt ?? new Date().toISOString());
+  const [originalFields] = useState(() => logDateFields(original));
+  const [eventAt, setEventAt] = useState(originalFields.local); const [offset, setOffset] = useState(originalFields.offset);
+  const [text, setText] = useState(initial?.text ?? ''); const [privateEntry, setPrivate] = useState(initial?.private ?? false); const [invalidTime, setInvalidTime] = useState(false);
+  return <form onChange={onDirty} onSubmit={e => { e.preventDefault(); if (retryBlocked) return; let timestamp: string; try { timestamp = logTimestamp(eventAt, offset, { original, ...originalFields }); setInvalidTime(false); } catch { setInvalidTime(true); return; } void onSave({ eventAt: timestamp, text, ...(owner ? { private: privateEntry } : {}) }); }}><fieldset disabled={busy}><legend>{t('Log entry', 'Καταχώριση ημερολογίου')}</legend>
+    {invalidTime && <p role="alert">{t('Enter a valid event date and UTC offset, such as +10:00.', 'Συμπληρώστε έγκυρη ημερομηνία γεγονότος και απόκλιση UTC, όπως +10:00.')}</p>}
+    <Field label={t('Event date and time', 'Ημερομηνία και ώρα γεγονότος')}><input required type="datetime-local" step="0.001" value={eventAt} onChange={e => setEventAt(e.target.value)} /></Field>
+    <Field label={t('UTC offset', 'Απόκλιση UTC')}><input required placeholder="+10:00" value={offset} onChange={e => setOffset(e.target.value)} /></Field>
+    <p>{t('The offset identifies the exact instant, including repeated hours when daylight saving ends. When changing the date or time, check its offset. Unchanged event times keep their original precision.', 'Η απόκλιση προσδιορίζει την ακριβή χρονική στιγμή, ακόμη και στις επαναλαμβανόμενες ώρες κατά τη λήξη της θερινής ώρας. Όταν αλλάζετε ημερομηνία ή ώρα, ελέγξτε την απόκλιση. Οι αμετάβλητοι χρόνοι διατηρούν την αρχική ακρίβειά τους.')}</p>
+    <Field label={t('Entry', 'Καταχώριση')}><textarea required maxLength={20000} value={text} onChange={e => setText(e.target.value)} /></Field>{owner && <label><input type="checkbox" checked={privateEntry} onChange={e => setPrivate(e.target.checked)} />{t('Private · owner only', 'Ιδιωτική · μόνο για τον ιδιοκτήτη')}</label>}<p>{t('Save the entry, then attach files to it.', 'Αποθηκεύστε την καταχώριση και μετά προσθέστε τα αρχεία της.')}</p>
+    {retryBlocked && <p>{t('The entry may already be saved. Refresh the saved Log before retrying. Your draft will stay here.', 'Η καταχώριση μπορεί να έχει ήδη αποθηκευτεί. Ανανεώστε το αποθηκευμένο ημερολόγιο πριν δοκιμάσετε ξανά. Το πρόχειρό σας θα παραμείνει εδώ.')}</p>}
+    {reviewed && <p>{t('Check the saved entries below before saving again to avoid a duplicate. Your draft is unchanged.', 'Ελέγξτε τις αποθηκευμένες καταχωρίσεις παρακάτω πριν αποθηκεύσετε ξανά, για να αποφύγετε διπλότυπο. Το πρόχειρό σας δεν άλλαξε.')}</p>}
+    {retryBlocked && <button type="button" onClick={() => void onReload()}>{t('Refresh saved Log', 'Ανανέωση αποθηκευμένου ημερολογίου')}</button>}
+    <BusyButton busy={busy} disabled={retryBlocked} type="submit">{t('Save entry', 'Αποθήκευση καταχώρισης')}</BusyButton><button type="button" onClick={onCancel}>{t('Cancel', 'Ακύρωση')}</button></fieldset></form>;
 }
 
-export function LogAttachment({ busy, onUpload, onDirty }: { busy: boolean; onUpload: (file: File) => Promise<void>; onDirty: (dirty: boolean) => void }) {
-  const { t } = useI18n(); const [file, setFile] = useState<File | null>(null); const [key, setKey] = useState(0);
-  return <details><summary>{t('Attach a file to this entry', 'Επισύναψη αρχείου σε αυτή την καταχώριση')}</summary><form onSubmit={e => { e.preventDefault(); if (file) void onUpload(file).then(() => { setFile(null); onDirty(false); setKey(old => old + 1); }).catch(() => {}); }}><Field label={t('Attachment file', 'Αρχείο συνημμένου')}><input key={key} type="file" required disabled={busy} onChange={e => { const next = e.target.files?.[0] ?? null; setFile(next); onDirty(next !== null); }} /></Field><BusyButton type="submit" busy={busy} disabled={!file}>{t('Upload attachment', 'Μεταφόρτωση συνημμένου')}</BusyButton></form></details>;
+export function LogAttachment({ busy, retryBlocked, onReload, onUpload, onDirty }: { busy: boolean; retryBlocked: boolean; onReload: () => Promise<boolean>; onUpload: (file: File) => Promise<void>; onDirty: (dirty: boolean) => void }) {
+  const { t } = useI18n(); const [file, setFile] = useState<File | null>(null); const [key, setKey] = useState(0); const [reviewed, setReviewed] = useState(false);
+  return <details><summary>{t('Attach a file to this entry', 'Επισύναψη αρχείου σε αυτή την καταχώριση')}</summary><form onSubmit={e => { e.preventDefault(); if (file && !retryBlocked) void onUpload(file).then(() => { setFile(null); onDirty(false); setKey(old => old + 1); }).catch(() => {}); }}><Field label={t('Attachment file', 'Αρχείο συνημμένου')}><input key={key} type="file" required disabled={busy} onChange={e => { const next = e.target.files?.[0] ?? null; setFile(next); onDirty(next !== null); }} /></Field>
+    {retryBlocked && <><p>{t('This file may already be saved. Refresh the saved attachments before retrying. Your selection will stay here.', 'Το αρχείο μπορεί να έχει ήδη αποθηκευτεί. Ανανεώστε τα αποθηκευμένα συνημμένα πριν δοκιμάσετε ξανά. Η επιλογή σας θα παραμείνει εδώ.')}</p><button disabled={busy} type="button" onClick={() => { void onReload().then(ok => { if (ok) setReviewed(true); }); }}>{t('Refresh saved attachments', 'Ανανέωση αποθηκευμένων συνημμένων')}</button></>}
+    {reviewed && <p>{t('Check the attachment list above before uploading again to avoid a duplicate.', 'Ελέγξτε τη λίστα συνημμένων παραπάνω πριν μεταφορτώσετε ξανά, για να αποφύγετε διπλότυπο.')}</p>}
+    <BusyButton type="submit" busy={busy} disabled={!file || retryBlocked}>{t('Upload attachment', 'Μεταφόρτωση συνημμένου')}</BusyButton></form></details>;
 }
 ``````
 
 #### File: `src/web/record/Measurements.tsx`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=4c9d5e181aea58be0e9f9bab9cc1b7cc5191f3f4167c8db2e7c382605c216acc -->
+<!-- replay task=4 phase=implementation encoding=text sha256=c01770fb1f2f6aca9bf26810b5878e33aa0defbc53811ba1abfcb3946aa2c75f -->
 
 ``````tsx
 import { useState } from 'react';
@@ -2245,6 +2369,7 @@ import { compareItems, compareOverTime, labelOf, normalizeLabel, orderSets, type
 import { BusyButton, Field, PersonSelect, VocabSelect } from '../core/forms';
 import { useI18n } from '../core/i18n';
 import { dateText, localInput, measurementGroups, signedBar } from './helpers';
+import { measurementNumber } from './number-format';
 
 type Set = SharedRecord['measurements'][number];
 function SignedBar({ value, max }: { value: number; max: number }) {
@@ -2266,7 +2391,7 @@ export function MeasurementEditor({ initial, sets, people, busy, onSave, onCance
 }
 
 export function Measurements({ sets, people, owner, onEdit, onDelete }: { sets: Set[]; people: { id: number; name: string }[]; owner: boolean; onEdit: (set: Set) => void; onDelete: (id: number) => void }) {
-  const { t, lang } = useI18n(); const number = (value: number) => new Intl.NumberFormat(lang, { maximumFractionDigits: 8 }).format(value);
+  const { t, lang } = useI18n(); const number = (value: number) => measurementNumber(value, lang);
   return <><h2>{t('Measurements', 'Μετρήσεις')}</h2>{sets.length === 0 && <p>{t('No measurements yet.', 'Δεν υπάρχουν ακόμη μετρήσεις.')}</p>}
     {orderSets(sets).map(set => <article key={set.id}><h3>{dateText(set.date, lang)} · {labelOf('measurementPhase', set.phase, lang)}</h3><p>{people.find(person => person.id === set.measuredById)?.name}</p><p className="user-text">{set.note}</p><div className="table-scroll"><table><thead><tr>{[t('Item', 'Αντικείμενο'), t('Quantity', 'Μέγεθος'), t('Value', 'Τιμή'), t('Unit', 'Μονάδα'), t('Note', 'Σημείωση')].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{set.rows.map((row, i) => <tr key={i}><td>{row.item}</td><td>{row.quantity}</td><td>{number(row.value)}</td><td>{labelOf('unit', row.unit, lang)}</td><td className="user-text">{row.note}</td></tr>)}</tbody></table></div>
       {owner && <><button onClick={() => onEdit(set)}>{t('Edit measurements', 'Επεξεργασία μετρήσεων')}</button><button onClick={() => onDelete(set.id)}>{t('Delete measurement set', 'Διαγραφή συνόλου μετρήσεων')}</button></>}
@@ -2386,13 +2511,13 @@ export function RecordEditor({ data, busy, onSave, onCancel, onDirty }: { data: 
 
 #### File: `src/web/record/RecordPage.tsx`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=358ea4f69549047d858a492ad76bb41accbfab68afae6d27f0b3d25c8043c61c -->
+<!-- replay task=4 phase=implementation encoding=text sha256=0cac8eeb747df400ff446d4a607fbf82fdb748de74cebceeac439522d694b277 -->
 
 ``````tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SharedRecord } from '../../domain';
 import type { RecordDetail } from '../../server/records/records';
-import { api, ApiError } from '../core/api';
+import { api, ApiError, isUnknownOutcome } from '../core/api';
 import { ErrorNotice, useDirtyGuard } from '../core/forms';
 import { useI18n } from '../core/i18n';
 import type { ViewContext } from '../core/types';
@@ -2417,12 +2542,14 @@ export function RecordPage(props: { context: ViewContext; onBack: () => void }) 
 function RecordSession({ context, onBack }: { context: ViewContext; onBack: () => void }) {
   const { t } = useI18n(); const [data, setData] = useState<RecordData | null>(null); const [error, setError] = useState<unknown>(null); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(true); const [tab, setTab] = useState<Tab>('overview'); const [editor, setEditor] = useState<Editor | null>(null); const [dirty, setDirty] = useState(false); const [notice, setNotice] = useState('');
   const controller = useRef<AbortController | null>(null); const writeController = useRef<AbortController | null>(null); const mounted = useRef(true); const owner = context.mode === 'owner';
+  const [logRetryBlocked, setLogRetryBlocked] = useState(false); const [logReviewed, setLogReviewed] = useState(false); const [attachmentBlocked, setAttachmentBlocked] = useState<number[]>([]);
   useDirtyGuard(dirty);
   const refresh = useCallback(async () => {
     controller.current?.abort(); const current = new AbortController(); controller.current = current; setLoading(true);
-    try { const next = await loadRecord(context, current.signal); if (!current.signal.aborted) { setData(next); setError(null); } }
+    try { const next = await loadRecord(context, current.signal); if (!current.signal.aborted) { setData(next); setError(null); return true; } }
     catch (reason) { if (!current.signal.aborted) { if (reason instanceof ApiError && [401, 403, 404].includes(reason.status)) { setData(null); setEditor(null); setDirty(false); } setError(reason); } }
     finally { if (!current.signal.aborted) setLoading(false); }
+    return false;
   }, [context.base, context.mode, context.projectId, context.token]);
   useEffect(() => { mounted.current = true; void refresh(); return () => { mounted.current = false; controller.current?.abort(); writeController.current?.abort(); }; }, [refresh]);
   const accessLost = useCallback((reason?: unknown) => {
@@ -2433,18 +2560,20 @@ function RecordSession({ context, onBack }: { context: ViewContext; onBack: () =
   const open = (next: Editor) => { if (!busy && leave()) { setEditor(next); setDirty(false); setError(null); setNotice(''); } };
   const cancel = () => { if (!busy && leave()) { setEditor(null); setDirty(false); setError(null); } };
   const mutate = async (path: string, method: string, body?: unknown) => {
+    if (path === '/log' && method === 'POST' && logRetryBlocked) return;
     writeController.current = new AbortController();
     setBusy(true); setError(null); setNotice('');
     try { await api(context.base + path, { method, signal: writeController.current.signal, ...(body === undefined ? {} : { body }) }); if (!mounted.current) return; setEditor(null); setDirty(false); await refresh(); setNotice(t('Saved.', 'Αποθηκεύτηκε.')); }
-    catch (reason) { if (mounted.current) { setError(reason); accessLost(reason); } }
+    catch (reason) { if (mounted.current) { if (path === '/log' && method === 'POST' && isUnknownOutcome(reason)) { setLogRetryBlocked(true); setLogReviewed(false); } setError(reason); accessLost(reason); } }
     finally { if (mounted.current) setBusy(false); }
   };
   const remove = (path: string, message: string) => { if (!busy && leave() && window.confirm(message)) void mutate(path, 'DELETE'); };
   const upload = async (entryId: number, file: File) => {
+    if (attachmentBlocked.includes(entryId)) throw new Error('refresh_required');
     writeController.current = new AbortController();
     setBusy(true); setError(null);
     try { await uploadEvidence(context, 'attachments', { file }, { logEntryId: entryId }, writeController.current.signal); if (mounted.current) await refresh(); }
-    catch (reason) { if (mounted.current) { setError(reason); accessLost(reason); } throw reason; }
+    catch (reason) { if (mounted.current) { if (isUnknownOutcome(reason)) setAttachmentBlocked(old => [...new Set([...old, entryId])]); setError(reason); accessLost(reason); } throw reason; }
     finally { if (mounted.current) setBusy(false); }
   };
   const sections: [Tab, string, string][] = [['overview', 'Overview', 'Επισκόπηση'], ['evidence', 'Evidence', 'Τεκμήρια'], ['measurements', 'Measurements', 'Μετρήσεις'], ['log', 'Log', 'Ημερολόγιο'], ['activity', 'Activity', 'Ιστορικό ενεργειών'], ...(owner ? [['sharing', 'Sharing', 'Κοινοποίηση'] as [Tab, string, string]] : [])];
@@ -2458,30 +2587,30 @@ function RecordSession({ context, onBack }: { context: ViewContext; onBack: () =
       {editor?.kind === 'status' && owner && <div onChange={() => setDirty(true)}><StatusDialog record={data.record as RecordDetail} people={data.owner!.people} busy={busy} error={error} onCancel={cancel} onSave={body => mutate('/transitions', 'POST', body)} /></div>}
       {editor?.kind === 'measurement' && owner && <MeasurementEditor {...(editor.initial ? { initial: editor.initial } : {})} sets={data.measurements} people={data.owner!.people} busy={busy} onDirty={() => setDirty(true)} onCancel={cancel} onSave={body => mutate('/measurement-sets' + (editor.initial ? `/${editor.initial.id}` : ''), editor.initial ? 'PATCH' : 'POST', body)} />}
       {editor?.kind === 'option' && owner && <OptionEditor {...(editor.initial ? { initial: editor.initial } : {})} busy={busy} onDirty={() => setDirty(true)} onCancel={cancel} onSave={body => mutate('/options' + (editor.initial ? `/${editor.initial.id}` : ''), editor.initial ? 'PATCH' : 'POST', body)} />}
-      {editor?.kind === 'log' && data.permissions.canAddLog && <LogEditor {...(editor.initial ? { initial: editor.initial } : {})} owner={owner} busy={busy} onDirty={() => setDirty(true)} onCancel={cancel} onSave={body => mutate('/log' + (editor.initial ? `/${editor.initial.id}` : ''), editor.initial ? 'PATCH' : 'POST', body)} />}
+      {editor?.kind === 'log' && data.permissions.canAddLog && <><LogEditor {...(editor.initial ? { initial: editor.initial } : {})} owner={owner} busy={busy || loading} retryBlocked={!editor.initial && logRetryBlocked} reviewed={logReviewed} onReload={async () => { const ok = await refresh(); if (ok) { setLogReviewed(true); setLogRetryBlocked(false); } return ok; }} onDirty={() => setDirty(true)} onCancel={cancel} onSave={body => mutate('/log' + (editor.initial ? `/${editor.initial.id}` : ''), editor.initial ? 'PATCH' : 'POST', body)} />{logReviewed && <section role="region" aria-label={t('Saved Log entries', 'Αποθηκευμένες καταχωρίσεις ημερολογίου')}><h2>{t('Saved Log entries', 'Αποθηκευμένες καταχωρίσεις ημερολογίου')}</h2>{data.log.length === 0 && <p>{t('No saved entries.', 'Δεν υπάρχουν αποθηκευμένες καταχωρίσεις.')}</p>}{data.log.map(entry => <article key={entry.id}><p>{entry.loggedBy}</p><p className="user-text">{entry.text}</p></article>)}</section>}</>}
       {!editor && <>
         {tab === 'overview' && <><Overview data={data} />{data.record.subtype !== 'task' && <section><h2>{t('Options considered', 'Εξεταζόμενες λύσεις')}</h2>{data.options.map(option => <article key={option.id}><h3>{option.label}{option.id === data.record.chosenOptionId ? ` · ${t('Chosen', 'Επιλεγμένη')}` : ''}</h3><p className="user-text">{option.description}</p>{owner && <><button disabled={busy} onClick={() => open({ kind: 'option', initial: option })}>{t('Edit option', 'Επεξεργασία λύσης')}</button><button disabled={busy || option.id === data.record.chosenOptionId} onClick={() => remove(`/options/${option.id}`, t('Delete this option?', 'Διαγραφή αυτής της λύσης;'))}>{t('Delete option', 'Διαγραφή λύσης')}</button></>}</article>)}{owner && <button disabled={busy || loading} onClick={() => open({ kind: 'option' })}>{t('Add option', 'Προσθήκη λύσης')}</button>}</section>}</>}
         {tab === 'evidence' && <EvidencePane context={context} photos={data.photos} attachments={data.attachments} canUpload={data.permissions.canUpload} owner={owner} onChange={() => void refresh()} onAccessLost={() => accessLost()} onDirty={setDirty} />}
         {tab === 'measurements' && <><Measurements sets={data.measurements} people={data.labels.people} owner={owner} onEdit={set => open({ kind: 'measurement', initial: set })} onDelete={id => remove(`/measurement-sets/${id}`, t('Delete this measurement set and all its rows?', 'Διαγραφή αυτού του συνόλου και όλων των μετρήσεών του;'))} />{owner && <button disabled={busy || loading} onClick={() => open({ kind: 'measurement' })}>{t('Add measurement set', 'Προσθήκη συνόλου μετρήσεων')}</button>}</>}
-        {tab === 'log' && <LogSection data={data} owner={owner} busy={busy} open={open} remove={remove} upload={upload} onDirty={setDirty} />}
+        {tab === 'log' && <LogSection data={data} owner={owner} busy={busy || loading} open={open} remove={remove} upload={upload} onDirty={setDirty} attachmentBlocked={attachmentBlocked} onReload={async () => { const ok = await refresh(); if (ok) setAttachmentBlocked([]); return ok; }} />}
         {tab === 'activity' && <Activity data={data} />}
         {tab === 'sharing' && owner && <Sharing base={context.base} draft={data.record.status === 'draft'} onAccessLost={accessLost} onDirty={setDirty} />}
       </>}
     </>}
   </section>;
 }
-function LogSection({ data, owner, busy, open, remove, upload, onDirty }: { data: RecordData; owner: boolean; busy: boolean; open: (editor: Editor) => void; remove: (path: string, message: string) => void; upload: (id: number, file: File) => Promise<void>; onDirty: (dirty: boolean) => void }) {
+function LogSection({ data, owner, busy, open, remove, upload, onDirty, attachmentBlocked, onReload }: { data: RecordData; owner: boolean; busy: boolean; open: (editor: Editor) => void; remove: (path: string, message: string) => void; upload: (id: number, file: File) => Promise<void>; onDirty: (dirty: boolean) => void; attachmentBlocked: number[]; onReload: () => Promise<boolean> }) {
   const { t, lang } = useI18n();
   const [pending, setPending] = useState<number[]>([]);
   useEffect(() => { onDirty(pending.length > 0 || busy); }, [pending, busy, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
-  return <section><h2>{t('Log', 'Ημερολόγιο')}</h2>{data.permissions.canAddLog && <button disabled={busy} onClick={() => open({ kind: 'log' })}>{t('Add Log entry', 'Προσθήκη καταχώρισης')}</button>}{data.log.length === 0 && <p>{t('No entries yet.', 'Δεν υπάρχουν ακόμη καταχωρίσεις.')}</p>}{data.log.map(entry => <article key={entry.id}><h3>{dateText(entry.eventAt, lang)} · {entry.loggedBy}</h3>{entry.private && <p className="badge">{t('Private · owner only', 'Ιδιωτική · μόνο για τον ιδιοκτήτη')}</p>}<p className="user-text">{entry.text}</p>{data.attachments.filter(file => file.logEntry?.id === entry.id).map(file => <p key={file.id}>{t('Attachment', 'Συνημμένο')}: {file.title || file.originalFilename}</p>)}{data.attachments.some(file => file.logEntry?.id === entry.id) && <p>{t('Open these files in Evidence.', 'Ανοίξτε αυτά τα αρχεία στα Τεκμήρια.')}</p>}{owner && <><button disabled={busy} onClick={() => open({ kind: 'log', initial: entry })}>{t('Edit entry', 'Επεξεργασία καταχώρισης')}</button><button disabled={busy} onClick={() => remove(`/log/${entry.id}`, t('Delete this entry and all its attachments?', 'Διαγραφή αυτής της καταχώρισης και όλων των συνημμένων της;'))}>{t('Delete entry', 'Διαγραφή καταχώρισης')}</button></>}{data.permissions.canUpload && <LogAttachment busy={busy} onUpload={file => upload(entry.id, file)} onDirty={value => setPending(old => value ? [...new Set([...old, entry.id])] : old.filter(id => id !== entry.id))} />}</article>)}</section>;
+  return <section><h2>{t('Log', 'Ημερολόγιο')}</h2>{data.permissions.canAddLog && <button disabled={busy} onClick={() => open({ kind: 'log' })}>{t('Add Log entry', 'Προσθήκη καταχώρισης')}</button>}{data.log.length === 0 && <p>{t('No entries yet.', 'Δεν υπάρχουν ακόμη καταχωρίσεις.')}</p>}{data.log.map(entry => <article key={entry.id}><h3>{dateText(entry.eventAt, lang)} · {entry.loggedBy}</h3>{entry.private && <p className="badge">{t('Private · owner only', 'Ιδιωτική · μόνο για τον ιδιοκτήτη')}</p>}<p className="user-text">{entry.text}</p>{data.attachments.filter(file => file.logEntry?.id === entry.id).map(file => <p key={file.id}>{t('Attachment', 'Συνημμένο')}: {file.title || file.originalFilename}</p>)}{data.attachments.some(file => file.logEntry?.id === entry.id) && <p>{t('Open these files in Evidence.', 'Ανοίξτε αυτά τα αρχεία στα Τεκμήρια.')}</p>}{owner && <><button disabled={busy} onClick={() => open({ kind: 'log', initial: entry })}>{t('Edit entry', 'Επεξεργασία καταχώρισης')}</button><button disabled={busy} onClick={() => remove(`/log/${entry.id}`, t('Delete this entry and all its attachments?', 'Διαγραφή αυτής της καταχώρισης και όλων των συνημμένων της;'))}>{t('Delete entry', 'Διαγραφή καταχώρισης')}</button></>}{data.permissions.canUpload && <LogAttachment busy={busy} retryBlocked={attachmentBlocked.includes(entry.id)} onReload={onReload} onUpload={file => upload(entry.id, file)} onDirty={value => setPending(old => value ? [...new Set([...old, entry.id])] : old.filter(id => id !== entry.id))} />}</article>)}</section>;
 }
 ``````
 
 #### File: `src/web/record/Sharing.tsx`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=e373fef89ca23cf0328cc9be33ec4b7ac9b0ad12699743fd364c6cd48024161c -->
+<!-- replay task=4 phase=implementation encoding=text sha256=5c7ab8b64e3037aa892af9fdcbead491250e4abba01e1d2902204f233572cf8e -->
 
 ``````tsx
 import { useEffect, useState } from 'react';
@@ -2501,8 +2630,8 @@ export function Sharing({ base, draft, onAccessLost, onDirty }: { base: string; 
   const run = async (action: () => Promise<void>) => { setBusy(true); setError(null); try { await action(); } catch (reason) { setError(reason); onAccessLost(reason); } finally { setBusy(false); } };
   return <section><h2>{t('Sharing and access', 'Κοινοποίηση και πρόσβαση')}</h2><ErrorNotice error={error} />{draft && <p>{t('Draft records are unavailable through links and contributor grants.', 'Οι πρόχειρες εγγραφές δεν είναι διαθέσιμες μέσω συνδέσμων και δικαιωμάτων συνεργατών.')}</p>}
     <h3>{t('Read-only links', 'Σύνδεσμοι μόνο για ανάγνωση')}</h3><p>{t('Anyone holding a link can read the public record until it expires or is revoked.', 'Όποιος έχει τον σύνδεσμο μπορεί να διαβάσει τη δημόσια εγγραφή μέχρι τη λήξη ή την ανάκλησή του.')}</p>
-    {links.map(link => { const expired = !!link.expiresAt && Date.parse(link.expiresAt) <= Date.now(); return <article key={link.id}><h4>{link.label}</h4><dl><div><dt>{t('Created', 'Δημιουργία')}</dt><dd>{dateText(link.createdAt, lang)}</dd></div><div><dt>{t('Expires', 'Λήξη')}</dt><dd>{dateText(link.expiresAt, lang)}</dd></div><div><dt>{t('Last viewed', 'Τελευταία προβολή')}</dt><dd>{dateText(link.lastViewedAt, lang)}</dd></div><div><dt>{t('Views', 'Προβολές')}</dt><dd>{link.viewCount}</dd></div></dl><p>{link.revokedAt ? t('Revoked', 'Ανακλήθηκε') : expired ? t('Expired', 'Έληξε') : t('Active', 'Ενεργός')}</p>{link.url && !link.revokedAt && !expired && <><Field label={t('Share URL', 'Διεύθυνση κοινοποίησης')}><input readOnly value={link.url} onFocus={e => e.target.select()} /></Field><button disabled={busy} onClick={() => void run(async () => { await navigator.clipboard.writeText(link.url!); setCopied(link.id); })}>{t('Copy link', 'Αντιγραφή συνδέσμου')}</button>{copied === link.id && <span role="status">{t('Copied', 'Αντιγράφηκε')}</span>}</>}{!link.revokedAt && <button disabled={busy} onClick={() => { if (window.confirm(t('Revoke this link? People using it will lose access.', 'Ανάκληση αυτού του συνδέσμου; Οι χρήστες του θα χάσουν την πρόσβαση.'))) void run(async () => { await api(base + `/share-links/${link.id}/revoke`, { method: 'POST', body: {} }); setLinks(await api(base + '/share-links')); }); }}>{t('Revoke link', 'Ανάκληση συνδέσμου')}</button>}</article>; })}
-    <details><summary>{t('Create a share link', 'Δημιουργία συνδέσμου κοινοποίησης')}</summary><form onChange={() => onDirty(true)} onSubmit={e => { e.preventDefault(); void run(async () => { const link = await api<ShareLinkOut>(base + '/share-links', { method: 'POST', body: { label, expiresAt: expiry ? new Date(expiry).toISOString() : null } }); setLinks(old => [link, ...old]); setLabel(''); setExpiry(''); onDirty(false); }); }}><fieldset disabled={busy || draft}><Field label={t('Link label', 'Τίτλος συνδέσμου')}><input required maxLength={200} value={label} onChange={e => setLabel(e.target.value)} /></Field><Field label={t('Expiry (optional)', 'Λήξη (προαιρετική)')}><input type="datetime-local" value={expiry} onChange={e => setExpiry(e.target.value)} /></Field><BusyButton busy={busy} type="submit">{t('Create link', 'Δημιουργία συνδέσμου')}</BusyButton></fieldset></form></details>
+    {links.map(link => { const expired = !!link.expiresAt && Date.parse(link.expiresAt) <= Date.now(); return <article key={link.id}><h4>{link.label}</h4><dl><div><dt>{t('Created', 'Δημιουργία')}</dt><dd>{dateText(link.createdAt, lang)}</dd></div><div><dt>{t('Expires', 'Λήξη')}</dt><dd>{dateText(link.expiresAt, lang)}</dd></div><div><dt>{t('Last viewed', 'Τελευταία προβολή')}</dt><dd>{dateText(link.lastViewedAt, lang)}</dd></div><div><dt>{t('Views', 'Προβολές')}</dt><dd>{link.viewCount}</dd></div></dl><p>{link.revokedAt ? t('Revoked', 'Ανακλήθηκε') : expired ? t('Expired', 'Έληξε') : draft ? t('Draft — unavailable', 'Πρόχειρο — μη διαθέσιμο') : t('Active', 'Ενεργός')}</p>{link.url && <><Field label={t('Share URL', 'Διεύθυνση κοινοποίησης')}><input readOnly value={link.url} onFocus={e => e.target.select()} /></Field><button disabled={busy} onClick={() => void run(async () => { await navigator.clipboard.writeText(link.url!); setCopied(link.id); })}>{t('Copy link', 'Αντιγραφή συνδέσμου')}</button>{copied === link.id && <span role="status">{t('Copied', 'Αντιγράφηκε')}</span>}</>}{!link.revokedAt && <button disabled={busy} onClick={() => { if (window.confirm(t('Revoke this link? People using it will lose access.', 'Ανάκληση αυτού του συνδέσμου; Οι χρήστες του θα χάσουν την πρόσβαση.'))) void run(async () => { await api(base + `/share-links/${link.id}/revoke`, { method: 'POST', body: {} }); setLinks(await api(base + '/share-links')); }); }}>{t('Revoke link', 'Ανάκληση συνδέσμου')}</button>}</article>; })}
+    <details><summary>{t('Create a share link', 'Δημιουργία συνδέσμου κοινοποίησης')}</summary><form onChange={() => onDirty(true)} onSubmit={e => { e.preventDefault(); void run(async () => { const link = await api<ShareLinkOut>(base + '/share-links', { method: 'POST', body: { label, expiresAt: expiry ? new Date(expiry).toISOString() : null } }); setLinks(old => [link, ...old]); setLabel(''); setExpiry(''); onDirty(false); }); }}><fieldset disabled={busy}><Field label={t('Link label', 'Τίτλος συνδέσμου')}><input required maxLength={200} value={label} onChange={e => setLabel(e.target.value)} /></Field><Field label={t('Expiry (optional)', 'Λήξη (προαιρετική)')}><input type="datetime-local" value={expiry} onChange={e => setExpiry(e.target.value)} /></Field><BusyButton busy={busy} type="submit">{t('Create link', 'Δημιουργία συνδέσμου')}</BusyButton></fieldset></form></details>
     <h3>{t('Named users', 'Ονομαστικοί χρήστες')}</h3><p>{t('Reading, uploading evidence and adding Log entries are separate permissions. Both switches off gives read-only access.', 'Η ανάγνωση, η μεταφόρτωση τεκμηρίων και η προσθήκη καταχωρίσεων είναι ανεξάρτητα δικαιώματα. Με τους δύο διακόπτες κλειστούς επιτρέπεται μόνο η ανάγνωση.')}</p>
     {grants.map(grant => <article key={grant.userId}><h4>{people.find(person => person.id === grant.userId)?.displayName ?? t('Unavailable user', 'Μη διαθέσιμος χρήστης')}</h4><p>{t('Upload evidence', 'Μεταφόρτωση τεκμηρίων')}: {grant.canUpload ? t('Yes', 'Ναι') : t('No', 'Όχι')} · {t('Add Log', 'Προσθήκη στο ημερολόγιο')}: {grant.canAddLog ? t('Yes', 'Ναι') : t('No', 'Όχι')}</p><button disabled={busy} onClick={() => { setSelected(String(grant.userId)); setUpload(grant.canUpload); setLog(grant.canAddLog); }}>{t('Edit access', 'Επεξεργασία πρόσβασης')}</button><button disabled={busy} onClick={() => { if (window.confirm(t('Remove this user’s access to the record?', 'Αφαίρεση πρόσβασης αυτού του χρήστη στην εγγραφή;'))) void run(async () => { await api(base + `/grants/${grant.userId}`, { method: 'DELETE' }); setGrants(old => old.filter(item => item.userId !== grant.userId)); }); }}>{t('Remove access', 'Αφαίρεση πρόσβασης')}</button></article>)}
     <form onChange={() => onDirty(true)} onSubmit={e => { e.preventDefault(); void run(async () => { const grant = await api<Grant>(base + `/grants/${selected}`, { method: 'PUT', body: { canUpload: upload, canAddLog: log } }); setGrants(old => [...old.filter(item => item.userId !== grant.userId), grant]); setSelected(''); setUpload(false); setLog(false); onDirty(false); }); }}><fieldset disabled={busy}><legend>{t('Grant or update record access', 'Παραχώρηση ή ενημέρωση πρόσβασης εγγραφής')}</legend><Field label={t('User', 'Χρήστης')}><select required value={selected} onChange={e => { setSelected(e.target.value); const grant = grants.find(item => item.userId === Number(e.target.value)); setUpload(grant?.canUpload ?? false); setLog(grant?.canAddLog ?? false); }}><option value="">{t('Choose', 'Επιλέξτε')}</option>{people.filter(person => person.active).map(person => <option key={person.id} value={person.id}>{person.displayName}</option>)}</select></Field><label><input type="checkbox" checked={upload} onChange={e => setUpload(e.target.checked)} />{t('Upload photos and attachments', 'Μεταφόρτωση φωτογραφιών και συνημμένων')}</label><label><input type="checkbox" checked={log} onChange={e => setLog(e.target.checked)} />{t('Add Log entries', 'Προσθήκη καταχωρίσεων στο ημερολόγιο')}</label><BusyButton type="submit" busy={busy}>{t('Save access', 'Αποθήκευση πρόσβασης')}</BusyButton></fieldset></form>
@@ -2632,7 +2761,7 @@ export async function loadRecord(context: ViewContext, signal: AbortSignal): Pro
 
 #### File: `src/web/record/helpers.ts`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=67857bb5adf8553ee17a4ccacc13860def6af1e84c3aa45fc3f0917bf8f72561 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=1e816df6d2aed39379b7109efac327665fb9d8db20aaf32318c2fdd4571d4cb7 -->
 
 ``````ts
 import { isCode, labelOf, normalizeLabel, type Lang, type ListKey, type MeasurementRow, type RecordPatchInput } from '../../domain';
@@ -2643,6 +2772,22 @@ export function changedPatch(before: RecordPatchInput, after: RecordPatchInput):
 export function localInput(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+export function logDateFields(original: string): { local: string; offset: string } {
+  const date = new Date(original); const minutes = -date.getTimezoneOffset();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return { local: `${localInput(date)}:${pad(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, '0')}`, offset: `${minutes < 0 ? '-' : '+'}${pad(Math.floor(Math.abs(minutes) / 60))}:${pad(Math.abs(minutes) % 60)}` };
+}
+export function logTimestamp(local: string, offset: string, initial?: { original: string; local: string; offset: string }): string {
+  if (initial && local === initial.local && offset === initial.offset) return initial.original;
+  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset);
+  if (!match || Number(match[2]) > 14 || Number(match[3]) > 59 || (Number(match[2]) === 14 && Number(match[3]) !== 0)) throw new RangeError('invalid_event_time');
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(local)) throw new RangeError('invalid_event_time');
+  const wall = new Date(local + 'Z');
+  if (!Number.isFinite(wall.getTime()) || wall.toISOString().slice(0, 16) !== local.slice(0, 16)) throw new RangeError('invalid_event_time');
+  const result = new Date(local + offset);
+  if (!Number.isFinite(result.getTime())) throw new RangeError('invalid_event_time');
+  return result.toISOString();
 }
 export function signedBar(value: number, maxAbsolute: number): { left: number; width: number } {
   const width = Math.abs(value) / Math.max(maxAbsolute, Number.EPSILON) * 50;
@@ -2679,12 +2824,26 @@ export function displayValue(field: string | null, value: unknown, lang: Lang, p
 export { RecordPage } from './RecordPage';
 ``````
 
-- [ ] **Verify this task.** Run `npx vitest run tests/web/record-helpers.test.ts tests/web/record-data.test.ts tests/web/record-errors.test.ts`, then `npm run typecheck`. The focused tests and TypeScript check must pass.
+#### File: `src/web/record/number-format.ts`
+
+<!-- replay task=4 phase=implementation encoding=text sha256=2d7ad0d6adf8e54954d3c1692b5a6220030d85df796b45ff14a3b7bbd0fc9b9e -->
+
+``````ts
+import type { Lang } from '../../domain';
+
+/** JS's shortest round-trip spelling preserves the stored double and nonzero deltas. */
+export function measurementNumber(value: number, lang: Lang): string {
+  const text = String(value);
+  return lang === 'el' ? text.replace('.', ',') : text;
+}
+``````
+
+- [ ] **Verify this task.** Run `npx vitest run tests/web/record-`, then `npm run typecheck`. The focused tests and TypeScript check must pass.
 
 - [ ] **Commit the task.** Stage only the task files. For Task 6, also stage the maintained-document and lifecycle edits named above.
 
 ```powershell
-git add 'tests/web/record-data.test.ts' 'tests/web/record-errors.test.ts' 'tests/web/record-helpers.test.ts' 'src/web/record/Activity.tsx' 'src/web/record/Log.tsx' 'src/web/record/Measurements.tsx' 'src/web/record/Options.tsx' 'src/web/record/Overview.tsx' 'src/web/record/RecordEditor.tsx' 'src/web/record/RecordPage.tsx' 'src/web/record/Sharing.tsx' 'src/web/record/StatusDialog.tsx' 'src/web/record/TagPicker.tsx' 'src/web/record/data.ts' 'src/web/record/helpers.ts' 'src/web/record/index.ts'
+git add 'tests/web/record-data.test.ts' 'tests/web/record-errors.test.ts' 'tests/web/record-format.test.ts' 'tests/web/record-helpers.test.ts' 'tests/web/record-log.test.ts' 'src/web/record/Activity.tsx' 'src/web/record/Log.tsx' 'src/web/record/Measurements.tsx' 'src/web/record/Options.tsx' 'src/web/record/Overview.tsx' 'src/web/record/RecordEditor.tsx' 'src/web/record/RecordPage.tsx' 'src/web/record/Sharing.tsx' 'src/web/record/StatusDialog.tsx' 'src/web/record/TagPicker.tsx' 'src/web/record/data.ts' 'src/web/record/helpers.ts' 'src/web/record/index.ts' 'src/web/record/number-format.ts'
 git commit -m "feat: add record editing and contributor screens"
 ```
 
@@ -3530,6 +3689,261 @@ test('inline tag creation and collision recovery retain unsaved record text', as
 });
 ``````
 
+#### File: `tests/browser/review-capture.spec.ts`
+
+<!-- replay task=5 phase=test encoding=text sha256=32fc4a438cb79c39a3d1f3b74bad0c3b8bb712a24087c36037471be351f7621b -->
+
+``````ts
+import { test, expect, login, seed } from './fixture';
+import { resolve } from 'node:path';
+
+test('capture blocks another creation after the server commits but the POST response is lost', async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const endpoint = `/api/projects/${projectId}/records`;
+  const title = 'Capture committed before response loss';
+  await page.goto(`/projects/${projectId}/records`);
+  await page.getByRole('button', { name: 'New record', exact: true }).click();
+  const capture = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'New record', exact: true }) });
+  await capture.getByLabel('Subtype', { exact: true }).selectOption('task');
+  await capture.getByLabel('Title', { exact: true }).fill(title);
+  await capture.getByText('Location and photos (optional)', { exact: true }).click();
+  await capture.getByLabel('Photos', { exact: true }).setInputFiles(resolve('tests/browser/fixtures/media-synthetic.png'));
+  await capture.getByLabel('Photo phase', { exact: true }).selectOption('during');
+  await capture.locator('.location-picker summary').filter({ hasText: 'Villa 1' }).click();
+  await capture.getByRole('checkbox', { name: 'Villa 1', exact: true }).check();
+  let creates = 0;
+  let failReload = true;
+  let committedId = 0;
+  await page.route(`**${endpoint}*`, async route => {
+    if (route.request().method() === 'POST') {
+      creates++;
+      const response = await route.fetch({ maxRetries: 0 });
+      expect(response.status()).toBe(201);
+      committedId = (await response.json()).id;
+      await route.abort('failed');
+    } else if (failReload) await route.fulfill({ status: 503, json: { error: 'request_failed' } });
+    else await route.continue();
+  });
+  await capture.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(capture.getByRole('alert')).toBeVisible();
+  const actual = await page.request.get(endpoint);
+  const records = (await actual.json()).records as { id: number; title: string }[];
+  expect(records.filter(item => item.title === title)).toHaveLength(1);
+  expect(committedId).toBeGreaterThan(0);
+  await expect(capture.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+  await expect(capture.getByLabel('Title', { exact: true })).toHaveValue(title);
+  await expect(capture.getByLabel('Subtype', { exact: true })).toHaveValue('task');
+  await expect(capture.getByLabel('Photo phase', { exact: true })).toHaveValue('during');
+  await expect(capture.getByRole('checkbox', { name: 'Villa 1', exact: true })).toBeChecked();
+  expect(await capture.getByLabel('Photos', { exact: true }).evaluate(el => (el as HTMLInputElement).files?.[0]?.name)).toBe('media-synthetic.png');
+  await capture.getByRole('button', { name: 'Reload saved records', exact: true }).click();
+  await expect(capture.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
+  await expect(capture.getByRole('region', { name: 'Saved records to review', exact: true })).toHaveCount(0);
+  failReload = false;
+  await capture.getByRole('button', { name: 'Reload saved records', exact: true }).click();
+  const review = capture.getByRole('region', { name: 'Saved records to review', exact: true });
+  await expect(review.locator(`a[href="/projects/${projectId}/records/${committedId}"]`)).toContainText(title);
+  await expect(review).toContainText('Public sample task');
+  await expect(capture.getByRole('button', { name: 'Create another draft', exact: true })).toBeEnabled();
+  expect(creates).toBe(1);
+  const final = (await (await page.request.get(endpoint)).json()).records as { title: string }[];
+  expect(final.filter(item => item.title === title)).toHaveLength(1);
+});
+``````
+
+#### File: `tests/browser/review-log.spec.ts`
+
+<!-- replay task=5 phase=test encoding=text sha256=68ec144b148c7d39025dc6f266af377e97d1d579e9db1b951f74978589f49c4b -->
+
+``````ts
+import { test, expect, login, seed } from './fixture';
+import type { Page } from '@playwright/test';
+const origin = 'http://127.0.0.1:3490';
+async function record(page: Page) {
+  await login(page); const { projectId } = seed();
+  const response = await page.request.post(`/api/projects/${projectId}/records`, { headers: { origin }, data: { subtype: 'task', title: `Log review ${Date.now()}` } });
+  const { id } = await response.json() as { id: number };
+  const base = `/api/projects/${projectId}/records/${id}`;
+  await page.goto(`/projects/${projectId}/records/${id}`);
+  await page.getByRole('button', { name: 'Log', exact: true }).click();
+  return base;
+}
+test('editing only Log text preserves milliseconds and the second Melbourne repeated hour', async ({ browser }) => {
+  const context = await browser.newContext({ timezoneId: 'Australia/Melbourne' }); const page = await context.newPage();
+  try {
+    const base = await record(page); const original = '2026-04-04T16:30:47.123Z';
+    await page.request.post(base + '/log', { headers: { origin }, data: { eventAt: original, text: 'Before edit' } });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit entry', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Entry', exact: true }).fill('Text edited only');
+    await page.getByRole('button', { name: 'Save entry', exact: true }).click();
+    await expect(page.getByText('Text edited only', { exact: true })).toBeVisible();
+    const log = await (await page.request.get(base + '/log')).json() as { eventAt: string }[];
+    expect(log[0]?.eventAt).toBe(original);
+    await page.getByRole('button', { name: 'Edit entry', exact: true }).click();
+    await page.getByLabel('Private · owner only', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save entry', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save entry', exact: true })).toHaveCount(0);
+    expect((await (await page.request.get(base + '/log')).json())[0]).toMatchObject({ eventAt: original, private: true });
+    await page.getByRole('button', { name: 'Edit entry', exact: true }).click();
+    await expect(page.getByRole('textbox', { name: 'UTC offset', exact: true })).toHaveValue('+10:00');
+    await page.getByRole('textbox', { name: 'UTC offset', exact: true }).fill('+11:00');
+    await page.getByRole('button', { name: 'Save entry', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save entry', exact: true })).toHaveCount(0);
+    expect((await (await page.request.get(base + '/log')).json())[0].eventAt).toBe('2026-04-04T15:30:47.123Z');
+  } finally { await context.close(); }
+});
+test('unknown Log creation outcome blocks retries through failed refresh and retains draft beside saved results', async ({ page }) => {
+  const base = await record(page); let posts = 0;
+  await page.getByRole('button', { name: 'Add Log entry', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Entry', exact: true }).fill('Committed once despite lost response');
+  await page.route(`**${base}/log`, async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    posts++; const result = await route.fetch(); expect(result.ok()).toBeTruthy(); await route.abort();
+  });
+  await page.getByRole('button', { name: 'Save entry', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save entry', exact: true })).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: 'Entry', exact: true })).toHaveValue('Committed once despite lost response');
+  await page.route(`**${base}`, route => route.fulfill({ status: 503, json: { error: 'temporary_failure' } }));
+  await page.getByRole('button', { name: 'Refresh saved Log', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save entry', exact: true })).toBeDisabled();
+  await page.unroute(`**${base}`);
+  await page.getByRole('button', { name: 'Refresh saved Log', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Saved Log entries', exact: true })).toContainText('Committed once despite lost response');
+  await expect(page.getByRole('button', { name: 'Save entry', exact: true })).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: 'Entry', exact: true })).toHaveValue('Committed once despite lost response');
+  expect(posts).toBe(1); expect(await (await page.request.get(base + '/log')).json()).toHaveLength(1);
+});
+for (const outcome of ['lost', 'truncated'] as const) test(`unknown Log attachment ${outcome} response blocks retries until a successful refresh shows the committed file`, async ({ page }) => {
+  const base = await record(page); await page.request.post(base + '/log', { headers: { origin }, data: { text: 'Attachment destination' } });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByText('Attach a file to this entry', { exact: true }).click();
+  await page.getByLabel('Attachment file', { exact: true }).setInputFiles({ name: 'saved-once.txt', mimeType: 'text/plain', buffer: Buffer.from('Synthetic log attachment') });
+  let posts = 0;
+  await page.route(`**${base}/attachments`, async route => { if (route.request().method() !== 'POST') return route.continue(); posts++; const result = await route.fetch(); expect(result.ok()).toBeTruthy(); if (outcome === 'lost') await route.abort(); else await route.fulfill({ status: 201, contentType: 'application/json', body: '{' }); });
+  await page.getByRole('button', { name: 'Upload attachment', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upload attachment', exact: true })).toBeDisabled();
+  await page.route(`**${base}`, route => route.fulfill({ status: 503, json: { error: 'temporary_failure' } }));
+  await page.getByRole('button', { name: 'Refresh saved attachments', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Upload attachment', exact: true })).toBeDisabled();
+  await page.unroute(`**${base}`);
+  await page.getByRole('button', { name: 'Refresh saved attachments', exact: true }).click();
+  await expect(page.getByText('Attachment: saved-once.txt', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upload attachment', exact: true })).toBeEnabled();
+  expect(posts).toBe(1); expect(await (await page.request.get(base + '/attachments')).json()).toHaveLength(1);
+});
+``````
+
+#### File: `tests/browser/review-sharing.spec.ts`
+
+<!-- replay task=5 phase=test encoding=text sha256=1ae912f2cd60b958e7f14862e5c3584a3e64d9e576eb1b9e83ea104a286dc3c4 -->
+
+``````ts
+import Database from 'better-sqlite3';
+import type { Page } from '@playwright/test';
+import { test, expect, login, seed } from './fixture';
+
+const origin = 'http://127.0.0.1:3490';
+async function tab(page: Page, name: string) {
+  await page.getByRole('navigation', { name: 'Record sections' }).getByRole('button', { name, exact: true }).click();
+}
+async function draft(page: Page) {
+  const base = `/api/projects/${seed().projectId}/records`;
+  const response = await page.request.post(base, { headers: { origin }, data: { subtype: 'task', title: 'Review synthetic draft' } });
+  expect(response.status()).toBe(201);
+  const record = await response.json() as { id: number };
+  return { base: `${base}/${record.id}`, url: `/projects/${seed().projectId}/records/${record.id}` };
+}
+const article = (page: Page, label: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: label, exact: true }) });
+
+test('owner creates and copies a Draft share link while its public record stays unavailable', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await login(page); const record = await draft(page);
+  await page.goto(record.url); await tab(page, 'Sharing');
+  await page.getByText('Create a share link', { exact: true }).click();
+  const label = page.getByRole('textbox', { name: 'Link label', exact: true });
+  await expect(label).toBeEnabled();
+  await label.fill('Draft review link');
+  await page.getByRole('button', { name: 'Create link', exact: true }).click();
+  const link = article(page, 'Draft review link');
+  await expect(link).toContainText('Draft — unavailable');
+  const url = await link.getByRole('textbox', { name: 'Share URL', exact: true }).inputValue();
+  await link.getByRole('button', { name: 'Copy link', exact: true }).click();
+  await expect(link.getByRole('status')).toHaveText('Copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
+  const publicPage = await context.newPage();
+  await publicPage.goto(url);
+  await expect(publicPage.getByRole('alert')).toHaveText('Το στοιχείο δεν είναι διαθέσιμο.');
+  await expect(publicPage.getByRole('heading', { name: 'Review synthetic draft', exact: true })).toHaveCount(0);
+  await publicPage.close();
+});
+
+test('revoked and expired links remain copyable but a null URL never exposes a copy control', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await login(page);
+  const { projectId, recordId, dbPath } = seed();
+  const base = `/api/projects/${projectId}/records/${recordId}`;
+  const links: { id: number; label: string; url: string }[] = [];
+  for (const label of ['Review revoked', 'Review expired', 'Review unavailable URL']) {
+    const response = await page.request.post(base + '/share-links', { headers: { origin }, data: { label } });
+    expect(response.status()).toBe(201); links.push(await response.json());
+  }
+  const db = new Database(dbPath);
+  try {
+    db.prepare('UPDATE share_links SET expires_at = ? WHERE id = ?').run('2000-01-01T00:00:00.000Z', links[1]!.id);
+    db.prepare('UPDATE share_links SET key_fingerprint = ? WHERE id = ?').run('synthetic-old-key', links[2]!.id);
+  } finally { db.close(); }
+  await page.goto(`/projects/${projectId}/records/${recordId}`); await tab(page, 'Sharing');
+  const revoked = article(page, 'Review revoked');
+  page.once('dialog', dialog => dialog.accept());
+  await revoked.getByRole('button', { name: 'Revoke link', exact: true }).click();
+  await expect(revoked).toContainText('Revoked');
+  for (const target of [links[0]!, links[1]!]) {
+    const row = article(page, target.label);
+    await expect(row.getByRole('button', { name: 'Copy link', exact: true })).toBeVisible();
+    await row.getByRole('button', { name: 'Copy link', exact: true }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(target.url);
+    const response = await page.request.get('/api/shared/record', { headers: { Authorization: `Bearer ${new URL(target.url).hash.slice(1)}` } });
+    expect(response.status()).toBe(404);
+  }
+  await expect(article(page, 'Review expired')).toContainText('Expired');
+  const unavailable = article(page, 'Review unavailable URL');
+  await expect(unavailable.getByRole('button', { name: 'Copy link', exact: true })).toHaveCount(0);
+  await expect(unavailable.getByRole('textbox', { name: 'Share URL', exact: true })).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('el');
+  await expect(revoked).toContainText('Ανακλήθηκε');
+  await expect(article(page, 'Review expired')).toContainText('Έληξε');
+});
+
+test('measurement tables preserve precise values and nonzero differences in English and Greek', async ({ page }) => {
+  await login(page); const record = await draft(page);
+  for (const [date, phase, value] of [['2026-01-01', 'before', 1], ['2026-01-02', 'after', 1.000000001]] as const) {
+    const response = await page.request.post(record.base + '/measurement-sets', { headers: { origin }, data: { date, phase, rows: [
+      { item: 'Reference', quantity: 'Width', unit: 'mm', value: 1 },
+      { item: 'Measured', quantity: 'Width', unit: 'mm', value },
+      { item: 'Small', quantity: 'Depth', unit: 'mm', value: 1e-12 },
+    ] } });
+    expect(response.status()).toBe(201);
+  }
+  await page.goto(record.url); await tab(page, 'Measurements');
+  await expect(page.getByRole('cell', { name: '1.000000001', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '1e-12', exact: true }).first()).toBeVisible();
+  const after = page.getByRole('article').filter({ has: page.getByRole('heading', { name: /2 Jan 2026/ }) });
+  await after.locator('summary').filter({ hasText: /^Between items · Width/ }).click();
+  await expect(after.getByRole('cell', { name: '1.000000082740371e-9', exact: true })).toBeVisible();
+  const history = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Before vs after · Measured · Width/ }) });
+  await history.locator('summary').click();
+  await expect(history.getByRole('cell', { name: '1.000000082740371e-9', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('el');
+  await expect(page.getByRole('cell', { name: '1,000000001', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('cell', { name: '1,000000082740371e-9', exact: true }).first()).toBeVisible();
+});
+``````
+
 #### File: `tests/browser/server.ts`
 
 <!-- replay task=5 phase=test encoding=text sha256=ac26d4034de775b677ac46e0c4d7deab0f96f57bbb1b0c32eed1fc1f7ad89e2c -->
@@ -3656,14 +4070,15 @@ createRoot(document.getElementById('root')!).render(<LanguageProvider shared={lo
 
 #### File: `src/web/home/Capture.tsx`
 
-<!-- replay task=5 phase=implementation encoding=text sha256=eba358a70cf6265d58c5d1007ea4785760c376ea8050ba434d1d2ddc1c065fe0 -->
+<!-- replay task=5 phase=implementation encoding=text sha256=4914c29d0e239656914eac81fdf2025930c1c121d0855e1012a4a115cfb9623d -->
 
 ``````tsx
 import { useEffect, useRef, useState } from 'react';
 import type { RecordDetail } from '../../server/records/records';
+import type { RecordList } from '../../server/records/list';
 import type { LocationNode } from '../../server/lists/locations';
 import type { Subtype, PhotoPhase } from '../../domain';
-import { api, ApiError } from '../core/api';
+import { api, ApiError, isUnknownOutcome } from '../core/api';
 import { useI18n } from '../core/i18n';
 import { BusyButton, ErrorNotice, Field, VocabSelect, useDirtyGuard } from '../core/forms';
 import { LocationPicker } from '../core/LocationPicker';
@@ -3674,21 +4089,47 @@ export function Capture({ projectId, nodes, onClose }: { projectId: number; node
   const [outcomes, setOutcomes] = useState<{ name: string; ok: boolean }[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null); const [controller, setController] = useState<AbortController | null>(null);
   const [currentFile, setCurrentFile] = useState(''); const [progress, setProgress] = useState<number | null>(null);
   const activeUpload = useRef<AbortController | null>(null);
-  useEffect(() => () => activeUpload.current?.abort(), []);
-  const dirty = busy || (!record && Boolean(title || locations.length || files.length));
+  const activeReview = useRef<AbortController | null>(null);
+  const [unknownCreation, setUnknownCreation] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewedRecords, setReviewedRecords] = useState<RecordList['records'] | null>(null);
+  useEffect(() => () => { activeUpload.current?.abort(); activeReview.current?.abort(); }, []);
+  const reloadSavedRecords = async () => {
+    if (busy || reviewing) return;
+    activeReview.current?.abort();
+    const abort = new AbortController(); activeReview.current = abort;
+    setReviewing(true); setReviewedRecords(null); setError(null);
+    try {
+      const saved = await api<RecordList>(`/api/projects/${projectId}/records?sort=updated&dir=desc`, { signal: abort.signal });
+      if (!saved || !Array.isArray(saved.records)) throw new ApiError(0, 'request_failed');
+      if (!abort.signal.aborted) setReviewedRecords(saved.records);
+    } catch (failure) { if (!abort.signal.aborted) setError(failure); }
+    finally { if (!abort.signal.aborted) setReviewing(false); }
+  };
+  const dirty = busy || (!record && Boolean(unknownCreation || title || locations.length || files.length));
   useDirtyGuard(dirty);
   return <section className="panel"><h2>{t('New record', 'Νέα καταγραφή')}</h2>{record ? <><p>{t('Draft saved.', 'Το πρόχειρο αποθηκεύτηκε.')} <a href={`/projects/${projectId}/records/${record.id}`}>{record.humanId}</a></p><ul>{outcomes.map((item, index) => <li key={index}>{item.name}: {item.ok ? t('Uploaded', 'Μεταφορτώθηκε') : t('Not uploaded. Open the record before retrying.', 'Δεν μεταφορτώθηκε. Ανοίξτε την καταγραφή πριν δοκιμάσετε ξανά.')}</li>)}</ul></> : <form onSubmit={async event => {
-    event.preventDefault(); if (busy) return; setBusy(true); setError(null); const abort = new AbortController(); activeUpload.current = abort; setController(abort);
+    event.preventDefault(); if (busy || reviewing || (unknownCreation && reviewedRecords === null)) return; setBusy(true); setError(null); const abort = new AbortController(); activeUpload.current = abort; setController(abort);
     try {
-      const saved = await api<RecordDetail>(`/api/projects/${projectId}/records`, { method: 'POST', body: { subtype, title, locationIds: locations } }); setRecord(saved);
+      const saved = await api<RecordDetail>(`/api/projects/${projectId}/records`, { method: 'POST', body: { subtype, title, locationIds: locations } });
+      if (!saved || !Number.isSafeInteger(saved.id) || saved.id <= 0 || typeof saved.humanId !== 'string') throw new ApiError(0, 'request_failed');
+      setRecord(saved); setUnknownCreation(false); setReviewedRecords(null);
       for (const file of files) {
         setCurrentFile(file.name); setProgress(null);
         if (abort.signal.aborted) { setOutcomes(items => [...items, { name: file.name, ok: false }]); continue; }
         try { const bundle = await preparePhoto(file, abort.signal); await uploadEvidence({ mode: 'owner', base: `/api/projects/${projectId}/records/${saved.id}`, projectId, recordId: saved.id }, 'photos', { original: bundle.original, display: bundle.display, thumbnail: bundle.thumbnail }, { phase, takenAt: bundle.takenAt }, abort.signal, setProgress); setOutcomes(items => [...items, { name: file.name, ok: true }]); }
         catch (failure) { setError(failure); if (failure instanceof ApiError && [401, 403, 404].includes(failure.status)) abort.abort(); setOutcomes(items => [...items, { name: file.name, ok: false }]); }
       }
-    } catch (failure) { setError(failure); } finally { setBusy(false); setController(null); }
-  }}><VocabSelect list="subtype" label={t('Subtype', 'Υποκατηγορία')} required value={subtype} onChange={value => { if (value) setSubtype(value as Subtype); }}/><Field label={t('Title', 'Τίτλος')}><input value={title} maxLength={200} onChange={event => setTitle(event.target.value)}/></Field><details><summary>{t('Location and photos (optional)', 'Θέση και φωτογραφίες (προαιρετικά)')}</summary><LocationPicker nodes={nodes} value={locations} onChange={setLocations}/><Field label={t('Photos', 'Φωτογραφίες')}><input type="file" multiple accept="image/*,.heic,.heif" onChange={event => setFiles(Array.from(event.target.files ?? []))}/></Field><VocabSelect label={t('Photo phase', 'Φάση φωτογραφιών')} list="photoPhase" value={phase} onChange={value => { if (value) setPhase(value as PhotoPhase); }}/><small>{t('A photo bundle, including its copies and metadata, must fit within 100 MB.', 'Η φωτογραφία μαζί με τα αντίγραφα και τα μεταδεδομένα πρέπει να χωρά σε 100 MB.')}</small></details><BusyButton busy={busy} className="primary">{t('Save draft', 'Αποθήκευση προχείρου')}</BusyButton></form>}
+    } catch (failure) { setError(failure); if (isUnknownOutcome(failure)) { setUnknownCreation(true); setReviewedRecords(null); } } finally { setBusy(false); setController(null); }
+  }}><VocabSelect list="subtype" label={t('Subtype', 'Υποκατηγορία')} required value={subtype} onChange={value => { if (value) setSubtype(value as Subtype); }}/><Field label={t('Title', 'Τίτλος')}><input value={title} maxLength={200} onChange={event => setTitle(event.target.value)}/></Field><details><summary>{t('Location and photos (optional)', 'Θέση και φωτογραφίες (προαιρετικά)')}</summary><LocationPicker nodes={nodes} value={locations} onChange={setLocations}/><Field label={t('Photos', 'Φωτογραφίες')}><input type="file" multiple accept="image/*,.heic,.heif" onChange={event => setFiles(Array.from(event.target.files ?? []))}/></Field><VocabSelect label={t('Photo phase', 'Φάση φωτογραφιών')} list="photoPhase" value={phase} onChange={value => { if (value) setPhase(value as PhotoPhase); }}/><small>{t('A photo bundle, including its copies and metadata, must fit within 100 MB.', 'Η φωτογραφία μαζί με τα αντίγραφα και τα μεταδεδομένα πρέπει να χωρά σε 100 MB.')}</small></details>{unknownCreation && <div>
+    <p role="status">{t('The creation result is unknown. The draft may already have been saved. Reload and review the saved records before creating another draft. Selected photos have not been uploaded.', 'Το αποτέλεσμα της δημιουργίας είναι άγνωστο. Το πρόχειρο μπορεί να έχει ήδη αποθηκευτεί. Ανανεώστε και ελέγξτε τις αποθηκευμένες καταγραφές πριν δημιουργήσετε άλλο πρόχειρο. Οι επιλεγμένες φωτογραφίες δεν έχουν μεταφορτωθεί.')}</p>
+    <BusyButton type="button" busy={reviewing} disabled={busy} onClick={() => void reloadSavedRecords()}>{t('Reload saved records', 'Ανανέωση αποθηκευμένων καταγραφών')}</BusyButton>
+    {reviewedRecords !== null && <section aria-label={t('Saved records to review', 'Αποθηκευμένες καταγραφές για έλεγχο')}>
+      <h3>{t('Saved records to review', 'Αποθηκευμένες καταγραφές για έλεγχο')}</h3>
+      <p>{t('Check the saved records and open your draft to continue. Creating another draft may create a duplicate.', 'Ελέγξτε τις αποθηκευμένες καταγραφές και ανοίξτε το πρόχειρό σας για να συνεχίσετε. Η δημιουργία άλλου προχείρου μπορεί να δημιουργήσει διπλότυπο.')}</p>
+      {reviewedRecords.length === 0 ? <p>{t('No saved records were returned.', 'Δεν επιστράφηκαν αποθηκευμένες καταγραφές.')}</p> : <ul>{reviewedRecords.map(item => <li key={item.id}><a href={`/projects/${projectId}/records/${item.id}`}>{item.humanId} · {item.title || t('Untitled draft', 'Πρόχειρο χωρίς τίτλο')}</a></li>)}</ul>}
+    </section>}
+  </div>}<BusyButton busy={busy} disabled={reviewing || (unknownCreation && reviewedRecords === null)} className="primary">{unknownCreation && reviewedRecords !== null ? t('Create another draft', 'Δημιουργία άλλου προχείρου') : t('Save draft', 'Αποθήκευση προχείρου')}</BusyButton></form>}
   {busy && currentFile && <p role="status">{currentFile} · {progress === null ? t('Preparing photo…', 'Προετοιμασία φωτογραφίας…') : `${progress}%`} {progress !== null && <progress max={100} value={progress}/>}</p>}{busy && <button onClick={() => controller?.abort()}>{t('Cancel remaining uploads', 'Ακύρωση υπόλοιπων μεταφορτώσεων')}</button>}<ErrorNotice error={error}/>{!busy && <button onClick={() => { if (!dirty || confirm(t('Discard unsaved changes?', 'Να απορριφθούν οι μη αποθηκευμένες αλλαγές;'))) onClose(); }}>{t('Close', 'Κλείσιμο')}</button>}</section>;
 }
 ``````
@@ -3756,7 +4197,7 @@ Use the installed Chrome option shown, or install Playwright Chromium and omit t
 - [ ] **Commit the task.** Stage only the task files. For Task 6, also stage the maintained-document and lifecycle edits named above.
 
 ```powershell
-git add 'tests/browser/app.spec.ts' 'tests/browser/fixture.ts' 'tests/browser/home.spec.ts' 'tests/browser/lists.spec.ts' 'tests/browser/media-app.spec.ts' 'tests/browser/media.spec.ts' 'tests/browser/record.spec.ts' 'tests/browser/server.ts' 'src/web/App.tsx' 'src/web/main.tsx' 'src/web/index.html' 'src/web/styles.css' 'src/web/home/Capture.tsx' 'src/web/home/RecordList.tsx'
+git add 'tests/browser/app.spec.ts' 'tests/browser/fixture.ts' 'tests/browser/home.spec.ts' 'tests/browser/lists.spec.ts' 'tests/browser/media-app.spec.ts' 'tests/browser/media.spec.ts' 'tests/browser/record.spec.ts' 'tests/browser/review-capture.spec.ts' 'tests/browser/review-log.spec.ts' 'tests/browser/review-sharing.spec.ts' 'tests/browser/server.ts' 'src/web/App.tsx' 'src/web/main.tsx' 'src/web/index.html' 'src/web/styles.css' 'src/web/home/Capture.tsx' 'src/web/home/RecordList.tsx'
 git commit -m "feat: integrate browser workflows and regression coverage"
 ```
 
@@ -3776,7 +4217,7 @@ This documentation task adds no test files.
 
 #### File: `docs/guides/web-interface.md`
 
-<!-- replay task=6 phase=implementation encoding=text sha256=52cb937fe1ababd29ed640fb98168aa91be8cda108d146a541e3504615018745 -->
+<!-- replay task=6 phase=implementation encoding=text sha256=0ebd9d551a4056c7416f7a29ebc57ce5ccbaa00ff5ce400bcb4c5f270fff2db2 -->
 
 ``````markdown
 # Web interface — local operation and browser checks
@@ -3826,6 +4267,10 @@ Choose an existing project, then open Records. Filters are explicit and removabl
 
 New record saves a Draft before uploading optional photos. Each file is separate. Keep the saved record if a later upload fails. For an uncertain request, refresh its evidence before trying again; the server may already have completed the earlier request. There is no automatic write retry or offline queue.
 
+An uncertain record or Log creation, or a Log attachment upload, keeps its input but blocks another submission until saved results have been reloaded and shown. Check those results before deciding to create or upload again. A failed reload does not enable retry.
+
+Editing only a Log entry's text or privacy keeps its exact event timestamp. When changing its time deliberately, check the displayed UTC offset. During a repeated daylight-saving hour, the offset distinguishes the two possible instants.
+
 Share recipients open the full `/share#token` URL. The fragment is used locally for bearer requests. Removing it makes the link unusable. Shared pages start in Greek and can switch to English. Typed record text is never translated. Public views never receive Private Notes, commercial fields or private Log evidence.
 
 ## Release boundary
@@ -3848,7 +4293,24 @@ git commit -m "docs: document browser operation and Plan 5 delivery"
 
 ## Planning replay and review evidence
 
-**Completed planning replay, 2026-10-04. This is not an implementation completion claim.**
+**Current revised planning replay, 2026-10-04: 464 unit/API tests across 64 files and 39 browser tests across 9 spec files passed. Build and typecheck passed. This is not an implementation completion claim.**
+
+### Revision after the four-point review of `0cb7470`
+
+All four findings were verified and corrected in the existing tasks, without changing the backend or adding scope:
+
+- Log text-only and privacy-only edits preserve the original event timestamp, including seconds/milliseconds and the second occurrence of a daylight-saving repeated hour. Deliberate event-time changes use an explicit UTC offset. Tests cover ordinary and repeated-hour timestamps and distinguish both offsets in Australia/Melbourne.
+- Quick capture, new Log entries and Log attachments retain input and block another submission after an unknown outcome. An explicit successful reload must show saved results before retry becomes available; a failed reload keeps it blocked. The regressions let the real backend commit, then suppress the response, and verify that only one record/entry/attachment exists. An additional committed-upload case truncates a successful JSON response. Both fetch and XHR treat unreadable successful responses as unknown, rather than successful empty results. Existing Evidence uploads reuse the same outcome classifier.
+- Owners can create links for Draft records and copy non-null stored URLs for revoked/expired links. Browser tests verify recipient denial remains intact, exact copied URLs match, and an actual old-key `url:null` response offers no copy control.
+- Measurement tables preserve JavaScript's available numeric precision through shortest round-trip formatting, with a Greek decimal comma. Tests cover more than eight decimal places, nonzero differences, scientific notation and extreme finite values. Calculations and storage are unchanged.
+
+The timestamp drift, enabled retry after a committed-but-lost response, Draft/inactive controls and rounded numeric display were reproduced before fixing them. A bounded independent review then checked the corrections and identified the XHR truncated-response gap; it was corrected and regression-tested before publication.
+
+The amended Markdown's **84 complete payloads** were extracted into a new checkout of `0cb7470`, with dependencies installed independently. That checkout has the same Plan 4 runtime baseline as `e27a535`. The complete unit/API and browser suites ran against these extracted files and the newly built production bundle. No source files or node_modules were copied from the authoring checkout. The browser suite finished with **39/39 passing**, including the eight new review regressions. All payload hashes were checked against the replayed files. Execution remains unstarted on main.
+
+### Original authoring replay retained for provenance
+
+**Original planning replay, 2026-10-04, before the four-point review.** The counts below describe the initially published plan, not the revised final totals above.
 
 The complete Markdown payloads were extracted, with all SHA-256 checks passing, into a second detached checkout of `e27a535`. No source files or node_modules were copied from the authoring checkout. New dependencies were installed against the baseline lockfile using the plan's commands. The checked-in extraction helper was the one used for this replay.
 
