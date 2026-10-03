@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { createCipheriv } from 'node:crypto';
 import { decryptShareToken, encryptShareToken, hashShareToken, newShareToken } from '../../src/server/sharing/crypto';
 
 const key = Buffer.alloc(32, 7);
@@ -25,4 +26,12 @@ it('generates canonical random tokens and authenticates ciphertext to its record
     expect(() => hashShareToken(invalid)).toThrow();
     expect(() => encryptShareToken(invalid, key, 12)).toThrow();
   }
+});
+
+it('rejects an authenticated copy whose decoded token is not canonical', () => {
+  const nonce = Buffer.alloc(12, 3);
+  const cipher = createCipheriv('aes-256-gcm', key, nonce);
+  cipher.setAAD(Buffer.from('builtbasis-share-v1:12'));
+  const ciphertext = Buffer.concat([cipher.update('a'.repeat(43)), cipher.final()]);
+  expect(() => decryptShareToken({ ciphertext, nonce, tag: cipher.getAuthTag() }, key, 12)).toThrow('invalid_share_token');
 });

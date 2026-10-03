@@ -25,8 +25,11 @@ declare module 'fastify' {
  * Request rules (design §11.5):
  * - every state-changing request needs Origin = the public origin and a JSON body
  *   (multipart only on routes that allow it);
- * - every /api route except health and login needs a valid session;
- * - session lookup is read-only, so GET requests never write.
+ * - owner /api routes except health and login need a valid session;
+ * - only explicitly marked shared GET/HEAD routes bypass that session requirement,
+ *   and their handlers independently require a valid bearer share token;
+ * - session lookup and file reads are read-only. Only a successful shared record GET
+ *   updates its link's view counter; HEAD changes nothing.
  */
 export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {
   app.decorateRequest('user', null);

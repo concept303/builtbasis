@@ -1,4 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { FastifyRequest } from 'fastify';
@@ -7,7 +8,7 @@ import { blobPath } from '../../src/server/files/storage';
 import { parseUpload } from '../../src/server/files/uploads';
 import { get, send } from './helpers';
 import { getRecord, makeFixture, postRecord, recordUrl, type Fixture } from './record-fixture';
-import { addAttachment, addPhoto, JPEG, multipart, PDF, upload } from './file-fixture';
+import { addAttachment, addPhoto, JPEG, multipart, PDF, PNG, upload } from './file-fixture';
 
 let f: Fixture;
 let id: number;
@@ -32,6 +33,31 @@ it('stores photo bundles, preserves metadata and sorts phases', async () => {
   expect((await getRecord(f, id)).updatedAt).not.toBe('2000-01-01');
   expect((await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, id, `/photos/${before.id}`))).statusCode).toBe(200);
   expect((await addPhoto(f, id)).id).toBeGreaterThan(before.id);
+});
+
+it('commits each photo variant and attachment only with complete matching disk bytes', async () => {
+  const original = PNG;
+  const display = Buffer.concat([JPEG, Buffer.from('display')]);
+  const thumbnail = Buffer.concat([JPEG, Buffer.from('thumbnail')]);
+  const photo = await upload(f, id, 'photos', [
+    { name: 'metadata', data: '{"phase":"during"}' },
+    { name: 'original', filename: 'original.png', data: original },
+    { name: 'display', filename: 'display.jpg', data: display },
+    { name: 'thumbnail', filename: 'thumbnail.jpg', data: thumbnail },
+  ]);
+  expect(photo.statusCode).toBe(201);
+  await addAttachment(f, id);
+  const hashes = f.ctx.db.prepare('SELECT original_hash, display_hash, thumbnail_hash FROM photos WHERE id=?').get(photo.json().id) as Record<string, string>;
+  for (const [column, bytes] of [['original_hash', original], ['display_hash', display], ['thumbnail_hash', thumbnail]] as const) {
+    expect(hashes[column]).toBe(createHash('sha256').update(bytes).digest('hex'));
+  }
+  const blobs = f.ctx.db.prepare('SELECT hash,size FROM blobs').all() as { hash: string; size: number }[];
+  expect(blobs).toHaveLength(4);
+  for (const blob of blobs) {
+    const bytes = await readFile(blobPath(f.ctx.config.filesDir, blob.hash));
+    expect(bytes.length).toBe(blob.size);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(blob.hash);
+  }
 });
 
 it('keeps separate occurrences, joins current Log metadata and cascades private Log deletion without deleting bytes', async () => {
