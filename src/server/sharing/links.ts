@@ -4,7 +4,7 @@ import type { AppConfig } from '../config';
 import { HttpError } from '../errors';
 import { recordActivity } from '../records/activity';
 import { requireRecord, touchRecord } from '../records/store';
-import { decryptShareToken, encryptShareToken, hashShareToken, keyFingerprint, newShareToken, requireShareKey } from './crypto';
+import { decryptShareToken, encryptShareToken, hashShareToken, keyFingerprint, newShareToken, requireShareKey, validShareToken } from './crypto';
 
 /** Administrative revocation has no owner actor and does not fabricate record activity. */
 export function revokeAllShareLinks(db: Db, now = new Date()): number {
@@ -96,4 +96,23 @@ export function revokeShareLink(db: Db, projectId: number, recordId: number, lin
     recordActivity(db, { recordId, userId, at, action: 'share_revoked', detail: { linkId, label: row.label } });
     touchRecord(db, recordId, userId, at);
   })();
+}
+
+export interface ShareAccess {
+  linkId: number;
+  projectId: number;
+  recordId: number;
+}
+
+export function authorizeShare(db: Db, authorization: string | undefined, now = new Date()): ShareAccess {
+  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!validShareToken(token)) throw new HttpError(404, 'not_available');
+  const row = db.prepare(`SELECT s.id AS linkId, r.project_id AS projectId, r.id AS recordId,
+    s.revoked_at AS revokedAt, s.expires_at AS expiresAt, r.status
+    FROM share_links s JOIN records r ON r.id = s.record_id WHERE s.token_hash = ?`).get(hashShareToken(token)) as
+    (ShareAccess & { revokedAt: string | null; expiresAt: string | null; status: string }) | undefined;
+  if (!row || row.revokedAt !== null || (row.expiresAt !== null && Date.parse(row.expiresAt) <= now.getTime()) || row.status === 'draft') {
+    throw new HttpError(404, 'not_available');
+  }
+  return { linkId: row.linkId, projectId: row.projectId, recordId: row.recordId };
 }

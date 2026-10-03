@@ -3,6 +3,7 @@ import { findSessionUser, type SessionUser } from '../auth/sessions';
 import type { AppConfig } from '../config';
 import type { Db } from '../db/connection';
 import { HttpError } from '../errors';
+import { shareHeaders } from './privacy';
 
 export const SESSION_COOKIE = 'bb_session';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -15,6 +16,8 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** Set on upload routes (Plan 4) to accept multipart/form-data instead of JSON. */
     multipart?: boolean;
+    shareRead?: boolean;
+    privateResponse?: boolean;
   }
 }
 
@@ -28,7 +31,8 @@ declare module 'fastify' {
 export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db): void {
   app.decorateRequest('user', null);
 
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.routeOptions.config.privateResponse) shareHeaders(reply);
     if (SAFE_METHODS.has(request.method)) return;
     if (request.headers.origin !== config.publicOrigin) throw new HttpError(403, 'origin_rejected');
     const contentType = (request.headers['content-type']?.split(';', 1)[0] ?? '').trim().toLowerCase();
@@ -39,6 +43,7 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
   });
 
   app.addHook('preHandler', async (request) => {
+    if (request.routeOptions.config.shareRead === true && (request.method === 'GET' || request.method === 'HEAD')) return;
     const token = request.cookies[SESSION_COOKIE];
     request.user = token ? findSessionUser(db, token) : null;
     const route = request.routeOptions.url ?? request.url;

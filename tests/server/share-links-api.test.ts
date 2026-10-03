@@ -51,6 +51,20 @@ it('validates future expiry, strict payloads, ownership and guards', async () =>
   expect((await send(f.ctx, f.cookie, 'POST', recordUrl(f, id, `/share-links/${created.id}/revoke`), { reason: 'x' })).statusCode).toBe(400);
 });
 
+it('applies private response headers even when Origin or content type is rejected', async () => {
+  const url = recordUrl(f, id, '/share-links');
+  const denied = [
+    await f.ctx.app.inject({ method: 'POST', url, headers: { cookie: f.cookie }, payload: { label: 'x' } }),
+    await f.ctx.app.inject({ method: 'POST', url, headers: { cookie: f.cookie, origin: f.ctx.origin, 'content-type': 'text/plain' }, payload: 'x' }),
+  ];
+  expect(denied.map(response => response.statusCode)).toEqual([403, 415]);
+  for (const response of denied) {
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['x-robots-tag']).toBe('noindex, nofollow');
+  }
+});
+
 it('rolls creation and revocation back if activity writing fails', async () => {
   const before = await getRecord(f, id);
   f.ctx.db.exec("CREATE TRIGGER fail_activity BEFORE INSERT ON activity BEGIN SELECT RAISE(ABORT,'forced'); END");
