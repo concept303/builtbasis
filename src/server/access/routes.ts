@@ -7,6 +7,7 @@ import type { Db } from '../db/connection';
 import { HttpError } from '../errors';
 import { resolveAttachmentFile, resolvePhotoFile, sendFile } from '../files/downloads';
 import { saveUpload } from '../files/occurrences';
+import { describeAttachment, resolveAttachmentView } from '../files/previews';
 import { discardStaged, publishFile } from '../files/storage';
 import { parseUpload } from '../files/uploads';
 import { ItemParams } from '../http/params';
@@ -107,7 +108,6 @@ export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppCo
           const access = requireContributorAccess(db, userId, id, 'upload');
           const logEntryId = kind === 'attachments' ? (envelope.metadata as AttachmentMeta).logEntryId : null;
           if (logEntryId != null) {
-            requireContributorAccess(db, userId, id, 'addLog');
             if (!db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ? AND private = 0').get(logEntryId, id)) {
               throw new HttpError(404, 'log_entry_not_found');
             }
@@ -134,6 +134,22 @@ export function registerAccessRoutes(app: FastifyInstance, db: Db, config: AppCo
       const { id, itemId } = FileParams.parse(request.params);
       requireContributorAccess(db, requireUserId(request), id);
       await sendFile(request, reply, config.filesDir, resolveAttachmentFile(db, id, itemId, 'shared'), 'attachment');
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/preview', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      const descriptor = describeAttachment(db, id, itemId, 'shared');
+      if (request.method === 'HEAD') return reply.send();
+      return descriptor;
+    },
+  });
+  app.route({ method: ['GET', 'HEAD'], url: '/api/assigned-records/:id/attachments/:itemId/view', config: contributorConfig,
+    handler: async (request, reply) => {
+      const { id, itemId } = FileParams.parse(request.params);
+      requireContributorAccess(db, requireUserId(request), id);
+      await sendFile(request, reply, config.filesDir, resolveAttachmentView(db, id, itemId, 'shared'), 'inline');
     },
   });
 }

@@ -77,7 +77,7 @@ it('permits only public Log creation for addLog-only users and preserves genuine
   }
 });
 
-it('permits uploads independently and only combined grants attach to public Logs', async () => {
+it('permits upload-only users to attach to public Logs without granting Log creation', async () => {
   const record = await postRecord(f, { subtype: 'task' });
   forceStatus(f, record.id, 'open');
   const publicLog = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Public' });
@@ -88,12 +88,58 @@ it('permits uploads independently and only combined grants attach to public Logs
   expect(response.json().uploadedBy).toBe('Alex Builder');
   expect(f.ctx.db.prepare('SELECT uploaded_by FROM attachments WHERE id = ?').pluck().get(response.json().id)).toBe(userId);
   expect((await upload(record.id, {}, true)).statusCode).toBe(201);
-  expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(403);
+  expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(201);
+  expect((await send(f.ctx, cookie, 'POST', assigned(record.id, '/log'), { text: 'Not permitted' })).statusCode).toBe(403);
+  expect((await upload(record.id, { logEntryId: privateLog.json().id })).statusCode).toBe(404);
   await grant(record.id, true, true);
   expect((await upload(record.id, { logEntryId: privateLog.json().id })).statusCode).toBe(404);
   expect((await upload(record.id, { logEntryId: publicLog.json().id })).statusCode).toBe(201);
   expect((await send(f.ctx, cookie, 'DELETE', recordUrl(f, record.id, `/attachments/${response.json().id}`))).statusCode).toBe(403);
   expect((await get(f.ctx, cookie, assigned(record.id))).body).not.toContain('PRIVATE_');
+});
+
+it('authorizes contributor media descriptors, views and byte ranges without exposing private occurrences', async () => {
+  const record = await postRecord(f, { subtype: 'task' });
+  const other = await postRecord(f, { subtype: 'task' });
+  forceStatus(f, record.id, 'open');
+  await grant(record.id);
+  const file = await addAttachment(f, record.id);
+  const foreignFile = await addAttachment(f, other.id);
+  const log = await send(f.ctx, f.cookie, 'POST', recordUrl(f, record.id, '/log'), { text: 'Hidden', private: true });
+  const hiddenFile = await addAttachment(f, record.id, { logEntryId: log.json().id });
+  const request = (itemId: number, suffix: string, method: 'GET' | 'HEAD' = 'GET', range?: string) =>
+    f.ctx.app.inject({ method, url: assigned(record.id, `/attachments/${itemId}/${suffix}`),
+      headers: { cookie, ...(range ? { range } : {}) } });
+  const descriptor = await request(file.id, 'preview');
+  expect(descriptor.statusCode).toBe(200);
+  expect(descriptor.json().capabilities).toMatchObject({ kind: 'pdf', view: 'native', download: true });
+  expect(descriptor.body).not.toContain('hash');
+  const range = await request(file.id, 'view', 'GET', 'bytes=1-4');
+  expect(range.statusCode).toBe(206);
+  expect(range.rawPayload).toEqual(PDF.subarray(1, 5));
+  expect(range.headers['content-range']).toBe(`bytes 1-4/${PDF.length}`);
+  expect(range.headers['content-disposition']).toMatch(/^inline;/);
+  expect((await request(file.id, 'view', 'GET', 'bytes=999999-')).statusCode).toBe(416);
+  for (const suffix of ['preview', 'view']) {
+    const head = await request(file.id, suffix, 'HEAD', 'bytes=1-4');
+    expect(head.statusCode).toBe(200);
+    expect(head.body).toBe('');
+    expect(head.headers['cache-control']).toBe('no-store');
+    for (const method of ['GET', 'HEAD'] as const) {
+      for (const itemId of [foreignFile.id, hiddenFile.id]) {
+        expect((await request(itemId, suffix, method, 'bytes=1-4')).statusCode).toBe(404);
+      }
+    }
+  }
+  forceStatus(f, record.id, 'draft');
+  expect((await request(file.id, 'view', 'HEAD')).statusCode).toBe(404);
+  forceStatus(f, record.id, 'open');
+  await send(f.ctx, f.cookie, 'DELETE', recordUrl(f, record.id, `/grants/${userId}`));
+  for (const suffix of ['preview', 'view']) {
+    for (const method of ['GET', 'HEAD'] as const) {
+      expect((await request(file.id, suffix, method, 'bytes=1-4')).statusCode).toBe(404);
+    }
+  }
 });
 
 it('rechecks grants on downloads and HEAD while isolating private and other-record occurrences', async () => {
