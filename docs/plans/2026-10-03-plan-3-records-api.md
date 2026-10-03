@@ -3647,7 +3647,7 @@ git commit -m "feat(server): record list with filters, accent-insensitive search
 
 This completes the Plan 2 hand-over items: a tag merge moves record links, a tag delete reports its usage first, and a location that records use cannot be deleted (the owner retires it instead). A merge or delete also marks each record whose tags change as updated (Decision 13), so the record moves up when the list is sorted by update time.
 
-- [ ] **Step 1: Write the failing test `tests/server/lists-with-records.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/lists-with-records.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3723,12 +3723,12 @@ describe('locations on records (design §9.4)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/lists-with-records.test.ts`
 Expected: FAIL — 4 tests fail and 1 passes. The merge leaves the record without tags (`expected [] to deeply equal [ 1 ]`), `/usage` answers `404`, the merged and deleted records keep their old update time, and deleting a used location hits the database's foreign-key check (`500` where `409` is expected). The rename test already passes: a rename never touched records; it guards that behaviour.
 
-- [ ] **Step 3: Modify `src/server/lists/tags.ts`**
+- [x] **Step 3: Modify `src/server/lists/tags.ts`**
 
 Replace:
 
@@ -3855,7 +3855,7 @@ with:
   });
 ```
 
-- [ ] **Step 4: Modify `src/server/lists/locations.ts`**
+- [x] **Step 4: Modify `src/server/lists/locations.ts`**
 
 Replace:
 
@@ -3894,11 +3894,11 @@ export function deleteLocation(db: Db, projectId: number, id: number): void {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npx vitest run tests/server/lists-with-records.test.ts` → PASS (5 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/server/lists/tags.ts src/server/lists/locations.ts tests/server/lists-with-records.test.ts

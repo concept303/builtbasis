@@ -128,16 +128,19 @@ export function updateLocation(db: Db, projectId: number, id: number, patch: Loc
 }
 
 /**
- * Deletes the node and everything inside it.
- * Plan 3 adds: only when no record uses any of them; otherwise 409 and the owner retires the node instead (design §9.4).
+ * Deletes the node and everything inside it, but only when no record uses any of them;
+ * otherwise the owner retires the node instead (design §9.4).
  */
 export function deleteLocation(db: Db, projectId: number, id: number): void {
   getLocation(db, projectId, id);
   const ids = subtreeIds(db, projectId, id);
-  db.prepare(`DELETE FROM location_nodes WHERE project_id = ? AND id IN (${ids.map(() => '?').join(', ')})`).run(
-    projectId,
-    ...ids,
-  );
+  const placeholders = ids.map(() => '?').join(', ');
+  const records = db
+    .prepare(`SELECT COUNT(DISTINCT record_id) FROM record_locations WHERE location_id IN (${placeholders})`)
+    .pluck()
+    .get(...ids) as number;
+  if (records > 0) throw new HttpError(409, 'location_in_use', { records });
+  db.prepare(`DELETE FROM location_nodes WHERE project_id = ? AND id IN (${placeholders})`).run(projectId, ...ids);
 }
 
 /** Duplicates a node with all its descendants; the copy's root gets the new names (design §9.4). */
