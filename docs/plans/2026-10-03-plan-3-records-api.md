@@ -3913,7 +3913,7 @@ git commit -m "feat(server): tag merge, usage and delete across records; locatio
 
 A guard test over everything built in Tasks 3–9 (design §11.5): no GET request changes the database, and the records routes follow Plan 2's session and `Origin` rules. It uses SQLite's `total_changes()`, which counts every row written on the connection. It should pass at once; if it fails, a GET handler writes and must be fixed.
 
-- [ ] **Step 1: Write the test `tests/server/records-reads.test.ts`**
+- [x] **Step 1: Write the test `tests/server/records-reads.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -3971,11 +3971,11 @@ describe('records and the request rules (design §11.5)', () => {
 });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `npx vitest run tests/server/records-reads.test.ts` → PASS (2 tests).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/server/records-reads.test.ts
