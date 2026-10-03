@@ -690,6 +690,8 @@ The Notes field, the Log and the Activity log are not printed.
 - Function/System classification, procurement categories, procurement milestones.
 - MS Project integration.
 - Inspections, checklists, inspection & test plans.
+- Deleting records: a record created by mistake is cancelled (reason _Raised in error_).
+- Edit-conflict detection: when the same record is saved from two devices, the last save wins.
 
 ## 15. Seed data for Gennadi 822A
 

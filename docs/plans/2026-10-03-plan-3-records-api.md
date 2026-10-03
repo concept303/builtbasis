@@ -1,17 +1,37 @@
 # Plan 3 — Records API Implementation Plan
 
 > **Document type:** Implementation plan
-> **Status:** In progress — execution approved
-> **Retention:** Active until executed; historical afterwards.
+> **Status:** Completed
+> **Retention:** Historical — do not execute.
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §4 (record model, human IDs, must be done before), §5 (shared fields, decision, measurements, verification, Log, activity), §6 (subtype fields), §8 (status rules), §9.3–§9.4 (tag and location operations that involve records), §10.2 (list filters, sorting, totals) — data and API only.
 > **Not in this plan:** photos, attachments, files and share links (Plan 4); screens (Plan 5); print view and PDF (Plan 6).
 > **Depends on:** Plan 2 (server foundation), merged to `main` at `48c50ef` (18 test files, 155 tests). Task 0 checks the starting point.
-> **Implemented by:** Not implemented
-> **Verified:** Not verified
+> **Implemented by:** `09c7e4d`..`6cd5713` (inclusive; Tasks 1–10). Task 0 was a read-only preflight; Task 11 records this closeout.
+> **Verified:** 2026-10-03 — `npm test`: 29 files, 237 tests passed; `npm run typecheck`: exit 0, no diagnostics.
+> **Merged to main:** Not merged.
+> **Checklist note:** Checkboxes are preserved execution history, not active instructions. Any unchecked boxes do not represent outstanding implementation work.
 > **Plan check:** 2026-10-03 — checked against the merged Plan 2 on `main` (`48c50ef`, 155 tests). Every step of this plan was replayed in order in a fresh clone of `main`: each "verify it fails" step failed as stated, each "verify it passes" step passed, `npm run typecheck` was clean after every task, and every commit staged its files with nothing left over. Final `npm test`: 29 files, 229 tests passed. The clones were deleted.
 > **Review:** 2026-10-03, second agent, on `a88af6f` — five findings, all reproduced and fixed: (1) the choice history kept only option ids, which SQLite could reuse after a delete — option ids are now never reused, and each choice entry keeps the option's label and description (Tasks 2, 3, 5); (2) a zone-type filter also matched differently typed nodes inside a typed node — it now matches only nodes carrying the type (Task 8); (3) tag merge and delete changed records without marking them updated — they now do, in the same transaction (Task 9); (4) the starting-point and final counts used Plan 2's planned 136 tests instead of the merged 155 (Tasks 0, 11); (5) the sort-by-update test could depend on timing — every record now gets its own update time (Task 8).
 >
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each box when its step is done.
+> **Historical execution instruction:** Workers used superpowers:subagent-driven-development or superpowers:executing-plans with checkbox tracking. Do not execute this completed plan.
+
+## Completion record — 2026-10-03
+
+The records API is implemented locally and has not been merged to `main`. Verification passed with 237 tests across 29 files and a clean typecheck. The first sandboxed test attempt stopped before tests ran with `spawn EPERM`; the same command passed with subprocess permission.
+
+The original expectation was 229 tests: 155 from Plans 1–2 and 74 from Plan 3. Implementation added eight regression tests: four in Task 3, two in Task 6 and two in Task 9. The actual Plan 3 total is 82: records 10, records-db 3, records-api 16, record-links 6, transitions-api 10, options-api 6, measurements-api 7, log-api 5, records-list 10, lists-with-records 7 and records-reads 2.
+
+Task 3 refined `checkSelection` to verify project ownership for every submitted ID, including retained selections. Only newly selected entries must be active. This preserves valid retired selections and rejects externally corrupted prior associations. The historical helper snippet below has been synchronized with that implementation. No material deviation from the approved design was identified. Decisions 2 and 12 are now recorded in design §14.
+
+No maintained specification exists yet. The maintained v1 specification and Architecture reconciliation remain Plan 6 work under the roadmap. The v1 design remains the implementation baseline and has not been marked Historical.
+
+Minor review suggestions remain pending final-review triage. These are test improvements, not reported implementation defects:
+
+- Task 4: rename the verifier test because it currently exercises only the inactive case, despite naming the foreign-project case too.
+- Task 6: consider measurement-specific tests for a foreign measurer and retaining a retired measurer on PATCH. Shared reference helpers cover the rules.
+- Task 8: consider an explicit second-project exclusion assertion for list results and totals. The reviewed predicate is project-scoped.
+- Task 9: strengthen the rename integration assertion with the returned name and unchanged record metadata. Plan 2 already tests renaming.
+- Task 10: assert successful setup creation and transition responses before the GET write-counter check, so setup failure cannot leave empty collections unnoticed.
 
 **Goal:** The owner can create, read, update and list records of all three subtypes through the API, with every rule of design §4–§8 enforced by the server: required fields, subtype fields, status transitions with reasons and verification, decision options, measurements, Log, activity, must-be-done-before links, and the list's filters, search, sorting and totals.
 
@@ -1466,13 +1486,13 @@ export function checkSelection(
   current: readonly number[] = [],
 ): void {
   const added = ids.filter((id) => !current.includes(id));
-  if (added.length === 0) return;
+  if (ids.length === 0) return;
   const active = HAS_ACTIVE[table] ? 'active' : '1 AS active';
   const rows = db
-    .prepare(`SELECT id, ${active} FROM ${table} WHERE project_id = ? AND id IN (${added.map(() => '?').join(', ')})`)
-    .all(projectId, ...added) as { id: number; active: number }[];
+    .prepare(`SELECT id, ${active} FROM ${table} WHERE project_id = ? AND id IN (${ids.map(() => '?').join(', ')})`)
+    .all(projectId, ...ids) as { id: number; active: number }[];
   const activeById = new Map(rows.map((row) => [row.id, row.active]));
-  const missing = added.filter((id) => !activeById.has(id));
+  const missing = ids.filter((id) => !activeById.has(id));
   if (missing.length > 0) throw new HttpError(400, 'invalid_reference', { field, ids: missing });
   const inactive = added.filter((id) => activeById.get(id) !== 1);
   if (inactive.length > 0) throw new HttpError(400, 'inactive_selection', { field, ids: inactive });
@@ -3989,13 +4009,13 @@ git commit -m "test(server): GET requests on records never write; records routes
 - Modify: `docs/designs/2026-10-02-v1-records-design.md` (§14)
 - Modify: `docs/plans/2026-10-03-plan-3-records-api.md` (metadata), `docs/plans/2026-10-02-v1-roadmap.md` (Plan 3 status)
 
-- [ ] **Step 1: Run the full suite and the type check**
+- [x] **Step 1: Run the full suite and the type check**
 
 Run: `npm test`
 Expected: `Test Files  29 passed (29)` and `Tests  229 passed (229)` (Plans 1–2: 155; Plan 3: 74 — records 10, records-db 3, records-api 12, record-links 6, transitions-api 10, options-api 6, measurements-api 5, log-api 5, records-list 10, lists-with-records 5, records-reads 2).
 Run: `npm run typecheck` → no output.
 
-- [ ] **Step 2: Update design §14 (Decisions 2 and 12)**
+- [x] **Step 2: Update design §14 (Decisions 2 and 12)**
 
 Replace:
 
@@ -4011,15 +4031,15 @@ with:
 - Edit-conflict detection: when the same record is saved from two devices, the last save wins.
 ```
 
-- [ ] **Step 3: Update this plan's metadata**
+- [x] **Step 3: Update this plan's metadata**
 
 Set `> **Status:** Completed`, `> **Retention:** Historical — do not execute.`, `> **Implemented by:**` the Plan 3 commit range (first..last hash), and `> **Verified:**` with the date and the two results of Step 1.
 
-- [ ] **Step 4: Update the roadmap**
+- [x] **Step 4: Update the roadmap**
 
 In `docs/plans/2026-10-02-v1-roadmap.md`, change the Plan 3 row's status from `Written` to `Completed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/designs/2026-10-02-v1-records-design.md docs/plans/2026-10-03-plan-3-records-api.md docs/plans/2026-10-02-v1-roadmap.md

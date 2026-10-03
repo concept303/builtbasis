@@ -2,7 +2,7 @@
 
 Lightweight construction-control application: quality issues, detail clarifications and tasks — with measurements, decisions, photos and read-only sharing — in English and Greek.
 
-**Status:** Plans 0–2 are complete. The server foundation runs locally; Plan 3 (records) is next. Plan 2 is merged to `main` (see roadmap).
+**Status:** Plans 0–3 are complete locally. The server foundation and records API are implemented. Plan 2 is merged to `main`; Plan 3 is not merged. Plan 4 (files and sharing) is next (see roadmap).
 
 ## Local dependency installation
 
