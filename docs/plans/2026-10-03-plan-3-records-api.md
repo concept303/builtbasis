@@ -2307,7 +2307,7 @@ git commit -m "feat(server): atomic status changes with reasons, verification an
 
 The chosen option is a record field (`chosenOptionId`, saved through `PATCH /records/:id` and logged in the activity log). This task adds the options themselves.
 
-- [ ] **Step 1: Write the failing test `tests/server/options-api.test.ts`**
+- [x] **Step 1: Write the failing test `tests/server/options-api.test.ts`**
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -2411,12 +2411,12 @@ describe('options considered (design §5.6)', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npx vitest run tests/server/options-api.test.ts`
 Expected: FAIL — all 6 tests fail with `404` (there are no option routes yet) or, for the choice test, `200` where `400` is expected (no option of another record can be checked yet).
 
-- [ ] **Step 3: Replace `src/server/http/params.ts`**
+- [x] **Step 3: Replace `src/server/http/params.ts`**
 
 `ProjectParams` and `ItemParams` keep their shape; `RecordItemParams` is new.
 
@@ -2431,7 +2431,7 @@ export const ItemParams = z.object({ projectId: positiveId, id: positiveId });
 export const RecordItemParams = z.object({ projectId: positiveId, id: positiveId, itemId: positiveId });
 ```
 
-- [ ] **Step 4: Create `src/server/records/options.ts`**
+- [x] **Step 4: Create `src/server/records/options.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2563,7 +2563,7 @@ export function registerOptionRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 5: Replace `src/server/records/routes.ts`**
+- [x] **Step 5: Replace `src/server/records/routes.ts`**
 
 ```ts
 import type { FastifyInstance } from 'fastify';
@@ -2582,11 +2582,11 @@ export function registerRecordRoutes(app: FastifyInstance, db: Db): void {
 }
 ```
 
-- [ ] **Step 6: Run to verify it passes**
+- [x] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run tests/server/options-api.test.ts` → PASS (6 tests). Then `npm test` and `npm run typecheck`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/server/http/params.ts src/server/records/options.ts src/server/records/routes.ts tests/server/options-api.test.ts
