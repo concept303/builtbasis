@@ -69,7 +69,8 @@ export function EvidenceViewer({ context, selection, onClose, onAccessLost }: { 
   };
   return <dialog ref={dialog} className="evidence-viewer" aria-label={t('Evidence viewer', 'Προβολή τεκμηρίου')} onCancel={event => { event.preventDefault(); onClose(); }}>
     <header><h3>{selection.item.originalFilename}</h3><button autoFocus onClick={onClose}>{t('Close', 'Κλείσιμο')}</button></header>
-    <button disabled={downloading} onClick={() => void download()}>{downloading ? t('Downloading…', 'Λήψη…') : t('Download original', 'Λήψη πρωτοτύπου')}</button>
+    <div className="evidence-viewer-actions"><button disabled={downloading} onClick={() => void download()}>{downloading ? t('Downloading…', 'Λήψη…') : t('Download original', 'Λήψη πρωτοτύπου')}</button></div>
+    <div className="evidence-viewer-body">
     {downloadFailed && <p role="alert">{t('Download failed. Try again.', 'Η λήψη απέτυχε. Δοκιμάστε ξανά.')}</p>}
     {loading && <p role="status">{t('Opening preview…', 'Άνοιγμα προεπισκόπησης…')}</p>}
     {failed && <p role="status">{t('Preview unavailable. Download the original to open it with a compatible application.', 'Η προεπισκόπηση δεν είναι διαθέσιμη. Κατεβάστε το πρωτότυπο και ανοίξτε το με συμβατή εφαρμογή.')}</p>}
@@ -78,6 +79,7 @@ export function EvidenceViewer({ context, selection, onClose, onAccessLost }: { 
     {!failed && source && kind === 'audio' && <audio controls preload="metadata" src={source} onError={mediaFailure} />}
     {!failed && pdf && <PdfViewer bytes={pdf} onFailure={() => setFailed(true)} />}
     {!failed && email && <article className="email-preview"><dl><dt>{t('Subject', 'Θέμα')}</dt><dd>{email.subject}</dd><dt>{t('From', 'Από')}</dt><dd>{email.from}</dd><dt>{t('To', 'Προς')}</dt><dd>{email.to}</dd><dt>{t('Date', 'Ημερομηνία')}</dt><dd>{email.date}</dd></dl><pre>{email.body}</pre>{email.attachments.length > 0 && <h4>{t('Embedded attachments', 'Ενσωματωμένα συνημμένα')}</h4>}{email.attachments.map((item, index) => <button key={index} onClick={() => downloadBlob(new Blob([item.bytes]), item.name, scope.current?.signal)}>{t('Download', 'Λήψη')} {item.name}</button>)}</article>}
+    </div>
   </dialog>;
 }
 

@@ -123,3 +123,36 @@ test('native photo failure rechecks occurrence access and clears the viewer afte
   await expect(page.locator('body')).toContainText('Access lost');
   await expect(page.locator('dialog')).toHaveCount(0);expect(heads).toBe(1);
 });
+
+for (const width of [360, 1280]) test('evidence viewer gives media its own readable row at width ' + width, async ({page}) => {
+  await page.setViewportSize({width,height:740});
+  await routeFiles(page); await openHarness(page);
+  for (const [name,selector] of [['media-video.webm','video'],['media-audio.wav','audio'],['media-html.eml','.email-preview'],['media-compound.msg','.email-preview']]) {
+    await page.getByRole('button',{name:name!,exact:true}).click();
+    const dialog=page.locator('dialog');const content=dialog.locator(selector!);
+    await expect(content).toBeVisible();
+    const box=(await dialog.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(width<650 ? width-40 : 700);
+    expect(box.x).toBeGreaterThanOrEqual(8); expect(box.x+box.width).toBeLessThanOrEqual(width-8);
+    const action=(await dialog.getByRole('button',{name:'Download original',exact:true}).boundingBox())!;
+    const media=(await content.boundingBox())!;
+    expect(media.y).toBeGreaterThanOrEqual(action.y+action.height+8);
+    expect(media.width).toBeGreaterThanOrEqual(box.width-70);
+    expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+    if(width===360 && selector==='video') await page.screenshot({path:'test-results/mobile-video-layout.png'});
+    await dialog.getByRole('button',{name:'Close',exact:true}).click();
+  }
+});
+
+test('long email scrolls inside the phone viewer while Close stays available', async ({page}) => {
+  await page.setViewportSize({width:360,height:640}); await routeFiles(page);
+  await page.route('**/api/shared/attachments/2/file',route=>route.fulfill({body:'Subject: '+ 'long-subject-'.repeat(35)+'\r\nContent-Type: text/plain\r\n\r\n'+Array.from({length:100},(_,i)=>'Email line '+i).join('\r\n'),contentType:'message/rfc822'}));
+  await openHarness(page);await page.getByRole('button',{name:'media-html.eml',exact:true}).click();
+  const dialog=page.locator('dialog');await expect(dialog.locator('.email-preview')).toContainText('Email line 99');
+  const content=dialog.locator('.evidence-viewer-body');await expect(content).toBeVisible();
+  await content.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  const close=dialog.getByRole('button',{name:'Close',exact:true});await expect(close).toBeInViewport();
+  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  await page.screenshot({path:'test-results/mobile-email-layout.png'});
+  await close.click();await expect(dialog).toHaveCount(0);
+});

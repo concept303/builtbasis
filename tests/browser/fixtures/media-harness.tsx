@@ -1,3 +1,4 @@
+import '../../../src/web/styles.css';
 import { createRoot } from 'react-dom/client';
 import { LanguageProvider } from '../../../src/web/core/i18n';
 import { EvidencePane } from '../../../src/web/media';

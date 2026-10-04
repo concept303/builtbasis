@@ -8,3 +8,23 @@
 .operations-status p { margin: .25rem 0; }
 .operations-warning { border-color: #a35b00; background: #fff8e9; }
 @media print { .operations-status { display: none !important; } }
+
+/* Evidence uses the available width; controls stay outside the scrolling preview. */
+.evidence-viewer { width: 900px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: hidden; padding: 20px; }
+.evidence-viewer[open] { display: flex; flex-direction: column; gap: 16px; }
+.evidence-viewer > header { display: flex; align-items: flex-start; gap: 16px; flex-shrink: 0; }
+.evidence-viewer > header h3 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.evidence-viewer > header button { flex-shrink: 0; }
+.evidence-viewer-actions { flex-shrink: 0; }
+.evidence-viewer-body { min-height: 0; overflow: auto; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.evidence-viewer-body > img, .evidence-viewer-body > video { display: block; width: 100%; max-height: 65vh; max-height: 65dvh; object-fit: contain; }
+.evidence-viewer-body > video { background: #111; }
+.evidence-viewer-body > audio { display: block; width: 100%; }
+.email-preview dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin-top: 0; }
+.email-preview dt { font-weight: 600; }
+.email-preview dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 650px) {
+  .evidence-viewer { padding: 14px; }
+  .email-preview dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .email-preview dd { margin-bottom: 10px; }
+}
