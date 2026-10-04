@@ -1,7 +1,20 @@
 import type { Page } from '@playwright/test';
 import { test, expect, login, seed } from './fixture';
 
-const entry = (page: Page, name: string) => page.locator('.managed-list > li').filter({ has: page.locator('strong').filter({ hasText: new RegExp(`^${name}$`) }) });
+const entry = (page: Page, name: string) => page.locator('.managed-table tbody > tr, .location-tree-row').filter({ has: page.locator('strong').filter({ hasText: new RegExp(`^${name}$`) }) });
+async function rowAction(page: Page, name: string, action: string) {
+  const row = entry(page, name);
+  if (await row.evaluate(element => element.classList.contains('location-tree-row'))) {
+    await row.getByRole('button', { name, exact: true }).click();
+    if (action === 'Edit') return;
+    const panel = page.getByRole('region', { name: 'Entry details' });
+    if (['Retire', 'Reactivate', 'Delete'].includes(action)) await panel.getByText('Actions', { exact: true }).click();
+    await panel.getByRole('button', { name: action, exact: true }).click();
+  } else {
+    if (action !== 'Edit' && !await row.locator('.row-menu').evaluate(element => element.hasAttribute('open'))) await row.getByText('Actions', { exact: true }).click();
+    await row.getByRole('button', { name: action, exact: true }).click();
+  }
+}
 async function openLists(page: Page) {
   await login(page);
   await page.goto(`/projects/${seed().projectId}/lists`);
@@ -56,11 +69,11 @@ test('five managed lists expose named controls; people and trades preserve field
   await page.getByLabel('Phone', { exact: true }).fill('+30 210 1234567');
   await save(page);
   const person = entry(page, 'List test engineer');
-  await person.getByRole('button', { name: 'Retire', exact: true }).click();
-  await expect(person.getByText('— Retired', { exact: true })).toBeVisible();
-  await person.getByRole('button', { name: 'Reactivate', exact: true }).click();
+  await rowAction(page, 'List test engineer', 'Retire');
+  await expect(person.getByText('Retired', { exact: true })).toBeVisible();
+  await rowAction(page, 'List test engineer', 'Reactivate');
   await expect(person.getByRole('button', { name: 'Retire', exact: true })).toBeVisible();
-  await person.getByRole('button', { name: 'Edit', exact: true }).click();
+  await rowAction(page, 'List test engineer', 'Edit');
   await expect(page.getByLabel('Company', { exact: true })).toHaveValue('Test engineering');
   await expect(page.getByLabel('Email', { exact: true })).toHaveValue('engineer@example.test');
   await expect(page.getByLabel('Phone', { exact: true })).toHaveValue('+30 210 1234567');
@@ -79,11 +92,11 @@ test('five managed lists expose named controls; people and trades preserve field
   const trade = entry(page, 'List test masonry');
   await trade.getByText('Definition', { exact: true }).click();
   await expect(trade.getByText('Builds and repairs walls.', { exact: true })).toBeVisible();
-  await trade.getByRole('button', { name: 'Retire', exact: true }).click();
+  await rowAction(page, 'List test masonry', 'Retire');
   await expect(trade.getByRole('button', { name: 'Reactivate', exact: true })).toBeVisible();
-  await trade.getByRole('button', { name: 'Reactivate', exact: true }).click();
+  await rowAction(page, 'List test masonry', 'Reactivate');
   await expect(trade.getByRole('button', { name: 'Retire', exact: true })).toBeVisible();
-  await trade.getByRole('button', { name: 'Edit', exact: true }).click();
+  await rowAction(page, 'List test masonry', 'Edit');
   await page.getByRole('textbox', { name: 'English definition', exact: true }).fill('Builds new walls.');
   await save(page);
   await page.getByLabel('Language', { exact: true }).selectOption('el');
@@ -103,7 +116,7 @@ test('tag rename offers one named merge target, rejects two collisions, and dele
   const sourceId = tags.find(tag => tag.nameEn === 'List source')!.id;
   const stoneId = tags.find(tag => tag.nameEn === 'List stone')!.id;
   const recordId = await linkedDraft(page, { tagIds: [sourceId] });
-  await entry(page, 'List source').getByRole('button', { name: 'Edit', exact: true }).click();
+  await rowAction(page, 'List source', 'Edit');
   await page.getByLabel('English name', { exact: true }).fill('List stone');
   await page.getByLabel('Greek name', { exact: true }).fill('Δοκιμαστικό νερό');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -122,13 +135,13 @@ test('tag rename offers one named merge target, rejects two collisions, and dele
   await expect(entry(page, 'List source')).toHaveCount(0);
   await expect(entry(page, 'List stone')).toHaveCount(1);
   expect((await record(page, recordId)).tagIds).toEqual([stoneId]);
-  await entry(page, 'List stone').getByRole('button', { name: 'Delete', exact: true }).click();
+  await rowAction(page, 'List stone', 'Delete');
   const confirm = page.getByRole('alertdialog', { name: 'Confirm deletion' });
   await expect(confirm).toContainText('used by 1 records');
   expect((await record(page, recordId)).tagIds).toEqual([stoneId]);
   await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(entry(page, 'List stone')).toBeVisible();
-  await entry(page, 'List stone').getByRole('button', { name: 'Delete', exact: true }).click();
+  await rowAction(page, 'List stone', 'Delete');
   await confirm.getByRole('button', { name: 'Delete permanently' }).click();
   await expect(entry(page, 'List stone')).toHaveCount(0);
   expect((await record(page, recordId)).tagIds).toEqual([]);
@@ -146,17 +159,17 @@ test('locations copy full branches, exclude descendants from moves, save order a
     await page.getByLabel('Location kind', { exact: true }).selectOption({ label: 'Building' });
     await save(page);
   }
-  await entry(page, 'List building A').getByRole('button', { name: 'Add child' }).click();
+  await rowAction(page, 'List building A', 'Add child');
   await page.getByLabel('English name', { exact: true }).fill('List room');
   await page.getByLabel('Location kind', { exact: true }).selectOption({ label: 'Space' });
   await page.getByRole('combobox', { name: 'Zone type', exact: true }).selectOption({ label: 'List service zone' });
   await page.getByLabel('Sort order').fill('-5');
   await save(page);
-  await entry(page, 'List building A').getByRole('button', { name: 'Edit', exact: true }).click();
+  await rowAction(page, 'List building A', 'Edit');
   await expect(page.getByLabel('Parent location').getByRole('option', { name: 'List building A', exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Parent location').getByRole('option', { name: /List room/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await entry(page, 'List building A').getByRole('button', { name: 'Copy branch' }).click();
+  await rowAction(page, 'List building A', 'Copy branch');
   await page.getByLabel('English name', { exact: true }).fill('List building copy');
   await save(page);
   await expect(entry(page, 'List room')).toHaveCount(2);
@@ -166,7 +179,7 @@ test('locations copy full branches, exclude descendants from moves, save order a
   expect(copiedRoom.sortOrder).toBe(-5);
   expect(copiedRoom.zoneTypeId).toBeGreaterThan(0);
   const sourceRoom = nodes.find(node => node.nameEn === 'List room' && node.parentId !== copiedRoot.id)!;
-  await entry(page, 'List building A').getByRole('button', { name: 'Edit', exact: true }).click();
+  await rowAction(page, 'List building A', 'Edit');
   await page.getByLabel('Parent location').selectOption({ label: 'List building B' });
   await save(page);
   await page.reload();
@@ -174,19 +187,19 @@ test('locations copy full branches, exclude descendants from moves, save order a
   const movedNodes = await rows<{ id: number; nameEn: string; parentId: number | null }>(page, 'locations');
   expect(movedNodes.find(node => node.nameEn === 'List building A')!.parentId).toBe(movedNodes.find(node => node.nameEn === 'List building B')!.id);
   const recordId = await linkedDraft(page, { locationIds: [sourceRoom.id] });
-  await entry(page, 'List building A').getByRole('button', { name: 'Delete', exact: true }).click();
+  await rowAction(page, 'List building A', 'Delete');
   await page.getByRole('button', { name: 'Delete permanently' }).click();
   await expect(page.getByRole('alert')).toContainText('Records use this branch');
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
-  await entry(page, 'List building A').getByRole('button', { name: 'Retire', exact: true }).click();
-  await expect(entry(page, 'List building A').getByRole('button', { name: 'Reactivate', exact: true })).toBeVisible();
+  await rowAction(page, 'List building A', 'Retire');
+  await expect(entry(page, 'List building A')).toContainText('Retired');
   expect((await record(page, recordId)).locationIds).toEqual([sourceRoom.id]);
-  await entry(page, 'List building copy').getByRole('button', { name: 'Delete', exact: true }).click();
+  await rowAction(page, 'List building copy', 'Delete');
   await page.getByRole('button', { name: 'Delete permanently' }).click();
   await expect(entry(page, 'List building copy')).toHaveCount(0);
   await expect(entry(page, 'List room')).toHaveCount(1);
   await tab(page, 'Zone types');
-  await entry(page, 'List service zone').getByRole('button', { name: 'Delete', exact: true }).click();
+  await rowAction(page, 'List service zone', 'Delete');
   await page.getByRole('button', { name: 'Delete permanently' }).click();
   await expect(page.getByRole('alert')).toContainText('Locations use this zone type');
 });
@@ -195,11 +208,11 @@ test('zone types rename and delete; unsaved bilingual names survive rejected dis
   await openLists(page);
   await tab(page, 'Zone types');
   await addNamed(page, 'List temporary zone');
-  await entry(page, 'List temporary zone').getByRole('button', { name: 'Edit', exact: true }).click();
+  await rowAction(page, 'List temporary zone', 'Edit');
   await page.getByLabel('English name', { exact: true }).fill('List renamed zone');
   await save(page);
   await expect(entry(page, 'List temporary zone')).toHaveCount(0);
-  await entry(page, 'List renamed zone').getByRole('button', { name: 'Delete', exact: true }).click();
+  await rowAction(page, 'List renamed zone', 'Delete');
   await page.getByRole('button', { name: 'Delete permanently' }).click();
   await expect(entry(page, 'List renamed zone')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add', exact: true }).click();

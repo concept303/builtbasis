@@ -28,3 +28,78 @@
   .email-preview dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .email-preview dd { margin-bottom: 10px; }
 }
+/* Project and managed-list administration: compact collection beside one editor. */
+.management-page .title-row h1 { margin-bottom: .35rem; }
+.management-page .title-row p { margin-top: 0; }
+.management-layout { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; align-items: start; }
+.management-layout.has-editor { grid-template-columns: minmax(0,1fr) minmax(310px,420px); }
+.management-collection,.management-editor { min-width: 0; margin-top: 12px; }
+.management-editor { position: sticky; top: 12px; }
+.management-editor h2,.management-editor h3 { margin-top: 0; }
+.management-editor fieldset { border: 0; padding: 0; margin: 0; }
+.management-collection > .field { margin-top: 0; }
+.management-table { min-width: 0; width: 100%; }
+.management-table th { font-size: .8rem; font-weight: 600; color: #596d7c; }
+.management-table td { padding: 8px 10px; vertical-align: middle; }
+.management-table tbody tr:hover { background: #f4f8fa; }
+.management-table tbody tr[data-selected=true] { background: #e9f2f7; }
+.management-table td:first-child { overflow-wrap: anywhere; }
+.management-table .entry-name { border: 0; background: transparent; text-align: left; padding: 3px 0; color: #245e79; font-weight: 600; width: 100%; }
+.management-table .entry-name small { display: block; font-weight: 400; }
+.management-table .row-controls { width: 1%; white-space: nowrap; }
+.management-table .row-controls > button { font-size: .82rem; padding: 5px 9px; min-height: 36px; }
+.row-menu { display: inline-block; position: relative; font-size: .82rem; }
+.row-menu > summary { list-style: none; padding: 8px; min-height: 36px; border-radius: 4px; color: #315e77; }
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu > summary::after { content: ' ▾'; }
+.row-menu[open] > summary { background: #e6eff5; }
+.row-menu > div { position: absolute; right: 0; top: 100%; z-index: 5; min-width: 155px; border: 1px solid #c7d4df; background: #fff; border-radius: 5px; box-shadow: 0 5px 18px #203b5026; padding: 5px; }
+.row-menu button { display: block; width: 100%; border: 0; text-align: left; white-space: nowrap; }
+.management-collection .table-wrap { overflow: visible; }
+.management-dialog { width: 540px; max-width: calc(100vw - 24px); }
+.management-back,.management-phone-code,.managed-phone-select { display: none; }
+.management-toolbar { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; }
+.management-toolbar .field { flex: 1; min-width: 180px; }
+.managed-nav button[aria-pressed=true] { border-bottom: 3px solid #245e79; color: #245e79; font-weight: 700; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 800px) {
+  .management-layout.has-editor { grid-template-columns: minmax(0,1fr); }
+  .management-layout.has-editor > .management-collection { display: none; }
+  .management-editor { position: static; }
+  .management-back { display: inline-block; margin-bottom: 14px; }
+  .management-secondary { display: none; }
+  .management-phone-code { display: block; }
+}
+@media (max-width: 650px) {
+  .managed-phone-select { display: block; }
+  .management-page .managed-nav { display: none; }
+  .management-table { min-width: 0; }
+  .management-table td { padding: 7px 4px; }
+  .management-table th { padding: 8px 4px; }
+  .management-table .row-controls > button { min-height: 42px; }
+  .row-menu > summary { min-height: 42px; }
+}
+.entry-secondary { display: block; color: #596d7c; font-size: .85rem; }
+.retired-label { display: inline-block; font-size: .75rem; background: #e9edf1; border-radius: 3px; padding: 2px 6px; }
+.entry-definition { font-size: .8rem; }
+.entry-definition p { margin: 6px 0; white-space: normal; }
+.location-tree ul { list-style: none; padding: 0; margin: 0; }
+.location-tree li > ul { margin-inline-start: 19px; padding-inline-start: 12px; border-inline-start: 1px solid #dce4ea; }
+.location-tree-row { display: flex; align-items: center; min-height: 42px; border-radius: 4px; margin: 2px 0; }
+.location-tree-row:hover { background: #f4f8fa; }
+.location-tree-row[data-selected=true] { background: #e9f2f7; box-shadow: inset 3px 0 #245e79; }
+.location-tree .branch-toggle,.location-tree .branch-spacer { width: 36px; flex: 0 0 36px; }
+.location-tree button { border: 0; background: transparent; min-height: 40px; }
+.location-tree .branch-toggle { font-size: 1.1rem; padding: 4px; }
+.location-tree .location-name { text-align: left; padding: 5px 8px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.location-name small { display: block; color: #697786; }
+.branch-count { font-size: .75rem; color: #738391; margin-inline-end: 10px; }
+.tree-toolbar { display: flex; gap: 12px; margin-bottom: 10px; }
+.tree-toolbar button { font-size: .8rem; color: #245e79; padding: 4px 8px; }
+.location-breadcrumb { font-size: .8rem; color: #596d7c; overflow-wrap: anywhere; }
+.location-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid #dce4ea; }
+.location-actions > button { font-size: .82rem; padding: 6px 9px; }
+@media (max-width: 650px) {
+  .location-tree li > ul { margin-inline-start: 12px; padding-inline-start: 5px; }
+  .location-tree .branch-toggle,.location-tree .branch-spacer { width: 32px; flex-basis: 32px; }
+}

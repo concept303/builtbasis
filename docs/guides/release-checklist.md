@@ -73,7 +73,7 @@ Private execution evidence is retained under `.superpowers/sdd/2026-10-04-plan-6
 
 Offsite destination: `X:\1976KN\Sys\Software\builtbasis`. The Windows runner now references the permanent `main` checkout. Its compiled tools were rebuilt after integration, and the actual scheduled task completed with result 0. The implementation worktree is retained for private acceptance evidence.
 
-The synthetic acceptance project remains available for the pending phone upload/media checks. Use T-0001, “Synthetic hosted acceptance”; the other synthetic records belong to automated PDF checks. The controlled code rollback/restart rehearsal passed as recorded below. The remaining unchecked acceptance details must be resolved before final release acceptance. Do not mark the specification Current or the design Historical from these partial results.
+The synthetic acceptance project was removed on 2026-10-04 at the owner’s request after a fresh verified server/off-site backup (snapshot `6e19b9b2416da2afbd92a5480f92b644`). Cleanup removed its five records, 12 photo occurrences, 15 attachment occurrences and four share links. Gennadi 822A and its lists were verified unchanged. Immutable stored bytes remain under the backup policy. The controlled code rollback/restart rehearsal passed as recorded below. The remaining unchecked acceptance details must be resolved before final release acceptance. Do not mark the specification Current or the design Historical from these partial results.
 
 ### Additional acceptance evidence
 

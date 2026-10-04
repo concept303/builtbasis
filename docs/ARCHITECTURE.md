@@ -1,6 +1,6 @@
 # Architecture
 
-> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5 and Plan 6 Tasks 1–3 on `main` (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
+> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5, Plan 6 and the locally verified project/managed-list refresh (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
 
 ## System
 
@@ -34,6 +34,8 @@ HEIC conversion and EML/MSG parsing use bundled local workers. PDF.js renders au
 See the [web interface guide](guides/web-interface.md) for commands and browser limits. A3 printing uses a strict owner-only projection and desktop browser Save as PDF. QR is optional, off by default, and unavailable for Drafts. Administration shows full server-backup/storage status; other owner pages show warning-only notices.
 
 Consistent SQLite snapshots are pinned before off-site transfer. Manifests preserve source backup time separately from transfer time; verification checks every referenced blob and source freshness. Offline restore creates a fresh directory and clears old access before publication. Compiled server/CLI entrypoints live in `dist/server`; deployment copies only built files and package manifests. The hosted release, scheduled transfers and populated offsite restore have been exercised. Remaining device, upstream logging and release acceptance details are tracked in the release checklist.
+
+Project management uses owner-only API routes and monotonic numeric sequences for project and record IDs. Project deletion is a single database transaction; record grants and sharing end with the project while immutable blobs remain available to backups. Managed lists use compact tables; location administration uses a hierarchy and one selected-node editor.
 
 ## Boundaries
 

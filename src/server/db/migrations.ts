@@ -1,3 +1,4 @@
+import { MIGRATION_0005_PROJECT_MANAGEMENT } from './migration-0005-project-management';
 import { MIGRATION_0002_RECORDS } from './migration-0002-records';
 import { MIGRATION_0003_FILES_SHARING } from './migration-0003-files-sharing';
 import { MIGRATION_0004_CONTRIBUTORS } from './migration-0004-contributors';
@@ -99,4 +100,5 @@ export const MIGRATIONS: readonly Migration[] = [
   MIGRATION_0002_RECORDS,
   MIGRATION_0003_FILES_SHARING,
   MIGRATION_0004_CONTRIBUTORS,
+  MIGRATION_0005_PROJECT_MANAGEMENT,
 ];

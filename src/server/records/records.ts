@@ -254,13 +254,13 @@ export function createRecord(
       )
       .pluck()
       .get(projectId, subtype) as number;
-    const info = db
+    const recordId = db.prepare('UPDATE record_id_sequence SET last_id = MAX(last_id, (SELECT COALESCE(MAX(id), 0) FROM records)) + 1 WHERE singleton = 1 RETURNING last_id').pluck().get() as number;
+    db
       .prepare(
-        `INSERT INTO records (project_id, subtype, sequence, human_id, status, created_at, created_by, updated_at, updated_by)
-         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+        `INSERT INTO records (id, project_id, subtype, sequence, human_id, status, created_at, created_by, updated_at, updated_by)
+         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
       )
-      .run(projectId, subtype, sequence, formatHumanId(subtype, sequence), at, userId, at, userId);
-    const recordId = Number(info.lastInsertRowid);
+      .run(recordId, projectId, subtype, sequence, formatHumanId(subtype, sequence), at, userId, at, userId);
     recordActivity(db, { recordId, userId, at, action: 'created', to: 'draft' });
     applyPatch(db, requireRecord(db, projectId, recordId), userId, patch, at);
     return getRecordDetail(db, projectId, recordId);

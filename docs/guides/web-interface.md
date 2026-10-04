@@ -1,7 +1,7 @@
 # Web interface — local operation and browser checks
 
 > **Document type:** Operator guide
-> **Status:** Current for the implemented browser, including Plan 6 printing and Administration on `codex/plan-6`; deployed as `6247a9f` on 2026-10-04.
+> **Status:** Current for the implemented browser. The project/managed-list refresh is verified locally on `codex/project-management`. Production remains `6247a9f` (2026-10-04) until a separate deployment.
 > **Governing contracts:** [v1 design](../designs/2026-10-02-v1-records-design.md) and [access/evidence guide](share-key-management.md)
 
 ## Run the compiled interface locally
@@ -50,6 +50,14 @@ An uncertain record or Log creation, or a Log attachment upload, keeps its input
 Editing only a Log entry's text or privacy keeps its exact event timestamp. When changing its time deliberately, check the displayed UTC offset. During a repeated daylight-saving hour, the offset distinguishes the two possible instants.
 
 Share recipients open the full `/share#token` URL. The fragment is used locally for bearer requests. Removing it makes the link unusable. Shared pages start in Greek and can switch to English. Typed record text is never translated. Public views never receive Private Notes, commercial fields or private Log evidence.
+
+## Projects and managed lists
+
+In Projects, choose New project or Edit. Give each project a name and a unique code. Open Actions → Delete project to review its record/photo/attachment counts. Deletion requires typing the project's current name. It removes the project's records and lists, including shared access. It does not remove user accounts, other projects, retained files or backups.
+
+Managed Lists has a search field and compact rows. Choose a name or Edit to open its fields beside the list. On a phone, use the List selector to switch lists and Back to list to leave an editor without losing the search. Unsaved changes require confirmation before leaving.
+
+Locations has expandable branches. Search reveals matching locations and their parents. Select a location to see its full path and controls for editing, adding a child, copying, retiring or deleting the branch. Expand all and Collapse all control the hierarchy when no search is active.
 
 ## Print and Administration
 

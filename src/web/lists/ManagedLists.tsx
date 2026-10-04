@@ -1,3 +1,4 @@
+import { foldText } from '../../domain/text';
 import { useEffect, useRef, useState } from 'react';
 import type { Person } from '../../server/lists/people';
 import type { Trade } from '../../server/lists/trades';
@@ -7,7 +8,9 @@ import type { LocationNode } from '../../server/lists/locations';
 import { api, ApiError } from '../core/api';
 import { BusyButton, ErrorNotice, Field, VocabSelect, useDirtyGuard } from '../core/forms';
 import { useI18n } from '../core/i18n';
-import { collidingTags, listName, locationRows, parentChoices } from './rules';
+import { collidingTags, listName, parentChoices } from './rules';
+
+import { LocationsTree } from './LocationsTree';
 
 type Section = 'people' | 'trades' | 'tags' | 'locations' | 'zone-types';
 interface Lists { people: Person[]; trades: Trade[]; tags: Tag[]; locations: LocationNode[]; 'zone-types': ZoneType[] }
@@ -32,6 +35,7 @@ export function ManagedLists({ projectId }: { projectId: number }): React.JSX.El
 function ListsProject({ projectId }: { projectId: number }): React.JSX.Element {
   const { t, lang } = useI18n();
   const [section, setSection] = useState<Section>('people');
+  const [query, setQuery] = useState('');
   const [data, setData] = useState<Lists | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [validation, setValidation] = useState<string | null>(null);
@@ -153,20 +157,42 @@ function ListsProject({ projectId }: { projectId: number }): React.JSX.Element {
   };
   const listError = error instanceof ApiError ? listErrors[error.code] : undefined;
 
-  return <section aria-label={t('Managed lists', 'Διαχείριση λιστών')}>
-    <h1>{t('Managed lists', 'Διαχείριση λιστών')}</h1>
-    <nav aria-label={t('List selection', 'Επιλογή λίστας')} className="tabs">
-      {sections.map(key => <button key={key} type="button" aria-pressed={key === section} disabled={busy} onClick={() => { if (discard()) { close(); setConfirmation(null); setSection(key); } }}>{title(key)}</button>)}
-    </nav>
-    {validation && <p role="alert" className="error">{validation}</p>}
-    {listError ? <p role="alert" className="error">{listError}</p> : <ErrorNotice error={error} />}
-    {loading && <p role="status">{t('Loading lists…', 'Φόρτωση λιστών…')}</p>}
-    {!loading && !data && <button type="button" disabled={busy} onClick={() => { setBusy(true); setError(null); void load().catch(setError).finally(() => setBusy(false)); }}>{t('Retry', 'Επανάληψη')}</button>}
-    {data && <>
-      <h2>{title(section)}</h2>
-      <button type="button" disabled={busy} onClick={() => edit(null)}>{t('Add', 'Προσθήκη')}</button>
-      {editor && <form onSubmit={e => { e.preventDefault(); void save(); }} className="panel">
+  function changeSection(key: Section) {
+    if (discard()) { close(); setConfirmation(null); setSection(key); setQuery(''); }
+  }
+  function locationPath(id: number | null): string {
+    const path: string[] = []; const seen = new Set<number>();
+    while (id !== null && !seen.has(id)) {
+      seen.add(id); const node = data?.locations.find(item => item.id === id);
+      if (!node) break;
+      path.unshift(name(node)); id = node.parentId;
+    }
+    return path.join(' / ') || t('Project root', 'Ρίζα έργου');
+  }
+  function secondaryActions(node: Item) {
+    return <details className="row-menu"><summary>{t('Actions', 'Ενέργειες')}</summary><div>
+      {'active' in node && <button type="button" disabled={busy} onClick={() => {
+        if (discard() && window.confirm(node.active ? t(`Retire “${name(node)}”? Existing records keep this entry.`, `Απενεργοποίηση «${name(node)}»; Οι υπάρχουσες εγγραφές διατηρούν το στοιχείο.`) : t(`Reactivate “${name(node)}”?`, `Επανενεργοποίηση «${name(node)}»;`))) void act(`${base}/${section}/${node.id}`, 'PATCH', { active: !node.active });
+      }}>{node.active ? t('Retire', 'Απενεργοποίηση') : t('Reactivate', 'Επανενεργοποίηση')}</button>}
+      {(section === 'tags' || section === 'zone-types' || section === 'locations') && <button type="button" disabled={busy} onClick={() => void askDelete(node)}>{t('Delete', 'Διαγραφή')}</button>}
+    </div></details>;
+  }
+  const term = foldText(query);
+  const filtered: Item[] = (data?.[section] ?? []).filter(node => {
+    const words = ['name' in node ? node.name : node.nameEn + ' ' + node.nameEl, 'code' in node ? node.code : '', 'company' in node ? node.company : '', 'email' in node ? node.email : ''];
+    return foldText(words.join(' ')).includes(term);
+  });
+
+  const editorPanel = editor && data && <aside role="region" aria-label={t('Entry details', 'Στοιχεία εγγραφής')} className="management-editor panel">
+      <button type="button" className="management-back" disabled={busy} onClick={() => { if (discard()) close(); }}>{t('Back to list', 'Επιστροφή στη λίστα')}</button>
+      <form onSubmit={e => { e.preventDefault(); void save(); }}>
         <h3>{editor.copy ? t('Copy branch', 'Αντιγραφή κλάδου') : editor.item ? t('Edit entry', 'Επεξεργασία στοιχείου') : t('Add entry', 'Προσθήκη στοιχείου')}</h3>
+        {section === 'locations' && <p aria-label={t('Location path', 'Διαδρομή τοποθεσίας')} className="location-breadcrumb">{locationPath(editor.item?.id ?? draft.parentId)}</p>}
+        {section === 'locations' && editor.item && !editor.copy && <div className="location-actions">
+          <button type="button" disabled={busy} onClick={() => edit(null, false, editor.item!.id)}>{t('Add child', 'Προσθήκη θυγατρικού')}</button>
+          <button type="button" disabled={busy} onClick={() => edit(editor.item, true)}>{t('Copy branch', 'Αντιγραφή κλάδου')}</button>
+          {secondaryActions(editor.item)}
+        </div>}
         <fieldset disabled={busy}>
           {(section === 'people' || section === 'trades') && textField('code', t('Code', 'Κωδικός'), true)}
           {section === 'people' ? <>
@@ -201,7 +227,21 @@ function ListsProject({ projectId }: { projectId: number }): React.JSX.Element {
           <BusyButton busy={busy} type="submit">{t('Save', 'Αποθήκευση')}</BusyButton>
           <button type="button" onClick={() => { if (discard()) close(); }}>{t('Cancel', 'Ακύρωση')}</button>
         </fieldset>
-      </form>}
+      </form>
+    </aside>;
+
+  return <section aria-label={t('Managed lists', 'Διαχείριση λιστών')} className="management-page">
+    <h1>{t('Managed lists', 'Διαχείριση λιστών')}</h1>
+    <nav aria-label={t('List selection', 'Επιλογή λίστας')} className="tabs managed-nav">
+      {sections.map(key => <button key={key} type="button" aria-pressed={key === section} disabled={busy} onClick={() => changeSection(key)}>{title(key)}</button>)}
+    </nav>
+    <div className="managed-phone-select"><Field label={t('List', 'Λίστα')}><select value={section} disabled={busy} onChange={e => changeSection(e.target.value as Section)}>{sections.map(key => <option key={key} value={key}>{title(key)}</option>)}</select></Field></div>
+    {validation && <p role="alert" className="error">{validation}</p>}
+    {listError ? <p role="alert" className="error">{listError}</p> : <ErrorNotice error={error} />}
+    {loading && <p role="status">{t('Loading lists…', 'Φόρτωση λιστών…')}</p>}
+    {!loading && !data && <button type="button" disabled={busy} onClick={() => { setBusy(true); setError(null); void load().catch(setError).finally(() => setBusy(false)); }}>{t('Retry', 'Επανάληψη')}</button>}
+    {data && <>
+
       {confirmation && <div role="alertdialog" aria-modal="false" aria-label={t('Confirm deletion', 'Επιβεβαίωση διαγραφής')} className="panel">
         <p>{t('Delete', 'Διαγραφή')} “{name(confirmation.item)}”?</p>
         {section === 'tags' && <p>{t(`This tag is used by ${confirmation.records} records. Deleting removes it from all of them.`, `Αυτή η ετικέτα χρησιμοποιείται σε ${confirmation.records} εγγραφές. Η διαγραφή την αφαιρεί από όλες.`)}</p>}
@@ -210,21 +250,29 @@ function ListsProject({ projectId }: { projectId: number }): React.JSX.Element {
         <BusyButton busy={busy} type="button" onClick={() => void act(`${base}/${section}/${confirmation.item.id}`, 'DELETE')}>{t('Delete permanently', 'Οριστική διαγραφή')}</BusyButton>
         <button type="button" disabled={busy} onClick={() => { setConfirmation(null); setError(null); }}>{t('Cancel', 'Ακύρωση')}</button>
       </div>}
-      {data[section].length === 0 && <p>{t('No entries yet.', 'Δεν υπάρχουν ακόμη στοιχεία.')}</p>}
-      <ul className="managed-list">
-        {(section === 'locations' ? locationRows(data.locations) : data[section].map(node => ({ node, depth: 0 }))).map(({ node, depth }) => <li key={node.id} style={{ marginInlineStart: `${depth * 1.25}rem` }}>
-          <strong>{name(node)}</strong>{'code' in node && <span> ({node.code})</span>}
-          {'active' in node && !node.active && <span> — {t('Retired', 'Ανενεργό')}</span>}
-          {'company' in node && node.company && <span> · {node.company}</span>}
-          {'defEn' in node && (node.defEn || node.defEl) && <details><summary>{t('Definition', 'Ορισμός')}</summary><p>{lang === 'en' ? node.defEn || node.defEl : node.defEl || node.defEn}</p></details>}
-          <div className="actions">
-            <button type="button" disabled={busy} onClick={() => edit(node)}>{t('Edit', 'Επεξεργασία')}</button>
-            {'active' in node && <button type="button" disabled={busy} onClick={() => { if (discard() && window.confirm(node.active ? t(`Retire “${name(node)}”? Existing records keep this entry.`, `Απενεργοποίηση «${name(node)}»; Οι υπάρχουσες εγγραφές διατηρούν το στοιχείο.`) : t(`Reactivate “${name(node)}”?`, `Επανενεργοποίηση «${name(node)}»;`))) void act(`${base}/${section}/${node.id}`, 'PATCH', { active: !node.active }); }}>{node.active ? t('Retire', 'Απενεργοποίηση') : t('Reactivate', 'Επανενεργοποίηση')}</button>}
-            {section === 'locations' && <><button type="button" disabled={busy} onClick={() => edit(null, false, node.id)}>{t('Add child', 'Προσθήκη θυγατρικού')}</button><button type="button" disabled={busy} onClick={() => edit(node, true)}>{t('Copy branch', 'Αντιγραφή κλάδου')}</button></>}
-            {(section === 'tags' || section === 'zone-types' || section === 'locations') && <button type="button" disabled={busy} onClick={() => void askDelete(node)}>{t('Delete', 'Διαγραφή')}</button>}
-          </div>
-        </li>)}
-      </ul>
+      <div className={`management-layout${editor ? ' has-editor' : ''}`}>
+        <div className="management-collection panel">
+          <div className="title-row"><h2>{title(section)}</h2><button type="button" disabled={busy} onClick={() => edit(null)}>{t('Add', 'Προσθήκη')}</button></div>
+          <Field label={t('Search entries', 'Αναζήτηση στοιχείων')}><input type="search" value={query} onChange={e => setQuery(e.target.value)} /></Field>
+          {section === 'locations' ? <LocationsTree nodes={data.locations} query={query} selectedId={editor?.item?.id ?? null} busy={busy} onSelect={node => edit(node)} /> : <>
+            <table className="management-table managed-table" aria-label={title(section)}>
+              <thead><tr><th>{t('Name', 'Όνομα')}</th>{(section === 'people' || section === 'trades') && <th className="management-secondary">{t('Code', 'Κωδικός')}</th>}<th><span className="sr-only">{t('Actions', 'Ενέργειες')}</span></th></tr></thead>
+              <tbody>{filtered.map(node => <tr key={node.id} data-selected={editor?.item?.id === node.id}>
+                <td><button type="button" className="entry-name" disabled={busy} onClick={() => edit(node)}><strong>{name(node)}</strong></button>
+                  {'active' in node && !node.active && <span className="retired-label">{t('Retired', 'Ανενεργό')}</span>}
+                  {'company' in node && node.company && <small className="entry-secondary">{node.company}</small>}
+                  {'code' in node && <small className="management-phone-code">{node.code}</small>}
+                  {'defEn' in node && (node.defEn || node.defEl) && <details className="entry-definition"><summary>{t('Definition', 'Ορισμός')}</summary><p>{lang === 'en' ? node.defEn || node.defEl : node.defEl || node.defEn}</p></details>}
+                </td>
+                {(section === 'people' || section === 'trades') && <td className="management-secondary">{'code' in node ? node.code : ''}</td>}
+                <td className="row-controls"><button type="button" disabled={busy} onClick={() => edit(node)}>{t('Edit', 'Επεξεργασία')}</button>{secondaryActions(node)}</td>
+              </tr>)}</tbody>
+            </table>
+            {filtered.length === 0 && <p>{term ? t('No matching entries.', 'Δεν βρέθηκαν στοιχεία.') : t('No entries yet.', 'Δεν υπάρχουν ακόμη στοιχεία.')}</p>}
+          </>}
+        </div>
+        {editorPanel}
+      </div>
     </>}
   </section>;
 }

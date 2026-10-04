@@ -4,6 +4,7 @@
 > **Status:** Approved (2026-10-02, project owner). Revised 2026-10-02 after independent design review (sharing, required fields, verification, security, backups, files, measurements, severity, Greek labels).
 > **Revision:** 2026-10-03 — owner approved named users with per-record upload/Log grants; owner-edited Public/Private Notes; broader attachments with viewing/playback; 100 MB upload-request ceiling; configurable total file-storage budget and free-space reserve. Implementation details are in the revised Plan 4.
 > **Revision:** 2026-10-04 — owner approved optional QR codes in print/PDF, off by default, and printing Draft records without sharing; an owner-only Administration page with backup/storage details and warning-only notices elsewhere, using a configurable 5 GB remaining-file threshold; and Windows notifications for failed off-site pulls. Implementation details are in Plan 6.
+> **Revision:** 2026-10-04 — owner approved project administration and the compact managed-list/location-tree refresh. Location images are a separate requested addition, pending clarification.
 > **Scope:** BuiltBasis v1 — records (Quality Issue, Detail Clarification, Task), their fields, value lists, rules, screens, sharing, PDF, hosting and operations.
 > **Retention:** Implementation baseline for the v1 specification and implementation plan. Becomes historical after v1 delivery and reconciliation (DOCS-STANDARD §2).
 > **Governed by:** `docs/VISION.md` (intent), `docs/adr/0001-v1-stack-and-hosting.md` (stack).
@@ -534,6 +535,15 @@ Selection and filtering rules: §5.5.
 
 A short per-project list of space types (name EN/EL), e.g. Kitchen, Bedroom, Bathroom. A node may carry one. **Filtering by zone type** returns records located on any node of that type (e.g. "all kitchens across villas").
 
+
+### Project administration
+
+The owner can create a project, edit its name and code, and permanently delete it from Projects. Names are required (up to 200 characters). Codes are required (up to 80 characters) and unique. Both are trimmed on save. Project IDs and internal record IDs are never reused after deletion, including in contributor record URLs.
+
+Deletion first shows the counts of records, photos and attachments. The owner must type the current project name exactly. A successful deletion atomically removes that project's records, managed lists, history, file occurrences, share links and record grants. Other projects and user accounts remain. Immutable blob files and existing backups remain under the storage/backup policy; deleting a project does not reclaim that file allowance.
+
+Projects and ordinary managed lists have search and a single entry editor. On desktop the editor sits beside the list; on a phone it replaces the list, with a Back button that preserves the search. People, Trades, Tags and Zone types use compact tables. Locations use an expandable hierarchy with ancestor paths shown during search. Selecting a location shows its path, edit fields and branch actions once. Existing retirement, move, merge and deletion rules still apply.
+
 ## 10. Screens
 
 Mobile-first responsive layout; every screen works on a phone. Language switch available everywhere.
@@ -557,12 +567,14 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
    - **Activity.**
    - **Share & print** — create, copy and revoke share links; open the A3 print/PDF view.
 5. **Status change dialog** — shows only allowed transitions (§8.1) and asks for what each requires (reason, verification, disposition).
-6. **Lists management** — people, trades, tags, location tree (with copy branch), zone types.
+6. **Lists management** — searchable tables for people, trades, tags and zone types; expandable locations tree with one selected-node editor and branch actions.
 7. **Shared record view** (no login) — read-only record page without private content, language switch, "not available" for revoked/expired/draft. _Must be done before / Requires first_ entries show only the other record's ID and title, omit Draft records, and are not links (§11.5).
 8. **A3 print view** (§12).
 9. **Named-user access** — owner account setup and per-record grant controls; each user sees only granted, non-Draft records and the actions permitted there. A contributor screen uses the same private-content exclusions as a share page.
 
 10. **Administration / Διαχείριση** — owner-only website page, linked alongside Projects and the project Records/Managed Lists navigation. Full backup and storage status is available here even when healthy. Other working screens show warnings only (§11.7).
+
+11. **Projects** — owner-only project search, creation, name/code editing and confirmed deletion.
 
 ## 11. Architecture and operations
 
