@@ -3,6 +3,7 @@
 > **Document type:** Design document
 > **Status:** Approved (2026-10-02, project owner). Revised 2026-10-02 after independent design review (sharing, required fields, verification, security, backups, files, measurements, severity, Greek labels).
 > **Revision:** 2026-10-03 — owner approved named users with per-record upload/Log grants; owner-edited Public/Private Notes; broader attachments with viewing/playback; 100 MB upload-request ceiling; configurable total file-storage budget and free-space reserve. Implementation details are in the revised Plan 4.
+> **Revision:** 2026-10-04 — owner approved optional QR codes in print/PDF, off by default, and printing Draft records without sharing; an owner-only website backup/storage status box; and Windows notifications for failed off-site pulls. Implementation details are in Plan 6.
 > **Scope:** BuiltBasis v1 — records (Quality Issue, Detail Clarification, Task), their fields, value lists, rules, screens, sharing, PDF, hosting and operations.
 > **Retention:** Implementation baseline for the v1 specification and implementation plan. Becomes historical after v1 delivery and reconciliation (DOCS-STANDARD §2).
 > **Governed by:** `docs/VISION.md` (intent), `docs/adr/0001-v1-stack-and-hosting.md` (stack).
@@ -645,6 +646,9 @@ All database access is confined to `src/server` data-access modules, so a later 
   3. **Verify** that every file referenced by the pinned backup is present locally; only then mark that off-site copy complete.
 - **Restore requirements** (the operator guide, written at delivery, must satisfy them): stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; **before access resumes, delete all sessions and revoke all share links** (a restored database can bring back links revoked after the backup was taken); disable all non-owner accounts and delete all record grants before access resumes; then issue new links where needed. Before restoring contributor access, the owner must reset their passwords, enable selected accounts and deliberately regrant records. Enabling alone must not revive credentials or permissions from an old backup.
 - **One restore drill** from an off-site copy is performed before v1 is declared delivered.
+- **Freshness:** exports and completion reports preserve the selected database backup's identity and creation timestamp, separately from transfer and verification times. Scheduled off-site verification rejects a source older than its configured tolerance (36 hours by default). Recopying an old backup never makes it current. Previously verified older recovery points remain available for deliberate restore.
+- **Owner warnings:** a compact status box below navigation on normal owner website pages shows the latest completed server backup's age and storage headroom. It warns when the backup is missing or overdue (configurable 36-hour default), storage is low, or status cannot be checked. It is absent from contributor/shared pages and print output. Managed file-budget headroom and filesystem free space are distinct; neither claims to measure the hosting account quota.
+- **PC pull failures:** the Windows pull reports failure with a nonzero exit and a desktop notification, including overdue-source and failed-transfer cases. Configure it for the owner's logged-on desktop and verify notification delivery during release acceptance. The website status describes server backups; it does not certify the PC copy. A stopped PC or a scheduled task that never starts cannot issue a failure notification.
 
 ### 11.8 PDF
 
@@ -668,6 +672,8 @@ A half-day trial on Webhosting L must confirm:
 
 ## 12. A3 print view and PDF
 
+The owner can print or save a PDF of any record, including a Draft, without creating a share link. The single print screen has an **Include QR link** checkbox, off by default. Draft status is clearly shown on the printed sheet; Drafts cannot include a share-link QR because their shared pages are unavailable. Choosing QR output requires an active, non-expired link. Private-content exclusions apply in both cases.
+
 One A3-landscape page per record (continuing to further pages if needed), in the chosen language, **without private content**. It shows exactly these fields:
 
 - Header: ID, title, subtype, status, severity, priority, due date, ball in court, responsible.
@@ -678,7 +684,7 @@ One A3-landscape page per record (continuing to further pages if needed), in the
 - Measurements: for each phase present, the latest set (by set order, §5.7) as a table, plus the comparison views.
 - Photos: up to 4 _Before_ and 4 _After_ (most recent first).
 - Verification entries.
-- **QR code** to an existing active, non-expired share link of the record, chosen by the owner. If the record has none, the print view offers a button to create one first (an explicit action, §11.5).
+- **Optional QR code**, only when the owner enables **Include QR link**, to an existing active, non-expired share link of the record chosen by the owner. If the record has none, the print view offers explicit link creation (§11.5). Reading or printing never creates a link automatically. Printing without QR does not depend on the sharing service.
 - Footer: generated date-time, record last-updated date-time.
 
 The Public Notes and Private Notes fields, the Log and the Activity log are not printed in the A3 layout. Public Notes remains visible on shared record pages; PDF layout changes are a separate Plan 6 decision.
@@ -692,7 +698,7 @@ The Public Notes and Private Notes fields, the Log and the Activity log are not 
   - **Log and attachments:** attachments added through a log entry appear in the record's attachments list with the entry's date and text; directly added attachments appear without one.
   - **Sharing:** private fields (including Private Notes and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; **same blob, two occurrences:** with one public and one private occurrence of the same file on the shared record, the public one downloads and the private one is denied, and no private filename or log metadata is returned; **deleting a private log entry** deletes its attachment occurrences and never makes them public; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
-- **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content.
+- **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content; ordinary and Draft records print without QR or share links by default; QR output requires explicit selection and a freshly checked valid link; printing uses the refreshed snapshot and waits for its resources.
 - **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7), including session deletion and share-link revocation.
 
 Additional tests for the 2026-10-03 revision: existing Notes stays private through migration; Public Notes is shared but owner-editable only; each contributor permission works independently; no grant, removed grant, disabled account and Draft status deny access; contributors cannot reach owner APIs, lists, private fields/files or other records; genuine contributor attribution; 100 MB request accounting with/without Content-Length; accepted-format capability matrix; authorised view/download/range paths; real HTTP oversized-upload and disconnect cleanup; safe diagnostic logs; storage admission across concurrent uploads, failed transactions and restarts; browser EML/MSG rendering and video/audio playback in Plan 5.

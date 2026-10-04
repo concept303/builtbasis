@@ -17,17 +17,18 @@ Finish the approved v1 scope: owner A3 print/PDF output, tested production packa
 
 Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API tests, 39 browser tests). It uses a separate scratch checkout. All proposed application/scripts/tests are included completely, once per file. Runtime payloads are not installed on main by publishing this document. The extraction helper checks SHA-256 before writing selected files. The lockfile is generated from the existing one, never embedded as a replacement snapshot.
 
-**Review follow-up still open:** the source-freshness, transfer, print-refresh and packaging corrections below have been replayed. The concrete operator-alert mechanism still needs the owner's choice: an owner-screen backup/storage warning plus Windows failure notification, or monitoring through operational tools only. The existing guide/checklist alert requirements are not yet backed by an implemented notification mechanism. Resolve that gap before executing this plan. Optional printing without a QR is also awaiting the owner's decision; the current snapshots retain the approved mandatory-QR rule.
+**Owner decisions, 2026-10-04:** print without QR is allowed, including Drafts; **Include QR link** is off by default. Add a compact backup/storage status box below navigation on normal owner website pages and Windows notifications for failed off-site pulls. These additions are included in the proposed snapshots and release acceptance below.
 
 ## Global constraints and settled decisions
 
 - Keep React/Vite, Fastify/TypeScript and SQLite/better-sqlite3. No server-side Chromium: Plan 0 proved the needed system libraries are absent. PDF means desktop browser Save as PDF from the A3 landscape print view.
-- Printing is owner-only. Its dedicated GET response uses a strict §12 allowlist. Both Notes fields, Log, Activity and private/commercial data are absent. It never creates a share link. QR selection and link creation are explicit owner actions. Draft records have no usable public QR; publish the record before producing a QR-bearing sheet. No empty/failing-resource sheet is represented as ready.
+- Printing is owner-only. Its dedicated GET response uses a strict §12 allowlist. Both Notes fields, Log, Activity and private/commercial data are absent. Printing works without a share link, including for Drafts with their status clearly shown. **Include QR link** is off by default. Enabling it requires explicit selection of an active link or explicit creation of one. Drafts cannot include QR. Printing never creates a link automatically and printing without QR does not depend on the sharing service. No empty/failing-resource sheet is represented as ready.
 - Pin existing QR encoder `qrcode` 1.5.4 and types 1.5.6. Test decoding independently with `jsqr` 1.4.0. Pin esbuild 0.28.2, already present transitively in the baseline, for local Node bundle generation. Do not upgrade unrelated dependencies.
 - Compile the server and operational CLIs locally. Hosting installs only production dependencies and executes `.mjs` entrypoints. Bundled browser packages remain development dependencies. Source npm commands using tsx and the private Excel seed importer remain local development commands. The production package excludes data, environment files, keys, source contacts and node_modules.
 - Keep the 100,000,000-byte whole-request ceiling, immutable blobs and configured total budget/reserve. Actual hosting quota and reserve values must be recorded at execution; free filesystem bytes are not the account quota. No per-user quotas or deletion of published evidence.
 - Nightly backup retains the latest snapshot for each of 14 UTC days and eight Monday-start UTC weeks, taking their union. Protect database pinning against rotation. A backup/export or pull lock fails closed on collision; remove a stale lock only after confirming its job stopped. Unreleased export pins are operational cleanup, not timed eviction of possibly active transfers.
 - Off-site order is pinned completed database and manifest first, then missing immutable files, then full hash/size/database and source-freshness verification, then COMPLETE. Use two SFTP batches, not a connection per file. Preserve the source backup filename and creation timestamp separately from export and verification times. Scheduled verification rejects a source older than the configurable 36-hour default. Deliberate restore can use an older completed recovery point. Shared local file pool is never pruned in v1. A restored directory is fresh; the live directory is never overwritten by the restore command.
+- Owner pages show a compact server-backup and storage status box below navigation, excluded from contributor/shared/print views. Missing or overdue backups (configurable 36-hour default), low storage and failed status checks warn visibly. Windows pull failures notify the logged-on owner and retain a failed exit status. The website does not claim the PC copy is current; a stopped PC or a task that never starts cannot notify.
 - Restore checks exact schema compatibility and all bytes before publication, then deletes sessions/grants, revokes links and disables nonowners atomically. Preserve the owner. Emit only the system reset reason and counts. Reset contributor passwords before enabling and deliberately granting access again. Keep the dedicated share key outside code, data and backups.
 - Separate local replay from live evidence. Tasks 4–5 require hosting access, private configuration, Windows scheduler access and actual off-site drill results. Do not mark release complete until those gates pass. No production change is authorized merely by publishing or reviewing this plan.
 
@@ -35,10 +36,11 @@ Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API t
 
 | Failure condition | Expected behavior | Verification |
 |---|---|---|
-| Private record content or a revoked QR leaks into a PDF | Strict projection; deliberate valid QR; refresh immediately before native print | Task 1 API/browser privacy, decoded QR and revocation tests |
+| Private record content or a revoked QR leaks into a PDF | Strict projection; QR off by default and valid when selected; refresh immediately before native print | Task 1 API/browser privacy, decoded QR and revocation tests |
 | Long Greek text, delayed image loads or page breaks truncate output | A3 landscape, continuing pages, ready resources | Task 1 actual generated PDF dimensions/text and browser readiness tests; physical output Task 4 |
 | Rotation races a slow PC pull | Pinned database survives rotation; immutable references remain available | Task 2 pin/retention test; scheduled transfer Task 5 |
 | Nightly backups stop but old snapshots keep transferring | Source timestamp stays unchanged; stale verification fails without a new COMPLETE report | Task 2 repeated-export regression and Task 3 failed-pull test |
+| Backup jobs fail quietly or storage runs low | Visible owner warning and a failed-pull desktop notification; unknown status is not healthy | Task 1 owner status/API tests; Task 3 notification orchestration tests; actual scheduled delivery Task 5 |
 | A referenced person or location changes without touching the record timestamp | Print adopts every refreshed value and waits for that snapshot's resources | Task 1 unchanged-record-timestamp browser regression |
 | Corrupt/missing bytes, wrong schema or restored old access | No completed candidate; all old access reset before publication | Task 2 integrity/schema/access-reset/cleanup tests; real drill Task 5 |
 | Development works but production omits tsx or hosting differs | Compiled runtime works with production-only packages; live failures block release | Task 3 process/production-only probe; Task 4 hosted checklist |
@@ -76,11 +78,11 @@ npm run test:browser
 Ports 3490 and 5174 must be free. Use synthetic local fixtures, never a production database or production server for automated tests. Do not run browser suites concurrently.
 
 
-## Task 1: Owner A3 print view and browser PDF
+## Task 1: Owner A3 print view and backup/storage status
 
 **Depends on:** verified Plan 5 baseline.
 
-Owner-only print projection, explicit existing-link QR selection and resource-ready A3 landscape output. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design.
+Owner-only print projection and resource-ready A3 landscape output. The single print screen defaults to no QR and permits Drafts; an optional Include QR link checkbox enables explicit existing-link selection. No-QR printing needs no sharing request. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design. Add the owner-only backup/storage status box below navigation on existing pages; its read-only API and live capacity snapshot are independent of the Task 2 scheduler. Missing, overdue, unavailable and low-capacity states must be visible. Details stay collapsed by default; printing and readers never show this owner information.
 
 - [ ] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Move bundled browser-only packages to development dependencies without changing their versions. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
 
@@ -237,7 +239,7 @@ it('allows only usable, non-revoked, strictly unexpired links and none for Draft
 
 #### File: `tests/browser/print.spec.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=e90c2f5540a75e83d7857f0da8efe67ac3e4d27d66a20adb14dc0222c5566db7 -->
+<!-- replay task=1 phase=test encoding=text sha256=f3622c248c2482980b7b071f8b50f450ec0c40890c2e7a63a64b8abd5a841ab5 -->
 
 ``````typescript
 import Database from 'better-sqlite3';
@@ -245,6 +247,52 @@ import jsQR from 'jsqr';
 import { readFileSync } from 'node:fs';
 import { test, expect, login, seed } from './fixture';
 const origin = 'http://127.0.0.1:3490';
+
+for (const status of ['draft', 'open'] as const) test(`default no-QR printing works for a ${status} record without links`, async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const created = await page.request.post(`/api/projects/${projectId}/records`, { headers: { origin }, data: { subtype: 'task', title: `No QR ${status}`, notes: 'NO_QR_PRIVATE', publicNotes: 'NO_QR_PUBLIC_NOTES' } });
+  expect(created.status()).toBe(201);
+  const { id } = await created.json() as { id: number };
+  const base = `/api/projects/${projectId}/records/${id}`;
+  if (status === 'open') expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
+  let shareRequests = 0;
+  page.on('request', request => { if (request.url().includes(base + '/share-links')) shareRequests++; });
+  await page.goto(`/projects/${projectId}/records/${id}/print`);
+  const checkbox = page.getByRole('checkbox', { name: 'Include QR link', exact: true });
+  await expect(checkbox).not.toBeChecked();
+  if (status === 'draft') await expect(checkbox).toBeDisabled();
+  const button = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
+  await expect(button).toBeEnabled();
+  await expect(page.locator('.print-sheet')).toContainText(status === 'draft' ? 'Draft' : 'Open');
+  await expect(page.locator('.print-sheet a')).toHaveCount(0);
+  await expect(page.locator('.print-sheet')).not.toContainText('NO_QR_');
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printed = document.querySelector('.print-page')!.classList.contains('print-ready') ? 'ready' : 'not-ready'; }; });
+  await button.click();
+  await expect(page.locator('body')).toHaveAttribute('data-printed', 'ready');
+  expect(shareRequests).toBe(0);
+  expect(await (await page.request.get(base + '/share-links')).json()).toEqual([]);
+});
+
+test('no-QR printing survives unavailable sharing, including after a failed QR opt-in', async ({ page }) => {
+  await login(page);
+  const { projectId, recordId } = seed();
+  const base = `/api/projects/${projectId}/records/${recordId}`;
+  await page.route(base + '/share-links', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"unavailable"}' }));
+  await page.goto(`/projects/${projectId}/records/${recordId}/print`);
+  const button = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
+  await expect(button).toBeEnabled();
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printed = 'yes'; }; });
+  await button.click(); await expect(page.locator('body')).toHaveAttribute('data-printed', 'yes');
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(button).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).uncheck();
+  await expect(button).toBeEnabled();
+  await page.evaluate(() => { delete document.body.dataset.printed; });
+  await button.click(); await expect(page.locator('body')).toHaveAttribute('data-printed', 'yes');
+  await expect(page.locator('.print-sheet a')).toHaveCount(0);
+});
 
 test('print refreshes renamed people and locations from another session without a record timestamp change', async ({ page, browser }) => {
   await login(page);
@@ -263,6 +311,7 @@ test('print refreshes renamed people and locations from another session without 
   expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
   expect((await page.request.post(base + '/share-links', { headers: { origin }, data: { label: 'Fresh print QR' } })).status()).toBe(201);
   await page.goto(`/projects/${projectId}/records/${record.id}/print`);
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Fresh print QR' });
   const printButton = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
   await expect(printButton).toBeEnabled();
@@ -297,6 +346,8 @@ test('owner print excludes Notes and Log from both DOM and its payload, and requ
   page.on('response', response => { if (response.url().includes(`/records/${recordId}`) && response.request().resourceType() === 'fetch') void response.text().then(text => payloads.push(text)); });
   await page.goto(`/projects/${projectId}/records/${recordId}/print`);
   await expect(page.getByRole('heading', { name: 'Public sample task', exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeEnabled();
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeDisabled();
   await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Browser synthetic reader' });
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeEnabled();
@@ -308,6 +359,16 @@ test('owner print excludes Notes and Log from both DOM and its payload, and requ
     return { data: Array.from(context.getImageData(0, 0, canvas.width, canvas.height).data), width: canvas.width, height: canvas.height };
   });
   expect(jsQR(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height)?.data).toBe(shareUrl);
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).uncheck();
+  await expect(page.locator('.print-qr')).toHaveCount(0);
+  await expect(page.locator('.print-sheet a')).toHaveCount(0);
+  expect(await page.locator('.print-sheet').innerHTML()).not.toContain(shareUrl);
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printedLinks = String(document.querySelectorAll('.print-sheet a').length); }; });
+  await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-printed-links', '0');
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
+  await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Browser synthetic reader' });
+  await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeEnabled();
   for (const secret of ['PRIVATE_SENTINEL', 'Public site note', 'Public log entry', 'PRIVATE_LOG_SENTINEL', '9876.54']) {
     expect(await page.locator('body').textContent()).not.toContain(secret);
     expect(payloads.join('')).not.toContain(secret);
@@ -338,6 +399,7 @@ test('one print action adopts a changed record and waits for its newly added pho
   expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
   expect((await page.request.post(base + '/share-links', { headers: { origin }, data: { label: 'Changed print QR' } })).status()).toBe(201);
   await page.goto(`/projects/${projectId}/records/${record.id}/print`);
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Changed print QR' });
   const button = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
   await expect(button).toBeEnabled();
@@ -370,10 +432,13 @@ test('no link is created on GET and long text continues onto further A3 pages', 
   const db = new Database(dbPath); try { db.prepare("UPDATE records SET status = 'open' WHERE id = ?").run(record.id); } finally { db.close(); }
   const base = `/api/projects/${projectId}/records/${record.id}`;
   await page.goto(`/projects/${projectId}/records/${record.id}/print`);
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await expect(page.getByRole('button', { name: 'Create share link', exact: true })).toBeVisible();
   expect(await (await page.request.get(base + '/share-links')).json()).toEqual([]);
   await page.getByLabel('Link label', { exact: true }).fill('Printed handover');
   await page.getByRole('button', { name: 'Create share link', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Printed handover' });
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeEnabled();
   const pdf = await page.pdf({ preferCSSPageSize: true, path: 'test-results/print-multipage-a3.pdf' });
@@ -406,6 +471,7 @@ test('printing waits for photo resources and excludes revoked and expired QR cho
   let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route(base + '/photos/*/display', async route => { await gate; await route.continue(); });
   await page.goto(`/projects/${projectId}/records/${record.id}/print`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   const choices = page.getByLabel('QR share link', { exact: true });
   await expect(choices.locator('option')).toHaveText(['Choose a link', 'Current']);
   await choices.selectOption({ label: 'Current' });
@@ -697,7 +763,196 @@ test('inline tag creation and collision recovery retain unsaved record text', as
 });
 ``````
 
-- [ ] Run the focused test before implementation: `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts`. The API suite fails on the missing endpoint before implementation. Existing guard-only assertions may already pass. The new browser case fails on the absent print heading after building the baseline. Do not mistake a missing browser installation for the intended RED.
+#### File: `tests/server/monitoring.test.ts`
+
+<!-- replay task=1 phase=test encoding=text sha256=289f560a7133d8341c7dbb5b571f5b22826355b4e05a6f7ef6300954e69dffaa -->
+
+``````typescript
+import { afterEach, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs/promises';
+import { join } from 'node:path';
+import { get, loginAsOwner, makeContext, OWNER, type TestContext } from './helpers';
+import { createContributor } from '../../src/server/auth/contributors';
+import { createSession } from '../../src/server/auth/sessions';
+import { loadConfig } from '../../src/server/config';
+vi.mock('node:fs/promises', async original => ({ ...await original<typeof import('node:fs/promises')>() }));
+let ctx: TestContext;
+afterEach(async () => { vi.restoreAllMocks(); if (ctx) await ctx.close(); });
+it('exposes read-only status only to the owner without paths or secrets', async () => {
+  ctx = await makeContext(); const cookie = await loginAsOwner(ctx);
+  expect((await ctx.app.inject('/api/operations/status')).statusCode).toBe(401);
+  const contributor = createContributor(ctx.db, 'status-reader', 'Reader', OWNER.password);
+  const token = createSession(ctx.db, contributor).token;
+  expect((await get(ctx, `bb_session=${token}`, '/api/operations/status')).statusCode).toBe(403);
+  const result = await get(ctx, cookie, '/api/operations/status');
+  expect(result.statusCode).toBe(200);
+  expect(result.headers['cache-control']).toContain('no-store');
+  expect(result.json().backup.state).toBe('missing');
+  expect(result.body).not.toContain(ctx.config.dataDir);
+  expect(result.body).not.toContain(ctx.config.shareKey!.toString('hex'));
+});
+it('uses nightly source timestamps, rejects future dates, and shows read failures as unavailable', async () => {
+  ctx = await makeContext(); const cookie = await loginAsOwner(ctx);
+  await fs.mkdir(ctx.config.backupsDir);
+  const stamp = (date: Date) => `builtbasis-nightly-${date.toISOString().replace(/[:.]/g, '-')}.db`;
+  await fs.writeFile(join(ctx.config.backupsDir, stamp(new Date(Date.now() - 40 * 3600000))), 'fixture');
+  await fs.writeFile(join(ctx.config.backupsDir, 'builtbasis-nightly-ignore.db.tmp'), 'partial');
+  expect((await get(ctx, cookie, '/api/operations/status')).json().backup.state).toBe('overdue');
+  await fs.writeFile(join(ctx.config.backupsDir, stamp(new Date())), 'fixture');
+  expect((await get(ctx, cookie, '/api/operations/status')).json().backup.state).toBe('ok');
+  await fs.writeFile(join(ctx.config.backupsDir, stamp(new Date(Date.now() + 3600000))), 'fixture');
+  expect((await get(ctx, cookie, '/api/operations/status')).json().backup.state).toBe('unavailable');
+  vi.spyOn(fs, 'readdir').mockRejectedValueOnce(new Error('private path'));
+  expect((await get(ctx, cookie, '/api/operations/status')).json().backup.state).toBe('unavailable');
+  vi.spyOn(fs, 'statfs').mockRejectedValueOnce(new Error('private disk path'));
+  expect((await get(ctx, cookie, '/api/operations/status')).json().storage.state).toBe('unavailable');
+});
+it('accepts only a positive finite backup warning age', () => {
+  expect(loadConfig({ BUILTBASIS_DATA_DIR: '.', BACKUP_MAX_AGE_HOURS: '12.5' }).backupMaxAgeHours).toBe(12.5);
+  for (const value of ['0', '-1', 'Infinity', 'no']) expect(() => loadConfig({ BUILTBASIS_DATA_DIR: '.', BACKUP_MAX_AGE_HOURS: value })).toThrow();
+});
+``````
+
+#### File: `tests/server/storage-capacity.test.ts`
+
+<!-- replay task=1 phase=test encoding=text sha256=164d55bd7be2d432acd63768b1799f8b9fc7df1a44c8ba4c678ebfd96edbc1e5 -->
+
+``````typescript
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { Readable } from 'node:stream';
+import { openStorageCapacity } from '../../src/server/files/capacity';
+import { stageFile, publishFile, discardStaged } from '../../src/server/files/storage';
+vi.mock('node:fs/promises', async original => ({...await original<typeof import('node:fs/promises')>()}));
+let dir: string;
+beforeEach(async()=>{dir=await fs.mkdtemp(join(tmpdir(),'bb-capacity-'));});
+afterEach(async()=>{vi.restoreAllMocks();await fs.rm(dir,{recursive:true,force:true});});
+const policy={budgetBytes:100,freeReserveBytes:1};
+const pdf=Buffer.concat([Buffer.from('%PDF-1.7\n'),Buffer.alloc(31)]);
+it('reports the live retained/orphan/reserved accounting and separate filesystem headroom', async () => {
+ await fs.writeFile(join(dir,'orphan'),Buffer.alloc(30));
+ const capacity=await openStorageCapacity(dir,{budgetBytes:200_000_000,freeReserveBytes:100});
+ vi.spyOn(fs,'statfs').mockResolvedValue({bavail:300_000_000n,bsize:1n} as never);
+ const slot=await capacity.reserve('100000000');
+ expect(await capacity.snapshot()).toMatchObject({state:'warning',retainedBytes:'30',reservedBytes:'100000000',managedHeadroomBytes:'99999970',filesystemAvailableBytes:'300000000',filesystemHeadroomBytes:'199999900'});
+ slot.release(); expect((await capacity.snapshot()).state).toBe('ok');
+ vi.spyOn(fs,'statfs').mockResolvedValueOnce({bavail:99n,bsize:1n} as never);
+ expect(await capacity.snapshot()).toMatchObject({state:'warning',filesystemHeadroomBytes:'-1'});
+ const failing=await capacity.reserve('1'); failing.cleanupFailed(); failing.release();
+ expect(await capacity.snapshot()).toMatchObject({state:'warning',healthy:false});
+ vi.spyOn(fs,'statfs').mockRejectedValueOnce(new Error('private'));
+ expect((await capacity.snapshot()).state).toBe('unavailable');
+});
+it('counts actual retained orphans and stale temporary bytes on every startup',async()=>{
+ await fs.mkdir(join(dir,'.tmp')); await fs.writeFile(join(dir,'.tmp','stale'),Buffer.alloc(10));
+ await fs.writeFile(join(dir,'orphan'),Buffer.alloc(30));
+ const capacity=await openStorageCapacity(dir,policy);
+ await expect(capacity.reserve('61')).rejects.toMatchObject({statusCode:507,code:'storage_capacity'});
+ const slot=await capacity.reserve('60');slot.release();
+});
+it('reserves concurrent requests before awaiting filesystem probes and releases admission failures',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);
+ const first=await capacity.reserve('60');
+ await expect(capacity.reserve('41')).rejects.toMatchObject({statusCode:507});
+ first.release();first.release();
+ const next=await capacity.reserve('100');next.release();
+ vi.spyOn(fs,'statfs').mockRejectedValueOnce(new Error('private disk path'));
+ await expect(capacity.reserve('100')).rejects.toMatchObject({statusCode:507,code:'storage_capacity'});
+ const afterFailure=await capacity.reserve('100');afterFailure.release();
+});
+it('protects the physical free-space reserve including pending uploads',async()=>{
+ const capacity=await openStorageCapacity(dir,{budgetBytes:1000,freeReserveBytes:100});
+ vi.spyOn(fs,'statfs').mockResolvedValue({bavail:200n,bsize:1n} as never);
+ const first=await capacity.reserve('60');
+ await expect(capacity.reserve('41')).rejects.toMatchObject({statusCode:507});
+ first.release();const next=await capacity.reserve('100');next.release();
+});
+it('charges a newly published orphan once across concurrent identical uploads',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);
+ const a=await capacity.reserve('50');const b=await capacity.reserve('50');
+ const fa=await stageFile(dir,Readable.from([pdf]),'a.pdf','attachment');
+ const fb=await stageFile(dir,Readable.from([pdf]),'b.pdf','attachment');
+ await Promise.all([publishFile(dir,fa,a.retained),publishFile(dir,fb,b.retained)]);
+ a.release();b.release();
+ await expect(capacity.reserve('61')).rejects.toMatchObject({statusCode:507});
+ const next=await capacity.reserve('60');next.release();
+ const restarted=await openStorageCapacity(dir,policy);
+ await expect(restarted.reserve('61')).rejects.toMatchObject({statusCode:507});
+});
+it('records the hardlink before a later publish cleanup failure and fails closed on unknown staging cleanup',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);const slot=await capacity.reserve('60');
+ const file=await stageFile(dir,Readable.from([pdf]),'a.pdf','attachment');
+ vi.spyOn(fs,'unlink').mockRejectedValueOnce(new Error('forced unlink failure'));
+ await expect(publishFile(dir,file,slot.retained)).rejects.toThrow('forced unlink');
+ await discardStaged(file);slot.release();
+ await expect(capacity.reserve('61')).rejects.toMatchObject({statusCode:507});
+ const second=await capacity.reserve('60');second.cleanupFailed();second.release();
+ await expect(capacity.reserve('1')).rejects.toMatchObject({statusCode:507});
+});
+it('distinguishes malformed and oversized envelopes from storage admission',async()=>{
+ const capacity=await openStorageCapacity(dir,{budgetBytes:200_000_000,freeReserveBytes:1});
+ await expect(capacity.reserve('100000001')).rejects.toMatchObject({statusCode:413});
+ await expect(capacity.reserve('-1')).rejects.toMatchObject({statusCode:400});
+ const chunked=await capacity.reserve(undefined);expect(chunked.maxBodyBytes).toBe(100_000_000);chunked.release();
+});
+it('prevents two admissions from spending capacity while the first statfs probe is pending',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);
+ let finish!:(value:never)=>void;
+ vi.spyOn(fs,'statfs').mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve as typeof finish;}) as never);
+ const firstPromise=capacity.reserve('60');
+ await expect(capacity.reserve('41')).rejects.toMatchObject({statusCode:507});
+ finish({bavail:1000n,bsize:1n} as never);
+ const first=await firstPromise;first.release();
+ const after=await capacity.reserve('100');after.release();
+});
+it('fails closed if staging cleanup becomes uncertain while another admission probes free space',async()=>{
+ const capacity=await openStorageCapacity(dir,policy);const first=await capacity.reserve('40');
+ let finish!:(value:never)=>void;
+ vi.spyOn(fs,'statfs').mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve as typeof finish;}) as never);
+ const second=capacity.reserve('40');first.cleanupFailed();first.release();
+ finish({bavail:1000n,bsize:1n} as never);
+ await expect(second).rejects.toMatchObject({statusCode:507});
+});
+``````
+
+#### File: `tests/browser/operations-status.spec.ts`
+
+<!-- replay task=1 phase=test encoding=text sha256=b5d60b27aa3c9e70f5966c930e3faef122f97b0f53a521c1ab17b1e24ba8dcc0 -->
+
+``````typescript
+import { test, expect, login, seed } from './fixture';
+
+test('owner sees a compact warning below navigation, including fetch failure after focus', async ({ page }) => {
+  await login(page);
+  await page.goto(`/projects/${seed().projectId}/records`);
+  const box = page.getByRole('region', { name: 'Server backup and storage' });
+  await expect(box).toBeVisible();
+  await expect(box).toContainText('No completed server backup');
+  await expect(box).toContainText('File allowance remaining');
+  await expect(box).toContainText('does not establish hosting account quota');
+  await page.route('**/api/operations/status', route => route.fulfill({ status: 503, body: '{}' }));
+  await page.evaluate(() => dispatchEvent(new Event('focus')));
+  await expect(box).toContainText('Status unavailable');
+  await expect(box).not.toContainText('File allowance remaining');
+  await page.getByLabel('Language', { exact: true }).selectOption('el');
+  await expect(page.getByRole('region', { name: 'Αντίγραφα ασφαλείας και χώρος' })).toContainText('Η κατάσταση δεν είναι διαθέσιμη');
+});
+
+test('status is absent from contributor, share and print pages', async ({ page }) => {
+  await login(page, 'reader');
+  await expect(page.getByTestId('operations-status')).toHaveCount(0);
+  await page.goto(seed().shareUrl);
+  await expect(page.getByTestId('operations-status')).toHaveCount(0);
+  await page.context().clearCookies();
+  await login(page);
+  await page.goto(`/projects/${seed().projectId}/records/${seed().recordId}/print`);
+  await expect(page.getByTestId('operations-status')).toHaveCount(0);
+});
+``````
+
+- [ ] Run the focused test before implementation: `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts`. The API suite fails on the missing endpoint before implementation. Existing guard-only assertions may already pass. The new browser case fails on the absent print heading after building the baseline. Do not mistake a missing browser installation for the intended RED.
 
 - [ ] Write/extract the complete implementation files.
 
@@ -765,7 +1020,7 @@ export function registerPrintRoutes(app: FastifyInstance, db: Db): void {
 
 #### File: `src/server/app.ts`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=1ed75ac84926fe159ef90edf4d4ccecf3f8b1f36782b87dc9968cf7e8ec73990 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=22033bd734e2245dd7451aa4990655dbd497c214e25fd763c5fb7e3579ce0d9f -->
 
 ``````typescript
 import { registerPrintRoutes } from './printing/routes';
@@ -796,6 +1051,7 @@ import { safeErrorDiagnostic, safeLogger } from './http/logging';
 import { registerAccessRoutes } from './access/routes';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
+import { registerOperationsStatus } from './monitoring/status';
 
 export interface AppDeps {
   config: AppConfig;
@@ -845,6 +1101,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));
 
   registerHealthRoutes(app);
+  registerOperationsStatus(app, config, capacity);
   registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
   registerProjectRoutes(app, db);
   registerPeopleRoutes(app, db);
@@ -886,7 +1143,7 @@ export async function registerWeb(app: FastifyInstance, directory: string): Prom
 
 #### File: `src/web/printing/PrintPage.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=ef94b180dc57e742aa074e910a0aeeffd1ced443c54714cc19d65af1c1847221 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=f0f8fd5668892fa7aeba7eb3826946305882d7f1a656ef9fbbf6aba2eaf8cafc -->
 
 ``````typescript
 import { useEffect, useState, type ReactNode } from 'react';
@@ -907,20 +1164,27 @@ export function activePrintLinks(links: ShareLinkOut[], draft: boolean, now = Da
 export function PrintPage({ projectId, recordId }: { projectId: number; recordId: number }) {
   const { t } = useI18n(); const base = `/api/projects/${projectId}/records/${recordId}`;
   const [data, setData] = useState<PrintRecord | null>(null); const [links, setLinks] = useState<ShareLinkOut[]>([]);
+  const [includeQr, setIncludeQr] = useState(false); const [shareError, setShareError] = useState<unknown>(null); const [linksLoaded, setLinksLoaded] = useState(false);
   const [selected, setSelected] = useState(''); const [qr, setQr] = useState(''); const [label, setLabel] = useState('');
   const [error, setError] = useState<unknown>(null); const [busy, setBusy] = useState(false); const [loaded, setLoaded] = useState<string[]>([]);
   const [snapshotVersion, setSnapshotVersion] = useState(0); const [printPending, setPrintPending] = useState(false);
   const [now, setNow] = useState(Date.now()); const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); void document.fonts.ready.then(() => setFontsReady(true)); return () => clearInterval(timer); }, []);
-  useEffect(() => { const abort = new AbortController(); void Promise.all([api<PrintRecord>(base + '/print', { signal: abort.signal }), api<ShareLinkOut[]>(base + '/share-links', { signal: abort.signal })]).then(([record, shares]) => { setData(record); setLinks(shares); }).catch(reason => { if (!abort.signal.aborted) setError(reason); }); return () => abort.abort(); }, [base]);
+  useEffect(() => { const abort = new AbortController(); void api<PrintRecord>(base + '/print', { signal: abort.signal }).then(setData).catch(reason => { if (!abort.signal.aborted) setError(reason); }); return () => abort.abort(); }, [base]);
+  useEffect(() => {
+    if (!includeQr || !data || data.record.status === 'draft') return;
+    const abort = new AbortController(); setLinksLoaded(false); setShareError(null);
+    void api<ShareLinkOut[]>(base + '/share-links', { signal: abort.signal }).then(shares => { setLinks(shares); setLinksLoaded(true); }).catch(reason => { if (!abort.signal.aborted) setShareError(reason); });
+    return () => abort.abort();
+  }, [base, includeQr, data?.record.status]);
   const active = activePrintLinks(links, data?.record.status === 'draft', now);
-  const link = active.find(item => String(item.id) === selected);
-  useEffect(() => { let cancelled = false; setQr(''); setLoaded(old => old.filter(key => key !== 'qr')); if (link?.url) void QRCode.toDataURL(link.url, { errorCorrectionLevel: 'M', margin: 4, width: 256 }).then(url => { if (!cancelled) setQr(url); }).catch(reason => { if (!cancelled) setError(reason); }); return () => { cancelled = true; }; }, [link?.url]);
+  const link = includeQr ? active.find(item => String(item.id) === selected) : undefined;
+  useEffect(() => { let cancelled = false; setQr(''); setLoaded(old => old.filter(key => key !== 'qr')); if (link?.url) void QRCode.toDataURL(link.url, { errorCorrectionLevel: 'M', margin: 4, width: 256 }).then(url => { if (!cancelled) setQr(url); }).catch(reason => { if (!cancelled) setShareError(reason); }); return () => { cancelled = true; }; }, [link?.url]);
   const markLoaded = (key: string) => setLoaded(old => old.includes(key) ? old : [...old, key]);
-  const ready = !!data && !!link && !!qr && loaded.includes('qr') && data.photos.every(photo => loaded.includes(String(photo.id))) && fontsReady && !busy && !error;
+  const ready = !!data && (!includeQr || (!!link && !!qr && linksLoaded && loaded.includes('qr') && !shareError)) && data.photos.every(photo => loaded.includes(String(photo.id))) && fontsReady && !busy && !error;
   useEffect(() => {
     if (!printPending) return;
-    if (error || !link) { setPrintPending(false); return; }
+    if (error || (includeQr && (shareError || !link))) { setPrintPending(false); return; }
     if (!ready) return;
     let cancelled = false;
     void (async () => {
@@ -929,29 +1193,37 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
       if (!cancelled) { setPrintPending(false); window.print(); }
     })();
     return () => { cancelled = true; };
-  }, [printPending, ready, error, link]);
+  }, [printPending, ready, error, includeQr, shareError, link]);
   const print = async () => {
     setBusy(true); setError(null);
     try {
-      const [freshLinks, freshData] = await Promise.all([api<ShareLinkOut[]>(base + '/share-links'), api<PrintRecord>(base + '/print')]);
-      setLinks(freshLinks);
+      const freshData = await api<PrintRecord>(base + '/print');
       setData(freshData); setLoaded([]); setSnapshotVersion(version => version + 1);
-      if (freshData.record.status === 'draft' || !activePrintLinks(freshLinks, false).some(item => String(item.id) === selected)) { setSelected(''); return; }
+      if (includeQr) {
+        if (freshData.record.status === 'draft') { setIncludeQr(false); setSelected(''); return; }
+        let freshLinks: ShareLinkOut[];
+        try { freshLinks = await api<ShareLinkOut[]>(base + '/share-links'); }
+        catch (reason) { setShareError(reason); return; }
+        setLinks(freshLinks);
+        if (!activePrintLinks(freshLinks, false).some(item => String(item.id) === selected)) { setSelected(''); return; }
+      }
       setPrintPending(true);
     } catch (reason) { setError(reason); } finally { setBusy(false); }
   };
   return <div className={`print-page${ready ? ' print-ready' : ''}`}>
-    <div className="print-controls"><h1>{t('A3 print view', 'Προβολή εκτύπωσης A3')}</h1><p>{t('Choose a share link, then print in A3 landscape. Select Save as PDF and turn off browser headers and footers.', 'Επιλέξτε σύνδεσμο και εκτυπώστε σε A3 οριζόντια. Επιλέξτε αποθήκευση ως PDF και απενεργοποιήστε κεφαλίδες και υποσέλιδα του προγράμματος περιήγησης.')}</p><ErrorNotice error={error} />
+    <div className="print-controls"><h1>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</h1><p>{t('Print in A3 landscape. Select Save as PDF and turn off browser headers and footers. A QR link is optional.', 'Εκτυπώστε σε A3 οριζόντια. Επιλέξτε αποθήκευση ως PDF και απενεργοποιήστε κεφαλίδες και υποσέλιδα του προγράμματος περιήγησης. Ο σύνδεσμος QR είναι προαιρετικός.')}</p><ErrorNotice error={error} />
       <a href={`/projects/${projectId}/records/${recordId}`}>{t('Back to record', 'Επιστροφή στην καταγραφή')}</a>
-      {data?.record.status === 'draft' ? <p>{t('Open this Draft before printing a working share QR code.', 'Ανοίξτε την πρόχειρη καταγραφή πριν εκτυπώσετε ενεργό κωδικό QR κοινοποίησης.')}</p> : <>
-        <Field label={t('QR share link', 'Σύνδεσμος κοινοποίησης QR')}><select aria-label={t('QR share link', 'Σύνδεσμος κοινοποίησης QR')} value={selected} onChange={event => { setSelected(event.target.value); setError(null); }}><option value="">{t('Choose a link', 'Επιλέξτε σύνδεσμο')}</option>{active.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
-        {data && !active.length && <form onSubmit={async event => { event.preventDefault(); setBusy(true); setError(null); try { await api(base + '/share-links', { method: 'POST', body: { label } }); setLinks(await api(base + '/share-links')); setLabel(''); } catch (reason) { setError(reason); } finally { setBusy(false); } }}><Field label={t('Link label', 'Τίτλος συνδέσμου')}><input required maxLength={200} value={label} onChange={event => setLabel(event.target.value)} /></Field><button disabled={busy} type="submit">{t('Create share link', 'Δημιουργία συνδέσμου κοινοποίησης')}</button></form>}
+      <label><input type="checkbox" checked={includeQr} disabled={!data || data.record.status === 'draft' || busy || printPending} onChange={event => { setIncludeQr(event.target.checked); setSelected(''); setShareError(null); }} />{t('Include QR link', 'Συμπερίληψη συνδέσμου QR')}</label>
+      {data?.record.status === 'draft' && <p>{t('Drafts print without a QR link. Open the record before sharing it.', 'Οι πρόχειρες καταγραφές εκτυπώνονται χωρίς σύνδεσμο QR. Ανοίξτε την καταγραφή πριν την κοινοποίησή της.')}</p>}
+      {includeQr && data?.record.status !== 'draft' && <><ErrorNotice error={shareError} />
+        <Field label={t('QR share link', 'Σύνδεσμος κοινοποίησης QR')}><select aria-label={t('QR share link', 'Σύνδεσμος κοινοποίησης QR')} value={selected} disabled={busy || printPending || !linksLoaded} onChange={event => { setSelected(event.target.value); setError(null); }}><option value="">{t('Choose a link', 'Επιλέξτε σύνδεσμο')}</option>{active.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
+        {data && linksLoaded && !shareError && !active.length && <form onSubmit={async event => { event.preventDefault(); setBusy(true); setShareError(null); try { await api(base + '/share-links', { method: 'POST', body: { label } }); setLinks(await api(base + '/share-links')); setLabel(''); } catch (reason) { setShareError(reason); } finally { setBusy(false); } }}><Field label={t('Link label', 'Τίτλος συνδέσμου')}><input required maxLength={200} value={label} onChange={event => setLabel(event.target.value)} /></Field><button disabled={busy} type="submit">{t('Create share link', 'Δημιουργία συνδέσμου κοινοποίησης')}</button></form>}
       </>}
       <button disabled={!ready || printPending} onClick={() => void print()}>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</button>
-      {data && !ready && <p role="status">{t('Printing is available after a valid link is selected and all images load.', 'Η εκτύπωση είναι διαθέσιμη αφού επιλεγεί έγκυρος σύνδεσμος και φορτωθούν όλες οι εικόνες.')}</p>}
+      {data && !ready && <p role="status">{includeQr ? t('Select a valid QR link and wait for all images to load.', 'Επιλέξτε έγκυρο σύνδεσμο QR και περιμένετε τη φόρτωση όλων των εικόνων.') : t('Wait for the print view and all images to load.', 'Περιμένετε τη φόρτωση της προβολής εκτύπωσης και όλων των εικόνων.')}</p>}
     </div>
-    <p className="print-blocker">{t('Print view is not ready. Select a valid share link and wait for images to load.', 'Η προβολή εκτύπωσης δεν είναι έτοιμη. Επιλέξτε έγκυρο σύνδεσμο και περιμένετε τη φόρτωση εικόνων.')}</p>
-    {data && <PrintSheet key={snapshotVersion} data={data} base={base} qr={qr} shareUrl={link?.url ?? ''} onLoaded={markLoaded} onError={() => setError(new Error(t('An image could not load. Reload this page before printing.', 'Μια εικόνα δεν φορτώθηκε. Ανανεώστε τη σελίδα πριν εκτυπώσετε.')))} />}
+    <p className="print-blocker">{t('Print view is not ready. Return to the print screen and check its status.', 'Η προβολή εκτύπωσης δεν είναι έτοιμη. Επιστρέψτε στην οθόνη εκτύπωσης και ελέγξτε την κατάστασή της.')}</p>
+    {data && <PrintSheet key={snapshotVersion} data={data} base={base} qr={includeQr ? qr : ''} shareUrl={link?.url ?? ''} onLoaded={markLoaded} onError={() => setError(new Error(t('An image could not load. Reload this page before printing.', 'Μια εικόνα δεν φορτώθηκε. Ανανεώστε τη σελίδα πριν εκτυπώσετε.')))} />}
   </div>;
 }
 
@@ -1023,7 +1295,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
 
 #### File: `src/web/App.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=1a60d3d3bab2df1099a313a86721cc940ec29c2feeb20be374009919850c1287 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=e0d2a747b74970da033416e2908dbbc2fa2578e69b5b894761ec0f8360d0bb29 -->
 
 ``````typescript
 import { useEffect, useState } from 'react';
@@ -1035,6 +1307,7 @@ import { RecordList } from './home/RecordList';
 import { RecordPage } from './record/RecordPage';
 import { PrintPage } from './printing/PrintPage';
 import { ManagedLists } from './lists/ManagedLists';
+import { OperationsStatus } from './OperationsStatus';
 interface User { displayName: string; isOwner: boolean }
 function Login({ onLogin }: { onLogin(): void }) {
   const { t } = useI18n(); const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null);
@@ -1059,6 +1332,7 @@ export function App() {
   const from = new URLSearchParams(location.search).get('from') ?? ''; const safeFrom = from.startsWith('?') ? from : '';
   return <><header className="site-header"><a className="brand" href={shared ? undefined : user?.isOwner ? '/projects' : '/assigned'}>BuiltBasis</a>{project && <span>{project.name}</span>}<div className="header-actions"><label>{t('Language', 'Γλώσσα')} <select aria-label={t('Language', 'Γλώσσα')} value={lang} onChange={event => setLang(event.target.value as 'en' | 'el')}><option value="en">English</option><option value="el">Ελληνικά</option></select></label>{user && <><span>{user.displayName}</span><button onClick={async () => { try { await api('/api/auth/logout', { method: 'POST', body: {} }); location.assign('/login'); } catch (failure) { setError(failure); } }}>{t('Sign out', 'Αποσύνδεση')}</button></>}</div></header>
   {user?.isOwner && projectId && <nav className="site-nav"><a href={`/projects/${projectId}/records`}>{t('Records', 'Καταγραφές')}</a><a href={`/projects/${projectId}/lists`}>{t('Managed lists', 'Διαχείριση λιστών')}</a><a href="/projects">{t('Projects', 'Έργα')}</a></nav>}
+  {user?.isOwner && !shared && !printMatch && <OperationsStatus/>}
   <main><ErrorNotice error={error}/>{shared ? (/^[A-Za-z0-9_-]{43}$/.test(token) ? <RecordPage context={{ mode: 'shared', base: '/api/shared', token }} onBack={() => {}}/> : <h1>{t('Record not available', 'Η καταγραφή δεν είναι διαθέσιμη')}</h1>) : !ready ? <p role="status">{t('Loading…', 'Φόρτωση…')}</p> : !user ? <Login onLogin={() => { location.assign(location.pathname === '/login' || location.pathname === '/' ? '/projects' : location.pathname + location.search); }}/> : !user.isOwner ? (assignedId ? <RecordPage context={{ mode: 'contributor', base: `/api/assigned-records/${assignedId}`, recordId: Number(assignedId) }} onBack={() => location.assign('/assigned')}/> : <Assigned/>) : printMatch ? <PrintPage projectId={Number(printMatch[1])} recordId={Number(printMatch[2])}/> : projectId && project ? (match?.[2] === 'lists' ? <ManagedLists projectId={projectId}/> : recordId ? <RecordPage context={{ mode: 'owner', base: `/api/projects/${projectId}/records/${recordId}`, projectId, recordId }} onBack={() => location.assign(`/projects/${projectId}/records${safeFrom}`)}/> : <RecordList projectId={projectId}/>) : <><h1>{t('Projects', 'Έργα')}</h1>{projects.length ? <div className="record-list">{projects.map(item => <a className="panel" key={item.id} href={`/projects/${item.id}/records`}>{item.name}</a>)}</div> : <p>{t('No project has been set up yet. Ask the owner to load the project data.', 'Δεν έχει καταχωριστεί έργο. Ζητήστε από τον ιδιοκτήτη να φορτώσει τα δεδομένα.')}</p>}</>}</main></>;
 }
 ``````
@@ -1186,9 +1460,284 @@ export function RecordEditor({ data, busy, onSave, onCancel, onDirty }: { data: 
 }
 ``````
 
-- [ ] GREEN: run `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts` and require success.
+#### File: `src/server/config.ts`
 
-- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect five focused unit/API tests and five print browser tests. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
+<!-- replay task=1 phase=implementation encoding=text sha256=cb9dca42a28c5afda1b211069901d05304a491b7f1bc09c700bb04d86501c189 -->
+
+``````typescript
+import { join } from 'node:path';
+
+export interface AppConfig {
+  dataDir: string;
+  dbPath: string;
+  backupsDir: string;
+  filesDir: string;
+  shareKey: Buffer | null;
+  /** Explicit HTTP upload capacity settings; offline commands may omit them. */
+  filesStorageBudgetBytes: number | null;
+  filesFreeReserveBytes: number | null;
+  backupMaxAgeHours: number;
+  /** Scheme + host (+ port) that browsers send as Origin, e.g. https://builtbasis.ktimanet.com */
+  publicOrigin: string;
+  secureCookies: boolean;
+  /** Read the visitor IP from CF-Connecting-IP (design §11.6). */
+  behindCloudflare: boolean;
+  /** PORT: a port number or a socket path. null = listen like Hetzner's example (no arguments). */
+  port: string | null;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const dataDir = env.BUILTBASIS_DATA_DIR;
+  if (!dataDir) throw new Error('BUILTBASIS_DATA_DIR is not set');
+  const publicOrigin = new URL(env.PUBLIC_BASE_URL ?? 'http://localhost:3000').origin;
+  const encodedKey = env.SHARE_LINK_KEY;
+  if (encodedKey !== undefined && !/^[a-fA-F0-9]{64}$/.test(encodedKey)) {
+    throw new Error('SHARE_LINK_KEY must contain exactly 64 hexadecimal characters');
+  }
+  const positiveBytes = (key: string): number | null => {
+    const value = env[key];
+    if (value === undefined) return null;
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
+      throw new Error(`${key} must be a positive safe integer byte count`);
+    }
+    return Number(value);
+  };
+  const backupAge = env.BACKUP_MAX_AGE_HOURS ?? '36';
+  if (!/^\d+(?:\.\d+)?$/.test(backupAge) || !Number.isFinite(Number(backupAge)) || Number(backupAge) <= 0) throw new Error('BACKUP_MAX_AGE_HOURS must be positive');
+  return {
+    dataDir,
+    dbPath: join(dataDir, 'builtbasis.db'),
+    backupsDir: join(dataDir, 'backups'),
+    filesDir: join(dataDir, 'files'),
+    shareKey: encodedKey === undefined ? null : Buffer.from(encodedKey, 'hex'),
+    filesStorageBudgetBytes: positiveBytes('FILES_STORAGE_BUDGET_BYTES'),
+    filesFreeReserveBytes: positiveBytes('FILES_FREE_RESERVE_BYTES'),
+    backupMaxAgeHours: Number(backupAge),
+    publicOrigin,
+    secureCookies: publicOrigin.startsWith('https://'),
+    behindCloudflare: env.BEHIND_CLOUDFLARE === '1',
+    port: env.PORT ?? null,
+  };
+}
+``````
+
+#### File: `src/server/files/capacity.ts`
+
+<!-- replay task=1 phase=implementation encoding=text sha256=723383d98570f215657bd31a86a536a17eca668960f288d67a3f430a840f9fa3 -->
+
+``````typescript
+import { mkdir, readdir, stat, statfs } from 'node:fs/promises';
+import { join } from 'node:path';
+import { UPLOAD_REQUEST_LIMIT } from '../../domain';
+import { HttpError } from '../errors';
+import { blobPath, type StagedFile } from './storage';
+
+export interface StoragePolicy { budgetBytes: number; freeReserveBytes: number }
+export interface StorageStatus {
+  state: 'ok' | 'warning' | 'unavailable'; healthy: boolean;
+  retainedBytes: string; reservedBytes: string; budgetBytes: string; managedHeadroomBytes: string;
+  freeReserveBytes: string; filesystemAvailableBytes: string | null; filesystemHeadroomBytes: string | null;
+}
+export interface UploadReservation {
+  maxBodyBytes: number;
+  retained: (file: StagedFile) => void;
+  cleanupFailed: () => void;
+  release: () => void;
+}
+const denied = (cause?: unknown) => new HttpError(507, 'storage_capacity', undefined, { cause });
+
+/** One HTTP process owns this directory. Retained blobs are never deleted while it runs. */
+export async function openStorageCapacity(filesDir: string, policy: StoragePolicy) {
+  if (![policy.budgetBytes, policy.freeReserveBytes].every(value => Number.isSafeInteger(value) && value > 0)) {
+    throw new Error('storage_configuration_required');
+  }
+  const retainedPaths = new Map<string, bigint>();
+  const inodes = new Set<string>();
+  let retainedBytes = 0n;
+  let pendingBytes = 0n;
+  let healthy = true;
+  const budget = BigInt(policy.budgetBytes);
+  const reserve = BigInt(policy.freeReserveBytes);
+  async function inventory(dir: string): Promise<void> {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) await inventory(path);
+      else if (entry.isFile()) {
+        const info = await stat(path, { bigint: true });
+        retainedPaths.set(path, info.size);
+        // A crash can leave the temporary and published names for one hardlinked inode.
+        const key = `${info.dev}:${info.ino}`;
+        if (!inodes.has(key)) { inodes.add(key); retainedBytes += info.size; }
+      } else throw new Error('unsupported_storage_entry');
+    }
+  }
+  try { await mkdir(filesDir, { recursive: true }); await inventory(filesDir); }
+  catch { throw new Error('storage_inventory_failed'); }
+
+  return {
+    async snapshot(): Promise<StorageStatus> {
+      let available: bigint | null = null;
+      try { const space = await statfs(filesDir, { bigint: true }); available = space.bavail * space.bsize; } catch { /* Unknown capacity must be visible. */ }
+      // Read accounting after the async probe so in-flight changes are represented consistently.
+      const managedHeadroom = budget - retainedBytes - pendingBytes;
+      const filesystemHeadroom = available === null ? null : available - pendingBytes - reserve;
+      return {
+        state: available === null ? 'unavailable' : !healthy || managedHeadroom < BigInt(UPLOAD_REQUEST_LIMIT) || filesystemHeadroom! < BigInt(UPLOAD_REQUEST_LIMIT) ? 'warning' : 'ok',
+        healthy, retainedBytes: String(retainedBytes), reservedBytes: String(pendingBytes), budgetBytes: String(budget),
+        managedHeadroomBytes: String(managedHeadroom), freeReserveBytes: String(reserve),
+        filesystemAvailableBytes: available === null ? null : String(available), filesystemHeadroomBytes: filesystemHeadroom === null ? null : String(filesystemHeadroom),
+      };
+    },
+    async reserve(contentLength: string | undefined): Promise<UploadReservation> {
+      if (contentLength !== undefined && !/^\d+$/.test(contentLength)) throw new HttpError(400, 'invalid_upload');
+      const amount = contentLength === undefined ? BigInt(UPLOAD_REQUEST_LIMIT) : BigInt(contentLength);
+      if (amount > BigInt(UPLOAD_REQUEST_LIMIT)) throw new HttpError(413, 'upload_too_large');
+      if (!healthy || retainedBytes + pendingBytes + amount > budget) throw denied();
+      // Reserve before the first await so concurrent admissions cannot spend the same headroom.
+      pendingBytes += amount;
+      try {
+        const space = await statfs(filesDir, { bigint: true });
+        if (!healthy || space.bavail * space.bsize - pendingBytes < reserve) throw denied();
+      } catch (error) {
+        pendingBytes -= amount;
+        throw denied(error);
+      }
+      let released = false;
+      return {
+        maxBodyBytes: Number(amount),
+        retained: (file: StagedFile): void => {
+          const path = blobPath(filesDir, file.hash);
+          const size = BigInt(file.size);
+          const existing = retainedPaths.get(path);
+          if (existing !== undefined) {
+            if (existing !== size) healthy = false;
+            return;
+          }
+          retainedPaths.set(path, size);
+          retainedBytes += size;
+        },
+        cleanupFailed: (): void => { healthy = false; },
+        release: (): void => {
+          if (!released) { pendingBytes -= amount; released = true; }
+        },
+      };
+    },
+  };
+}
+export type StorageCapacity = Awaited<ReturnType<typeof openStorageCapacity>>;
+``````
+
+#### File: `src/server/monitoring/status.ts`
+
+<!-- replay task=1 phase=implementation encoding=text sha256=e5b58a6706db35d7d36378eff861577e143ea0d232f1f3645d6def22e33adc6a -->
+
+``````typescript
+import { readdir } from 'node:fs/promises';
+import type { FastifyInstance } from 'fastify';
+import type { AppConfig } from '../config';
+import type { StorageCapacity, StorageStatus } from '../files/capacity';
+
+export interface BackupStatus {
+  state: 'ok' | 'missing' | 'overdue' | 'unavailable';
+  sourceCreatedAt: string | null; ageHours: number | null; maxAgeHours: number;
+}
+export interface OperationsStatus { checkedAt: string; backup: BackupStatus; storage: StorageStatus }
+
+/** Reads existing completed naming only; no dependency on scheduled backup/export tools. */
+async function backupStatus(dir: string, maxAgeHours: number, now: Date): Promise<BackupStatus> {
+  const empty = { sourceCreatedAt: null, ageHours: null, maxAgeHours };
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    const names = entries.filter(entry => entry.isFile() && /^builtbasis-nightly-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.db$/.test(entry.name)).map(entry => entry.name).sort().reverse();
+    if (!names[0]) return { state: 'missing', ...empty };
+    const stamp = names[0].slice('builtbasis-nightly-'.length, -3).replace(/T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, 'T$1:$2:$3.$4Z');
+    const date = new Date(stamp);
+    if (!Number.isFinite(date.getTime()) || date.toISOString() !== stamp) return { state: 'unavailable', ...empty };
+    const ageHours = (now.getTime() - date.getTime()) / 3600000;
+    return { state: ageHours < -5 / 60 ? 'unavailable' : ageHours > maxAgeHours ? 'overdue' : 'ok', sourceCreatedAt: stamp, ageHours: Math.max(0, ageHours), maxAgeHours };
+  } catch (error) {
+    return { state: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'unavailable', ...empty };
+  }
+}
+export function registerOperationsStatus(app: FastifyInstance, config: AppConfig, capacity: StorageCapacity): void {
+  app.get('/api/operations/status', { config: { privateResponse: true } }, async (): Promise<OperationsStatus> => {
+    const now = new Date();
+    const [backup, storage] = await Promise.all([backupStatus(config.backupsDir, config.backupMaxAgeHours, now), capacity.snapshot()]);
+    return { checkedAt: now.toISOString(), backup, storage };
+  });
+}
+``````
+
+#### File: `src/web/OperationsStatus.tsx`
+
+<!-- replay task=1 phase=implementation encoding=text sha256=1ff216f44397abcc853a0fc986be5d9de325f7a2cac81819239caea7f8416e9a -->
+
+``````typescript
+import { useEffect, useState } from 'react';
+import type { OperationsStatus as Status } from '../server/monitoring/status';
+import { api } from './core/api';
+import { useI18n } from './core/i18n';
+
+export function OperationsStatus() {
+  const { t, lang } = useI18n();
+  const [status, setStatus] = useState<Status | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let current: AbortController | undefined;
+    const refresh = () => {
+      current?.abort();
+      const abort = new AbortController(); current = abort;
+      const timeout = setTimeout(() => { abort.abort(); setFailed(true); setStatus(null); }, 15000);
+      api<Status>('/api/operations/status', { signal: abort.signal }).then(value => {
+        if (!abort.signal.aborted) { setStatus(value); setFailed(false); }
+      }).catch(() => { if (!abort.signal.aborted) { setFailed(true); setStatus(null); } }).finally(() => clearTimeout(timeout));
+    };
+    refresh();
+    const timer = setInterval(refresh, 60000);
+    addEventListener('focus', refresh);
+    return () => { current?.abort(); clearInterval(timer); removeEventListener('focus', refresh); };
+  }, []);
+  const bytes = (value: string | null) => value === null ? t('unavailable', 'μη διαθέσιμο') : `${(Number(value) / 1000000).toLocaleString(lang, { maximumFractionDigits: 1 })} MB`;
+  const backupText = !status ? '' : status.backup.state === 'missing' ? t('No completed server backup.', 'Δεν υπάρχει ολοκληρωμένο αντίγραφο στον διακομιστή.')
+    : status.backup.state === 'unavailable' ? t('Backup status unavailable.', 'Η κατάσταση αντιγράφων δεν είναι διαθέσιμη.')
+    : status.backup.state === 'overdue' ? t('Server backup overdue.', 'Το αντίγραφο στον διακομιστή έχει καθυστερήσει.') : t('Server backup is recent.', 'Το αντίγραφο στον διακομιστή είναι πρόσφατο.');
+  const warning = failed || (status && (status.backup.state !== 'ok' || status.storage.state !== 'ok'));
+  return <section className={`operations-status panel${warning ? ' operations-warning' : ''}`} data-testid="operations-status" aria-label={t('Server backup and storage', 'Αντίγραφα ασφαλείας και χώρος')} aria-live="polite">
+    <strong>{t('Server backup and storage', 'Αντίγραφα ασφαλείας και χώρος')}</strong>
+    {failed ? <p>{t('Status unavailable. Check backups and storage before relying on them.', 'Η κατάσταση δεν είναι διαθέσιμη. Ελέγξτε τα αντίγραφα και την αποθήκευση.')}</p>
+      : !status ? <p>{t('Checking status…', 'Έλεγχος κατάστασης…')}</p> : <>
+        <p>{backupText} {status.backup.sourceCreatedAt && <>{new Date(status.backup.sourceCreatedAt).toLocaleString(lang)} ({status.backup.ageHours?.toFixed(1)} {t('hours old', 'ώρες πριν')}; {t('limit', 'όριο')} {status.backup.maxAgeHours} h).</>}</p>
+        <p>{t('File allowance remaining', 'Χώρος που απομένει για αρχεία')}: {bytes(status.storage.managedHeadroomBytes)}. {status.storage.state === 'unavailable' ? t('Storage status unavailable.', 'Η κατάσταση αποθήκευσης δεν είναι διαθέσιμη.') : status.storage.state === 'warning' ? (!status.storage.healthy ? t('Storage needs checking; uploads are blocked.', 'Απαιτείται έλεγχος χώρου· οι μεταφορτώσεις έχουν αποκλειστεί.') : t('Storage is running low; large uploads may fail.', 'Ο χώρος εξαντλείται· μεγάλες μεταφορτώσεις μπορεί να αποτύχουν.')) : ''}</p>
+        <details><summary>{t('Storage details', 'Λεπτομέρειες χώρου')}</summary>
+          <p>{t('Managed-file budget', 'Όριο διαχειριζόμενων αρχείων')}: {bytes(status.storage.budgetBytes)}. {t('Retained, including orphan files', 'Διατηρούμενα, μαζί με μη συσχετισμένα αρχεία')}: {bytes(status.storage.retainedBytes)}; {t('reserved for uploads', 'δεσμευμένα για μεταφορτώσεις')}: {bytes(status.storage.reservedBytes)}.</p>
+          <p>{t('Filesystem available', 'Διαθέσιμος χώρος συστήματος αρχείων')}: {bytes(status.storage.filesystemAvailableBytes)}; {t('free-space reserve', 'απόθεμα ελεύθερου χώρου')}: {bytes(status.storage.freeReserveBytes)}; {t('headroom after reserve and pending uploads', 'περιθώριο μετά το απόθεμα και τις εκκρεμείς μεταφορτώσεις')}: {bytes(status.storage.filesystemHeadroomBytes)}. {t('This does not establish hosting account quota.', 'Αυτό δεν επιβεβαιώνει το όριο του λογαριασμού φιλοξενίας.')}</p>
+          <p>{t('The PC off-site copy is separate and is not checked here.', 'Το αντίγραφο εκτός διακομιστή στον υπολογιστή είναι ξεχωριστό και δεν ελέγχεται εδώ.')}</p>
+        </details>
+      </>}
+  </section>;
+}
+``````
+
+#### File: `src/web/styles.css`
+
+<!-- replay task=1 phase=implementation encoding=text sha256=b1c2ceb65de58e9b0ce80fabfc9ac21193ff070af14b59aa6f22317bf7eb965b -->
+
+``````css
+:root{font-family:system-ui,-apple-system,sans-serif;color:#243747;background:#f2f5f7;line-height:1.5;font-size:16px}*{box-sizing:border-box}body{margin:0}a{color:#225c7b;text-underline-offset:3px}button,input,select,textarea{font:inherit}button,a,input,select,summary{touch-action:manipulation}button{border:1px solid #9cabb7;background:white;color:#243747;border-radius:5px;padding:.55rem .85rem;cursor:pointer;min-height:42px}button:disabled{opacity:.6;cursor:default}button.primary,.primary{background:#245e79;color:white;border-color:#245e79}input,select,textarea{border:1px solid #b1c0cc;border-radius:4px;background:white;color:inherit;max-width:100%;min-height:42px;padding:.45rem .6rem}input:not([type=checkbox]):not([type=radio]),textarea{width:100%}input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:20px}textarea{min-height:100px;resize:vertical}select[multiple]{min-height:116px}h1{font-size:1.7rem;line-height:1.2}h2{font-size:1.25rem}h3{font-size:1.05rem}small,.muted{color:#596d7c}fieldset{border:1px solid #ced8e0;border-radius:5px;margin:12px 0;min-width:0}legend{padding:0 6px}label{overflow-wrap:anywhere}.site-header{display:flex;align-items:center;gap:24px;background:#203b50;color:white;padding:15px 28px;flex-wrap:wrap}.brand{font-size:1.3rem;color:white;font-weight:750;text-decoration:none}.header-actions{margin-left:auto;display:flex;align-items:center;gap:15px;flex-wrap:wrap}.header-actions label{font-size:.85rem}.header-actions select{font-size:.85rem}.site-nav{display:flex;gap:24px;padding:12px 28px;background:white;border-bottom:1px solid #d4dfe5}main{max-width:1280px;margin:auto;padding:28px}.panel,.filters,.record-card{background:white;border:1px solid #d1dce4;border-radius:7px;padding:20px;margin:16px 0}.panel a{overflow-wrap:anywhere}.grid,.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.field{display:flex;flex-direction:column;gap:5px;margin:12px 0}.field>span{font-size:.87rem;font-weight:600}.field select{width:100%}.check{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:.9rem}.multi{max-height:240px;overflow:auto}.title-row,.actions,.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}.actions,.toolbar{justify-content:flex-start;margin:14px 0}.error{background:#fff0ed;color:#8a3028;border:1px solid #e6b4ab;padding:12px;margin:12px 0;border-radius:5px;white-space:pre-wrap}.success{background:#e7f4ed;padding:12px}.badge{display:inline-block;background:#e6eff5;border-radius:4px;padding:3px 9px;font-size:.85rem}.safety{background:#f8e7de;color:#893d27;padding:3px 8px;border-radius:4px}.record-list{display:grid;gap:10px}.record-card{margin:0}.record-card>a{text-decoration:none}.record-card h2{display:inline;margin-left:16px;font-size:1.05rem}.record-facts{display:flex;gap:16px;flex-wrap:wrap;font-size:.86rem;margin-top:12px}.record-facts progress{width:65px;height:8px}.totals{font-size:.9rem}.tabs,.record-tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid #c4d4df;margin:16px 0;padding-bottom:8px}.tabs button,.record-tabs button{border-color:transparent;background:transparent;font-size:.88rem}.tabs button[aria-selected=true],.record-tabs button[aria-selected=true]{border-bottom:3px solid #245e79;color:#245e79;font-weight:700}.phone-sections{display:none}.record-summary{display:flex;gap:20px;flex-wrap:wrap}.private{border-color:#d8c8a6;background:#fcf9f1}.help{font-size:.85rem;margin:5px 0 12px}.help summary{color:#315e77}.help dd{margin:3px 0 12px}details>summary{cursor:pointer;min-height:38px;padding:7px 0}.location-picker ul{list-style:none;padding-left:16px}.location-picker>ul{padding-left:0}.location-picker .field{max-width:450px}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border-bottom:1px solid #dbe4e9;padding:10px;text-align:left;vertical-align:top}th{background:#f4f7f9}.table-wrap{overflow-x:auto}img,video,canvas{max-width:100%;height:auto}audio{max-width:100%}dialog{max-width:min(1000px,95vw);max-height:92vh;border:1px solid #9eb2c0;border-radius:8px;padding:24px}dialog::backdrop{background:#1c2d4090}.login{max-width:450px;margin:40px auto}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #c38320;outline-offset:3px}.viewer{overflow:auto}.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}@media(max-width:650px){main{padding:16px}.site-header{padding:12px 16px;gap:12px}.header-actions{gap:8px}.header-actions>span{display:none}.site-nav{padding:10px 16px;gap:15px;font-size:.9rem}.panel,.filters,.record-card{padding:14px}.grid,.form-grid{grid-template-columns:1fr}.record-card h2{display:block;margin:5px 0}.record-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tabs,.record-tabs{display:none}.phone-sections{display:block}.record-summary{gap:12px}h1{font-size:1.4rem}dialog{padding:15px}.actions button{flex-grow:1}table{min-width:500px}}
+
+.user-text{white-space:pre-wrap;overflow-wrap:anywhere}.table-scroll{overflow-x:auto}.filter-chips{display:flex;flex-wrap:wrap;gap:8px}.record-tabs button[aria-current=page]{border-bottom:3px solid #245e79;color:#245e79;font-weight:700}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;background:white;border:1px solid #d1dce4;border-radius:7px;padding:16px}.summary-grid dt{font-size:.82rem;color:#596d7c}.summary-grid dd{margin:0}.summary-grid small{display:block}.summary-grid progress{width:80px}.record-page details{max-width:100%;overflow-x:auto}.record-page section>dl dd{margin:3px 0 14px}.record-page section>dl dt{font-weight:600}.record-page article{border-bottom:1px solid #d1dce4;padding:12px 0}
+.site-header select{color:#243747}@media(max-width:650px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.phone-sections{display:flex;flex-direction:column;gap:6px}.summary-grid>div{min-width:0;overflow-wrap:anywhere}}
+
+.operations-status { margin: .6rem auto; max-width: 1200px; padding: .65rem 1rem; font-size: .85rem; }
+.operations-status p { margin: .25rem 0; }
+.operations-warning { border-color: #a35b00; background: #fff8e9; }
+@media print { .operations-status { display: none !important; } }
+``````
+
+- [ ] GREEN: run `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts` and require success.
+
+- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect 17 focused print/monitoring/capacity tests and eight print browser tests. Also run tests/browser/operations-status.spec.ts; expect two tests for owner visibility, refresh errors and reader/print exclusion. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
 
 - [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files and generated package lock. Preserve synthetic PDF fixture whitespace from Plan 5.
 
@@ -1832,7 +2381,7 @@ try {
 
 #### File: `docs/guides/backup-restore.md`
 
-<!-- replay task=2 phase=implementation encoding=text sha256=97c97994e952dfb99a801d264daf8539a81cb311dade4fabbf1503b739db1268 -->
+<!-- replay task=2 phase=implementation encoding=text sha256=45a04ef419cbf8ea5e1fbf33bcad7eafb8a079acf0d22df61721ccf4aac2205e -->
 
 ``````markdown
 # Backup and restore
@@ -1877,7 +2426,17 @@ powershell.exe -NoProfile -NonInteractive -File "C:\path\to\builtbasis\scripts\p
 
 Configure Task Scheduler to run this command under the owner account with the checkout as its working directory. Select the nightly schedule deliberately; this example creates no task. Build the matching tools first. Verify `node`, `ssh` and `sftp` resolve in that account's unattended environment. Establish the host key deliberately and verify BatchMode SSH authentication succeeds without prompts. Keep the SSH private key separate from the backup destination. Do not weaken host-key checking to make scheduling work.
 
+The pull script sends a built-in Windows desktop message on failure using [`msg.exe`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/msg). This is a desktop message, not a notification-center toast. It targets only the local account named by `-NotificationUser`, which defaults to the task's `USERNAME`. Use the logged-on owner account; never use a wildcard or a remote server. The message contains no backup paths, tokens or credentials and remains visible for up to five minutes. The script preflights command availability. Setup, lock, SSH/SFTP, verification, stale-source and export-release failures trigger the message and preserve a failing process exit code. Notification delivery failure produces a diagnostic warning and does not turn the backup failure into success.
+
+Configure the task to run in the owner's logged-on desktop session and verify an actual controlled failure message during release acceptance. `msg.exe` availability and session message permissions must be verified on that PC. Tests mock delivery and cannot prove the real desktop receives it. A powered-off PC, a task that never starts or an absent logged-on desktop cannot notify the owner through this mechanism. Check Task Scheduler history and the structured source dates separately. No additional service or email channel is installed.
+
 Test the task using its actual scheduled identity and logon mode. Confirm X: exists and is writable in that context; an interactive mapped drive may not exist in a background task. Set `-Destination` to the verified private location. Configure no overlapping runs. Record the task's exit code and capture diagnostic output in a private log. Alert on nonzero results, missing completion reports and sourceCreatedAt older than the configured maximum. Check verifiedAt separately for task execution monitoring; never use COMPLETE file modification time for source freshness. An old COMPLETE file does not prove the latest pull succeeded. Investigate incomplete snapshot folders and failed export release. If `.pull-lock` remains after a crash, prove no pull is active before removing only that lock.
+
+## Owner status box
+
+Normal owner pages show a compact server-backup and storage box below navigation. It is absent for contributors, public shares and print. The owner-only read API discloses no filesystem paths or secrets. It reads the newest completed nightly filename's source time; missing, overdue, future-dated or unreadable status is shown as a warning. `BACKUP_MAX_AGE_HOURS` is a positive configurable threshold, default 36 hours. This reports the server copy only. It does not confirm that the separate Windows offsite task has run.
+
+The file allowance uses the same live accounting as upload admission, including retained/orphan files and pending reservations. Storage details separately show filesystem free space and the configured reserve. Neither measure establishes the hosting account quota. A warning appears when one maximum-size request cannot fit, the reserve is threatened or accounting is unhealthy. Failed probes remain visibly unavailable. The box loads when opened, refreshes on focus and every minute, and reports request failures rather than retaining a healthy-looking result. It is not an alert service while the application is closed.
 
 ## Offline restore
 
@@ -1908,7 +2467,7 @@ Successful restore emits a system diagnostic with reason `database_restore` and 
 
 **Depends on:** Task 2.
 
-Build Node ESM entrypoints locally with esbuild while keeping runtime packages external. Stage only compiled assets and package manifests; npm ci --omit=dev runs with the hosting Node 24 directory on PATH. Staging never switches the running release. Windows pull pins the database, downloads database/manifest, copies only missing immutable blobs into a shared local pool, uses one SFTP batch for database/manifest and one for all missing blobs, verifies all references and source freshness, and only then creates COMPLETE. Windows tests exercise batch orchestration with mocked commands; they do not establish real SSH behavior.
+Build Node ESM entrypoints locally with esbuild while keeping runtime packages external. Stage only compiled assets and package manifests; npm ci --omit=dev runs with the hosting Node 24 directory on PATH. Staging never switches the running release. Windows pull pins the database, downloads database/manifest, copies only missing immutable blobs into a shared local pool, uses one SFTP batch for database/manifest and one for all missing blobs, verifies all references and source freshness, and only then creates COMPLETE. Failed pulls notify only the configured local logged-on operator through Windows msg.exe and retain a nonzero exit. This includes setup, lock, transfer, verification and pin-release failures. Windows tests exercise transfer and notification dispatch with mocked commands; they do not establish real SSH or desktop delivery.
 
 - [ ] Write/extract the tests first.
 
@@ -1957,7 +2516,7 @@ test('compiled production entrypoints run without tsx and serve a real health re
 
 #### File: `tests/server/pull-script.test.ts`
 
-<!-- replay task=3 phase=test encoding=text sha256=dc14c11d25a989dc3db40cb70eb5c4113df734285b33d8aedacac6cd6f032b0b -->
+<!-- replay task=3 phase=test encoding=text sha256=b241d50dc756411e1653e976ac8d2321a26775473e038708e2254a1c22efec37 -->
 
 ``````typescript
 import { afterEach, expect, it } from 'vitest';
@@ -1993,38 +2552,58 @@ function run(f: ReturnType<typeof fixture>, mode = 'success') {
 }
 it.skipIf(process.platform !== 'win32')('uses two SFTP batches for 128 new blobs, metadata first, and skips existing blobs on the next pull', () => {
   const f = fixture(); const first = run(f);
-  expect(first.report).toMatchObject({ batches: [2, 128], released: true, age: '24', failed: false, locked: false });
+  expect(first.report).toMatchObject({ batches: [2, 128], released: true, age: '24', failed: false, locked: false, notifications: 0 });
   expect(first.report.order.slice(0, 2)).toEqual(['builtbasis.db', 'manifest.json']);
   for (const b of f.blobs) expect(existsSync(join(first.destination, 'files', b.hash.slice(0, 2), b.hash))).toBe(true);
   const second = run(f);
   expect(second.report.batches).toEqual([2]);
+}, 15000);
+it.skipIf(process.platform !== 'win32').each(['setup', 'lock', 'ssh', 'sftp', 'integrity', 'stale', 'release', 'notification-failure'])('dispatches one local desktop failure notification for %s without hiding failure', mode => {
+  const { report } = run(fixture(), mode);
+  expect(report.failed).toBe(true);
+  expect(report.notifications).toBe(1);
+  expect(report.notificationTargets).toEqual(['fixture-operator']);
+  if (mode === 'notification-failure') expect(report.deliveryWarnings).toBe(1);
+  expect(report.locked).toBe(mode === 'lock');
 }, 15000);
 it.skipIf(process.platform !== 'win32')('fails an overdue-source verifier result, releases its pin and never publishes COMPLETE', () => {
   const { report, destination } = run(fixture(), 'stale');
   expect(report).toMatchObject({ failed: true, released: true, locked: false });
   expect(existsSync(join(destination, 'snapshots', 'a'.repeat(32), 'COMPLETE'))).toBe(false);
 }, 15000);
+it.skipIf(process.platform !== 'win32')('exits the scheduled PowerShell process nonzero after notifying of setup failure', () => {
+  const f = fixture();
+  try {
+    execFileSync('powershell.exe', ['-NoProfile', '-File', resolve('tests/operations/pull-harness.ps1'), '-Repo', f.repo,
+      '-Fixture', f.source, '-Destination', join(f.root, 'backup'), '-Mode', 'setup', '-Uncaught'], { stdio: 'pipe' });
+    throw new Error('Expected nonzero exit');
+  } catch (error) { expect((error as { status?: number }).status).toBe(1); }
+}, 15000);
 ``````
 
 #### File: `tests/operations/pull-harness.ps1`
 
-<!-- replay task=3 phase=test encoding=text sha256=749a148aa8d7313a023473ea46c6b3d4ef23c742ac7e43178faa6d27e1346766 -->
+<!-- replay task=3 phase=test encoding=text sha256=bddf339d636430f7bfa83b97df6b9b9c890ddd705f9ade2de57885e3cad7aed2 -->
 
 ``````powershell
-param([string]$Repo, [string]$Fixture, [string]$Destination, [string]$Mode = 'success')
+param([string]$Repo, [string]$Fixture, [string]$Destination, [string]$Mode = 'success', [switch]$Uncaught)
 $ErrorActionPreference = 'Stop'
 $global:TransferBatches = [Collections.Generic.List[object]]::new()
 $global:Released = $false
 $global:VerifiedAge = $null
 $global:CopyOrder = [Collections.Generic.List[string]]::new()
+$global:Notifications = 0
+$global:NotificationTargets = [Collections.Generic.List[string]]::new()
+function global:msg.exe { $global:Notifications++; $global:NotificationTargets.Add($args[0]); $global:LASTEXITCODE = $(if ($Mode -eq 'notification-failure') { 1 } else { 0 }) }
 function global:ssh {
   $global:LASTEXITCODE = 0
-  if ($args[-1] -like '* begin') { return '{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' }
-  if ($args[-1] -like '* release *') { $global:Released = $true; return }
+  if ($args[-1] -like '* begin') { if ($Mode -eq 'ssh') { $global:LASTEXITCODE = 1; return }; return '{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' }
+  if ($args[-1] -like '* release *') { $global:Released = $true; if ($Mode -eq 'release') { $global:LASTEXITCODE = 1 }; return }
   throw 'Unexpected SSH command in mock'
 }
 function global:scp { throw 'Per-file SCP is forbidden in this test' }
 function global:sftp {
+  if ($Mode -eq 'sftp') { $global:LASTEXITCODE = 1; return }
   $index = [Array]::IndexOf($args, '-b')
   if ($index -lt 0) { throw 'Missing SFTP batch file' }
   $lines = @(Get-Content -LiteralPath $args[$index + 1])
@@ -2035,6 +2614,7 @@ function global:sftp {
     $name = ($remote -split '/')[-1]
     $global:CopyOrder.Add($name)
     Copy-Item -LiteralPath (Join-Path $Fixture $name) -Destination $local
+    if ($Mode -eq 'integrity' -and $name -match '^[a-f0-9]{64}$') { [IO.File]::WriteAllText($local, 'corrupt') }
   }
   $global:LASTEXITCODE = 0
 }
@@ -2042,14 +2622,18 @@ function global:node {
   $index = [Array]::IndexOf($args, '--max-age-hours')
   if ($index -lt 0) { throw 'Missing source freshness limit' }
   $global:VerifiedAge = $args[$index + 1]
-  if ($Mode -eq 'stale') { $global:LASTEXITCODE = 1; return }
+  if ($Mode -in @('stale','notification-failure')) { $global:LASTEXITCODE = 1; return }
   [IO.File]::WriteAllText((Join-Path $args[2] 'COMPLETE'), '{"sourceCreatedAt":"2026-10-04T00:00:00Z"}')
   $global:LASTEXITCODE = 0
 }
 $failed = $false
-try { & (Join-Path $Repo 'scripts/pull-backup.ps1') -SshAlias fixture -RemoteRelease /fixture/release -RemoteData /fixture/data -Destination $Destination -MaxAgeHours 24 | Out-Null }
+if ($Mode -eq 'setup') { Remove-Item -LiteralPath (Join-Path $Repo 'dist/server/backup-export.mjs') }
+if ($Mode -eq 'lock') { [IO.Directory]::CreateDirectory((Join-Path $Destination '.pull-lock')) | Out-Null }
+if ($Uncaught) { & (Join-Path $Repo 'scripts/pull-backup.ps1') -SshAlias fixture -RemoteRelease /fixture/release -RemoteData /fixture/data -Destination $Destination -MaxAgeHours 24; return }
+$deliveryWarnings = @()
+try { & (Join-Path $Repo 'scripts/pull-backup.ps1') -SshAlias fixture -RemoteRelease /fixture/release -RemoteData /fixture/data -Destination $Destination -MaxAgeHours 24 -NotificationUser fixture-operator -WarningAction SilentlyContinue -WarningVariable deliveryWarnings | Out-Null }
 catch { $failed = $true }
-[ordered]@{ batches = $global:TransferBatches.ToArray(); released = $global:Released; age = $global:VerifiedAge; failed = $failed; order = $global:CopyOrder.ToArray(); locked = Test-Path (Join-Path $Destination '.pull-lock') } | ConvertTo-Json -Compress
+[ordered]@{ notificationTargets = $global:NotificationTargets.ToArray(); deliveryWarnings = $deliveryWarnings.Count; notifications = $global:Notifications; batches = $global:TransferBatches.ToArray(); released = $global:Released; age = $global:VerifiedAge; failed = $failed; order = $global:CopyOrder.ToArray(); locked = Test-Path (Join-Path $Destination '.pull-lock') } | ConvertTo-Json -Compress
 ``````
 
 - [ ] Run the focused test before implementation: `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts`. The production test fails because scripts/build-server.mjs does not exist. It must pass after extraction, exercising a real compiled process and HTTP health request without invoking tsx.
@@ -2126,20 +2710,29 @@ try {
 
 #### File: `scripts/pull-backup.ps1`
 
-<!-- replay task=3 phase=implementation encoding=text sha256=9dc770b2ce55b2420ea904408715f12e68010dc0d4570f21060d8f355920498c -->
+<!-- replay task=3 phase=implementation encoding=text sha256=4bfe52b267fac265a265f6999c4868e449de2ddac26fc8b17a2b761b21056ef2 -->
 
 ``````powershell
+[CmdletBinding()]
 param(
-  [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]*$')][string]$SshAlias,
-  [Parameter(Mandatory)][ValidatePattern('^/[A-Za-z0-9_/-]+$')][string]$RemoteRelease,
-  [Parameter(Mandatory)][ValidatePattern('^/[A-Za-z0-9_/-]+$')][string]$RemoteData,
-  [Parameter(Mandatory)][string]$Destination,
-  [ValidateScript({ $_ -gt 0 -and -not [double]::IsInfinity($_) -and -not [double]::IsNaN($_) })][double]$MaxAgeHours = 36
+  [string]$SshAlias,
+  [string]$RemoteRelease,
+  [string]$RemoteData,
+  [string]$Destination,
+  $MaxAgeHours = 36,
+  [string]$NotificationUser = $env:USERNAME
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$lockCreated = $false
+$exportId = $null
+try {
+if ($NotificationUser -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') { throw 'Invalid local notification user' }
+Get-Command msg.exe -ErrorAction Stop | Out-Null
+$MaxAgeHours = [double]::Parse([string]$MaxAgeHours, [Globalization.CultureInfo]::InvariantCulture)
+if ($SshAlias -notmatch '^[A-Za-z0-9][A-Za-z0-9.-]*$' -or [string]::IsNullOrWhiteSpace($Destination) -or $MaxAgeHours -le 0 -or [double]::IsInfinity($MaxAgeHours) -or [double]::IsNaN($MaxAgeHours)) { throw 'Invalid pull configuration' }
 foreach ($path in @($RemoteRelease,$RemoteData)) {
-  if ($path.Contains('/../') -or $path.EndsWith('/..') -or $path -eq '/') { throw 'Unsafe remote path' }
+  if ($path -notmatch '^/[A-Za-z0-9_/-]+$' -or $path.Contains('/../') -or $path.EndsWith('/..') -or $path -eq '/') { throw 'Unsafe remote path' }
 }
 $repo = Split-Path $PSScriptRoot -Parent
 if (-not (Test-Path -LiteralPath (Join-Path $repo 'dist/server/backup-export.mjs'))) { throw 'Build the matching server tools first' }
@@ -2147,7 +2740,7 @@ $root = [IO.Path]::GetFullPath($Destination)
 [IO.Directory]::CreateDirectory($root) | Out-Null
 $lock = Join-Path $root '.pull-lock'
 New-Item -ItemType Directory -Path $lock -ErrorAction Stop | Out-Null
-$exportId = $null
+$lockCreated = $true
 $remoteCommand = "cd '$RemoteRelease' && BUILTBASIS_DATA_DIR='$RemoteData' /usr/local/nodejs/24/bin/node dist/server/backup-export.mjs"
 # One SFTP process handles a batch; never open one SSH connection per blob.
 function Invoke-BatchTransfer([string[]]$Lines) {
@@ -2198,19 +2791,31 @@ try {
   }
   & node (Join-Path $repo 'dist/server/backup-export.mjs') verify $bundle --files-dir $pool --max-age-hours $MaxAgeHours.ToString([Globalization.CultureInfo]::InvariantCulture)
   if ($LASTEXITCODE -ne 0) { throw 'Off-site verification failed; copy is incomplete' }
-  Write-Output "Verified off-site backup: $bundle"
 } finally {
-  if ($exportId) {
-    & ssh -o BatchMode=yes -- $SshAlias "$remoteCommand release $exportId"
-    if ($LASTEXITCODE -ne 0) { Write-Warning "Release pin $exportId manually after checking active jobs" }
-  }
-  Remove-Item -LiteralPath $lock
+  try {
+    if ($exportId) {
+      & ssh -o BatchMode=yes -- $SshAlias "$remoteCommand release $exportId"
+      if ($LASTEXITCODE -ne 0) { throw "Export pin release failed: $exportId. Inspect active jobs and release it manually." }
+    }
+  } finally { if ($lockCreated) { Remove-Item -LiteralPath $lock; $lockCreated = $false } }
+}
+Write-Output "Verified off-site backup: $bundle"
+} catch {
+  $pullFailure = $_
+  try {
+    if ($NotificationUser -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') { throw 'Invalid notification target' }
+    Get-Command msg.exe -ErrorAction Stop | Out-Null
+    # Local operator only. No remote server argument, wildcard or messages containing private paths.
+    & msg.exe $NotificationUser /time:300 'BuiltBasis off-site backup failed. Check the scheduled task and its private log. The latest recovery point may be overdue.'
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop notification delivery failed' }
+  } catch { Write-Warning 'BuiltBasis backup failed and the local desktop notification could not be delivered. Check task history and the private log.' }
+  throw $pullFailure
 }
 ``````
 
 - [ ] GREEN: run `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts` and require success.
 
-- [ ] Run npm run build and npm run typecheck. Parse both PowerShell scripts with System.Management.Automation.Language.Parser and require zero errors. Follow the production-only probe below. Actual SSH upload, scheduling and live activation remain Task 4/5; local tests do not claim those passed.
+- [ ] Expect 12 focused tests: one compiled-process check and 11 Windows transfer/failure checks. Run npm run build and npm run typecheck. Parse both PowerShell scripts with System.Management.Automation.Language.Parser and require zero errors. Follow the production-only probe below. Actual SSH upload, scheduling and live activation remain Task 4/5; local tests do not claim those passed.
 
 - [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files. Preserve synthetic PDF fixture whitespace from Plan 5.
 
@@ -2224,7 +2829,7 @@ This task requires the owner’s actual hosting settings and live acceptance evi
 
 #### File: `docs/guides/deployment.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=eba51f11d6f0e8822ec1f7fcc149b5bf6c5bf1c6a35a3975b19381824367d19b -->
+<!-- replay task=4 phase=implementation encoding=text sha256=683eac8064cc126985a507f84dc4b7176a5c7aae31a8497a06bc96d2378b17f2 -->
 
 ``````markdown
 # Deploy and release BuiltBasis v1
@@ -2251,6 +2856,8 @@ The script transfers only built assets, compiled server tools and the package ma
 Use separate directories: `/usr/home/ktimana/builtbasis/releases/<commit>` for code, `/usr/home/ktimana/builtbasis/current` for its symlink, `/usr/home/ktimana/builtbasis-data` for data, and `/usr/home/ktimana/builtbasis-config/operations.env` for non-secret command-line configuration. The configuration directory and file are owner-readable only (700 and 600). They are outside code, data and backup transfers. Preserve the dedicated share key across releases. Do not put real configuration or account passwords in this repository.
 
 Record the actual account quota and current usage from konsoleH before setting `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`. Budget for immutable files, the database, 14 daily/8 weekly backups, export pins, two releases and other sites. The filesystem free-space value is not the account quota. No default budget is assumed. Record the chosen values and rationale privately in the release checklist.
+
+Set `BACKUP_MAX_AGE_HOURS` if the owner-page server-backup warning threshold should differ from its 36-hour default. Keep it aligned with the planned nightly schedule and the Windows pull's `-MaxAgeHours`. The compact owner status box reports the server copy and live file allowance; its details distinguish that allowance from filesystem space and hosting quota. Missing/unreadable status remains a warning. Verify the box is absent from contributor, share and print pages. The separate Windows failure message and its logged-on-desktop requirement are documented in the [backup guide](backup-restore.md).
 
 Set `BUILTBASIS_DATA_DIR`, `PUBLIC_BASE_URL=https://builtbasis.ktimanet.com`, `SHARE_LINK_KEY`, `BEHIND_CLOUDFLARE=1`, both storage settings, and `NODE_ENV=production`. Leave `PORT` unset: Hetzner supplies its socket. Keep `SHARE_LINK_KEY` only in the HTTP application settings in konsoleH. The command-line tools do not need it. Put only `BUILTBASIS_DATA_DIR` and any other needed non-secret settings in `operations.env`; keep the data path aligned with konsoleH. Never duplicate the share key into that file. Never print the key in logs. Cloudflare Full (strict) remains enabled.
 
@@ -2298,7 +2905,7 @@ Use synthetic records/files and dedicated temporary test accounts first. Record 
 - Stream an exact 100,000,000-byte multipart request and a 100,000,001-byte request (including metadata and boundaries), with and without Content-Length where supported by the proxy. The first obeys format/record rules and the second returns 413 without a new occurrence. Test disconnect cleanup, 507 capacity handling and originals/range/HEAD semantics. Measure whole-request sizes; a 100 MB file alone exceeds the request limit. If the proxy rejects earlier, record the actual boundary and resolve it before release rather than silently lowering the approved limit.
 - Measure peak Node RSS during concurrent representative uploads, backup, and ordinary reads under the 384 MB limit. Verify capacity reservations and restart behavior. Test Linux file and directory fsync and retained-blob visibility following a controlled app termination; do not simulate host power loss or claim power-loss proof.
 - Verify the actual nightly cron and Windows scheduled pull each complete successfully. Perform the restore drill from that off-site copy in an isolated destination. Confirm hashes, record/evidence reads and invalidation of old access before reopening anything.
-- Inspect A3 landscape output in English and Greek, short and multipage records, actual QR scanning, photo readability and footer times. Print to PDF on a supported desktop browser. Test the ordinary interface and media fallback on the owner's actual phone, including representative large photos/email/media. Synthetic Chrome viewport tests do not prove physical-device memory limits.
+- Inspect A3 landscape output in English and Greek, short and multipage records, default printing without QR (including Drafts), explicit optional QR scanning, photo readability and refreshed footer times. Print to PDF on a supported desktop browser. Test the ordinary interface and media fallback on the owner's actual phone, including representative large photos/email/media. Synthetic Chrome viewport tests do not prove physical-device memory limits.
 - Check `https://www.ktimanet.com/` still serves WordPress using a browser User-Agent. After successful acceptance, remove only the explicitly identified spike app/data artifacts from Plan 0. Preserve all application data and backups.
 
 Release only when the hosted checks, real off-site drill and documentation reconciliation pass. Until then record Plan 6 as In progress. The design becomes Historical only after its enduring contracts are consolidated into the maintained v1 specification and Architecture. Planning replay alone is never go-live evidence.
@@ -2306,7 +2913,7 @@ Release only when the hosted checks, real off-site drill and documentation recon
 
 #### File: `docs/guides/release-checklist.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=508a0f87d63f26b457a7a89b7d5dca8db870cd584b52715cd44ae84245386ead -->
+<!-- replay task=4 phase=implementation encoding=text sha256=c168f423bb9a01ef845e1e2887151e44e8cd705ccdb05e29e5873c1abcac9806 -->
 
 ``````markdown
 # v1 release checklist
@@ -2345,9 +2952,12 @@ For every completed gate, record the date, operator, release commit, environment
 - [ ] Check representative EML/MSG, PDF, SVG, audio/video and download-only attachments on desktop and phone. Confirm no external email tracking requests, safe failure/cancel, original-download fallback and supported playback behavior.
 - [ ] Inspect the Greek and English interface with actual project labels. Check keyboard use, phone-accessible definitions, owner/contributor separation, public/private Notes and private Log attachments. Confirm one public occurrence never reveals metadata of a private occurrence with identical bytes.
 - [ ] Print representative Greek and English records to **A3 landscape PDF** from the intended desktop browser. Include long multi-page text, all subtypes, measurements/comparisons and Before/After photo limits. Inspect Greek glyphs, page breaks, clipping and pagination at actual scale.
-- [ ] Decode the printed QR and open it on a separate device. Verify it resolves to the owner-selected active existing share link. Confirm revoked/expired/Draft denial, no automatic link creation on GET and exclusion of Notes, Log, Activity and all private fields from PDF.
+- [ ] Print an ordinary record and a Draft with **Include QR link** off by default. Confirm no link is created, no QR is printed, Draft status is clear, and sharing-service failure does not block printing without QR. Enable QR on an eligible record, decode it and open it on a separate device. Verify it resolves to the owner-selected active existing share link. Confirm revoked/expired/Draft denial, no automatic link creation, fresh labels/footer after managed-list changes, and exclusion of Notes, Log, Activity and all private fields from every PDF.
 
 ## Backup and recovery
+
+- [ ] Verify the owner-only status box below navigation shows the completed server source date and configured age threshold. Exercise missing/overdue/read-failure warnings and low managed-budget/filesystem-reserve states. Confirm it uses live upload reservations, does not expose paths/secrets, distinguishes hosting quota and remains absent for contributors/share/print.
+- [ ] Under the actual scheduled Windows identity, trigger a controlled pull failure and observe the local `msg.exe` desktop message. Verify setup/transfer/stale/release failures keep a nonzero task exit, failed notification delivery is logged, and success sends no message. Record the logged-on-desktop requirement and that a powered-off PC or a task that never runs cannot alert through this mechanism.
 
 - [ ] Install nightly server cron with absolute Node, stable release directory and the existing external configuration file. Keep the share key out of cron text and backup directories. Observe an actual scheduled run, inspect its completed SQLite copy and confirm failed jobs produce a visible operator alert.
 - [ ] Confirm retention keeps 14 daily and eight weekly UTC buckets while leaving pre-migration backups and immutable blobs intact. Verify rotation cannot break an active pinned export. Document abandoned-pin and stale-lock inspection without clearing active work.
@@ -2370,7 +2980,7 @@ For every completed gate, record the date, operator, release commit, environment
 
 **Depends on:** Task 4.
 
-Install nightly server cron and the Windows scheduled pull using the operating guide from Task 2. Verify the scheduled jobs actually run under their real identities, including X: availability and unattended SSH. Pin/copy database first, copy immutable files, verify, then mark complete. Monitor failed jobs and the source backup timestamp. New transfer or COMPLETE times cannot make an old recovery point current. Perform the drill from that actual off-site copy into a new isolated data directory.
+Install nightly server cron and the Windows scheduled pull using the operating guide from Task 2. Verify the scheduled jobs actually run under their real identities, including X: availability, noninteractive SSH authentication and the logged-on desktop required for local failure notifications. Demonstrate actual warning/message delivery using isolated failure cases. Pin/copy database first, copy immutable files, verify, then mark complete. Monitor failed jobs and the source backup timestamp. New transfer or COMPLETE times cannot make an old recovery point current. Perform the drill from that actual off-site copy into a new isolated data directory.
 
 - [ ] Record integrity/hash verification, restored records/files, owner access, zero old sessions/grants, revoked links and disabled contributors. Demonstrate password reset before enable and deliberate regrant. A real production cutover requires app and jobs stopped through access reset and verification; the drill must not replace production data. Keep the key outside backups. Complete all backup/recovery gates before v1 delivery.
 
@@ -2386,7 +2996,7 @@ The complete proposed maintained specification below consolidates approved requi
 
 #### File: `docs/specs/v1.md`
 
-<!-- replay task=6 phase=implementation encoding=text sha256=614424dff94072dba7a02597b4decc420e005a621bd3ac5c0dcc671a9aab540c -->
+<!-- replay task=6 phase=implementation encoding=text sha256=b720b6c1cd2974d599de27f248624efac99ffbca49ca7ce89f8855e6cdcb7b9a -->
 
 ``````markdown
 # BuiltBasis v1 specification
@@ -3034,12 +3644,17 @@ All database access is confined to `src/server` data-access modules, so a later 
   3. **Verify** that every file referenced by the pinned backup is present locally; only then mark that off-site copy complete.
 - **Restore requirements**: stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; **before access resumes, delete all sessions and revoke all share links** (a restored database can bring back links revoked after the backup was taken); disable all non-owner accounts and delete all record grants before access resumes; then issue new links where needed. Before restoring contributor access, the owner must reset their passwords, enable selected accounts and deliberately regrant records. Enabling alone must not revive credentials or permissions from an old backup.
 - **One restore drill** from an off-site copy is performed before v1 is declared delivered.
+- **Freshness:** exports and completion reports preserve the selected database backup's identity and creation timestamp, separately from transfer and verification times. Scheduled off-site verification rejects a source older than its configured tolerance (36 hours by default). Recopying an old backup never makes it current. Previously verified older recovery points remain available for deliberate restore.
+- **Owner warnings:** a compact status box below navigation on normal owner website pages shows the latest completed server backup's age and storage headroom. It warns when the backup is missing or overdue (configurable 36-hour default), storage is low, or status cannot be checked. It is absent from contributor/shared pages and print output. Managed file-budget headroom and filesystem free space are distinct; neither claims to measure the hosting account quota.
+- **PC pull failures:** the Windows pull reports failure with a nonzero exit and a desktop notification, including overdue-source and failed-transfer cases. Configure it for the owner's logged-on desktop and verify notification delivery during release acceptance. The website status describes server backups; it does not certify the PC copy. A stopped PC or a scheduled task that never starts cannot issue a failure notification.
 
 ### 11.8 PDF
 
 - **v1: the owner prints the A3 print view to PDF from the desktop browser** (the print view has an A3-landscape print layout). There is no server-side PDF renderer in v1.
 
 ## 12. A3 print view and PDF
+
+The owner can print or save a PDF of any record, including a Draft, without creating a share link. The single print screen has an **Include QR link** checkbox, off by default. Draft status is clearly shown on the printed sheet; Drafts cannot include a share-link QR because their shared pages are unavailable. Choosing QR output requires an active, non-expired link. Private-content exclusions apply in both cases.
 
 One A3-landscape page per record (continuing to further pages if needed), in the chosen language, **without private content**. It shows exactly these fields:
 
@@ -3051,7 +3666,7 @@ One A3-landscape page per record (continuing to further pages if needed), in the
 - Measurements: for each phase present, the latest set (by set order, §5.7) as a table, plus the comparison views.
 - Photos: up to 4 _Before_ and 4 _After_ (most recent first).
 - Verification entries.
-- **QR code** to an existing active, non-expired share link of the record, chosen by the owner. If the record has none, the print view offers a button to create one first (an explicit action, §11.5).
+- **Optional QR code**, only when the owner enables **Include QR link**, to an existing active, non-expired share link of the record chosen by the owner. If the record has none, the print view offers explicit link creation (§11.5). Reading or printing never creates a link automatically. Printing without QR does not depend on the sharing service.
 - Footer: generated date-time, record last-updated date-time.
 
 The Public Notes and Private Notes fields, the Log and the Activity log are not printed in the A3 layout. Public Notes remains visible on shared record pages.
@@ -3065,7 +3680,7 @@ The Public Notes and Private Notes fields, the Log and the Activity log are not 
   - **Log and attachments:** attachments added through a log entry appear in the record's attachments list with the entry's date and text; directly added attachments appear without one.
   - **Sharing:** private fields (including Private Notes and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; **same blob, two occurrences:** with one public and one private occurrence of the same file on the shared record, the public one downloads and the private one is denied, and no private filename or log metadata is returned; **deleting a private log entry** deletes its attachment occurrences and never makes them public; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
-- **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content.
+- **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content; ordinary and Draft records print without QR or share links by default; QR output requires explicit selection and a freshly checked valid link; printing uses the refreshed snapshot and waits for its resources.
 - **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7), including session deletion and share-link revocation.
 
 Additional required coverage: existing Notes stays private through migration; Public Notes is shared but owner-editable only; each contributor permission works independently; no grant, removed grant, disabled account and Draft status deny access; contributors cannot reach owner APIs, lists, private fields/files or other records; genuine contributor attribution; 100 MB request accounting with/without Content-Length; accepted-format capability matrix; authorised view/download/range paths; real HTTP oversized-upload and disconnect cleanup; safe diagnostic logs; storage admission across concurrent uploads, failed transactions and restarts; browser EML/MSG rendering and video/audio playback.
@@ -3106,7 +3721,7 @@ EML/MSG readers fetch the authorised original into a cancellable Worker and rend
 
 Only successful public record GET updates link view count and last-viewed time. HEAD, file reads and descriptors do not. Private/no-store response and logging rules apply through the upstream proxy as well as inside the application. Logs must not expose credentials, Authorization, session tokens, share tokens or private request bodies.
 
-Print uses an owner-selected existing active, unexpired share URL. Reading or printing never creates a share link. A missing link requires an explicit owner action before a QR can be selected. The PDF contains no Notes, Log, Activity or other private data. Save-to-PDF remains a desktop browser operation.
+Print includes no QR by default and requires no share link, including for Drafts. With **Include QR link** enabled, it uses an owner-selected existing active, unexpired share URL; Drafts cannot use this option. Reading or printing never creates a share link. A missing link requires an explicit owner action before a QR can be selected. Before native print, always adopt the refreshed printable snapshot and wait for its resources; when QR is selected, freshly validate its link too. The PDF contains no Notes, Log, Activity or other private data. Save-to-PDF remains a desktop browser operation.
 
 ## Appendix B. Seed and operational invariants
 
@@ -3155,33 +3770,34 @@ Their real remote and scheduled execution is checked in Tasks 4–5. Use PowerSh
 
 ## Planning replay evidence
 
-On 2026-10-04 the initial publication was replayed from `59f04d0`, passing 480 unit/API tests and 42 browser tests. After the two external reviews of `7997780`, the revised plan was extracted into a new detached checkout of `7997780`, separately from the authoring checkout. All **33 full-file payloads** were verified by hash. The runtime baseline of those commits is identical. The checkout contains proposed code only; main still runs Plan 5. The table below reports the revised replay.
+On 2026-10-04 the initial publication was replayed from `59f04d0`, passing 480 unit/API tests and 42 browser tests. The first review corrections were replayed from `7997780`, passing 486 unit/API tests and 44 browser tests, and published as `9d937ac`. After the owner approved optional QR printing and both backup warnings, all **41 full-file payloads** were extracted task by task into a fresh detached checkout of `9d937ac`, separately from authoring. The approved design amendment was copied into that checkout too. The runtime baseline of these commits is identical. All payloads were verified by hash. The checkout contains proposed code only; main still runs Plan 5. The table below reports this final replay.
 
 | Check | Actual result |
 |---|---|
-| Task 1 RED/GREEN | Initial missing print route/module, then five focused tests passed. Review regressions failed on stale names and missing automatic print, then all five print browser tests passed |
+| Task 1 RED/GREEN | Initial missing print route/module; stale-name and optional-QR browser regressions failed before fixes. Missing status/API/capacity regressions failed before implementation. Fresh replay independently passed all 17 print/monitoring/capacity tests and TypeScript before Task 2 extraction; eight print and two status browser tests passed during authoring |
 | Task 2 RED/GREEN | Initial missing operations module. Review regressions failed on missing source metadata/freshness checks, then all eighteen focused operations/database tests passed |
-| Task 3 RED/GREEN | Initial missing build script, then real compiled-process HTTP test passed. Added Windows batch-transfer success and stale-verification failure tests passed |
+| Task 3 RED/GREEN | Initial missing build script; notification regression observed no failure message before implementation. Fresh replay passed the real compiled-process HTTP test and all 11 Windows transfer/failure/exit tests |
 | Full Node/browser production builds and TypeScript | Passed |
-| Complete unit/API suite | **486 tests passed across 69 files** |
-| Complete Chrome browser suite | **44 tests passed across 10 spec files** |
-| Print output | Independent QR decode, Greek A3 dimensions, 180-paragraph multipage text completeness and photo readiness passed; screenshot inspected |
+| Complete unit/API suite | **499 tests passed across 70 files** |
+| Complete Chrome browser suite | **49 tests passed across 11 spec files** |
+| Print output | Independent QR decode, Greek A3 dimensions, 180-paragraph multipage text completeness and photo readiness passed; screenshots of print output and owner status placement inspected |
 | Production-only installation | 78 packages installed with dev dependencies omitted, down from 126; tsx and bundled browser packages absent; native runtime check, real health request and built shell passed |
 | Existing dependency resolutions | All 316 existing package-path version/resolved/integrity values preserved |
 | Production dependency audit | Zero vulnerabilities reported; four existing moderate findings remain in the complete development dependency tree |
-| Windows tooling | Release/pull scripts and test harness parsed without errors on PowerShell 5.1. Mocked transfer tests used two SFTP batches for 128 missing blobs and one metadata batch on repeat; stale verification failed without COMPLETE and released its pin. Real remote execution and Task Scheduler operation remain Tasks 4–5 |
+| Windows tooling | Release/pull scripts and test harness parsed without errors on PowerShell 5.1. Two SFTP batches covered 128 missing blobs; repeat used metadata only. Mocked notifications covered setup, lock, SSH/SFTP, integrity, stale-source, pin-release and delivery failures; an actual child process exited 1. `msg.exe` is installed on the replay PC, but delivery was mocked. Real remote execution, scheduled identity and visible desktop delivery remain Tasks 4–5 |
 
 Environment: Windows, Node 24.12.0, npm 11.6.2, Playwright 1.63.0 and installed Chrome 154.0.8037.58. Browser tests start private local fixture servers. No command connected to the hosting account or altered production. The synthetic restore is a local fixture drill, not the required actual off-site drill.
 
-The review corrections preserve source backup identity and creation time, reject stale scheduled copies, always adopt fresh printable data before printing, batch missing-file transfers, keep the share key solely in the HTTP application settings, and align Greek field labels with the design. Long-lived recovery points remain restorable. The package change preserves every existing dependency version and integrity value. Code blocks use their correct language tags and contain no leading BOM.
+The review corrections preserve source backup identity and creation time, reject stale scheduled copies, always adopt fresh printable data before printing, batch missing-file transfers, keep the share key solely in the HTTP application settings, and align Greek field labels with the design. The approved additions permit printing Drafts without QR, add a compact owner-only status box, and notify the local Windows operator on a failed pull. Long-lived recovery points remain restorable. The package change preserves every existing dependency version and integrity value. Code blocks use their correct language tags and contain no leading BOM.
 
 Authoring caught and corrected one full-suite timeout: a rotation test originally made 74 VACUUM copies. It now uses validated historical snapshots and one real rotation, preserving the race/retention assertion without the unnecessary I/O. Restore diagnostics were reconciled with §5.12 to include only system reason and reset counts. A reviewer questioned the existing ignore-scripts installation workaround; the clean production-only native/runtime probe confirmed the pinned package includes usable prebuilds on this machine. Linux installation remains a separate hosted check.
 
-The build retains existing dependency annotation and large-chunk warnings (main browser bundle approximately 931 kB before gzip). Local replay does not establish Cloudflare's request limit, account quota, upstream log/caching rules, 384 MB peak memory, Linux crash durability, physical phone capacity or actual recovery scheduling. Those are explicit uncompleted release gates, not implied passing results. No additional service, offline mode, hosted PDF engine or evidence cleanup policy was introduced.
+The build retains existing dependency annotation and large-chunk warnings (main browser bundle approximately 936 kB before gzip). Local replay does not establish Cloudflare's request limit, account quota, upstream log/caching rules, 384 MB peak memory, Linux crash durability, physical phone capacity, actual recovery scheduling or desktop-message delivery. Those are explicit uncompleted release gates, not implied passing results. No additional service, offline mode, hosted PDF engine or evidence cleanup policy was introduced.
 
 ## References checked
 
 - [esbuild packages option](https://esbuild.github.io/api/#packages) — external runtime packages in local Node builds.
 - [Node environment-file option](https://nodejs.org/api/cli.html#--env-filefile) — explicit external configuration for cron and administrative entrypoints.
 - [node-qrcode](https://github.com/soldair/node-qrcode) and [jsQR](https://github.com/cozmo/jsQR) — local QR generation and independent test decoding.
+- [Microsoft msg command](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/msg) — named local-user desktop messages, display timeout and session permissions. Live delivery remains an acceptance gate.
 - The installed pinned package source/types, project tests and actual Plan 0 results govern the concrete commands. Actual account capacity, upstream controls and physical-device behavior remain execution evidence.
