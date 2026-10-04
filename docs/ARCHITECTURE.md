@@ -1,6 +1,6 @@
 # Architecture
 
-> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5 and Plan 6 Tasks 1–3 on `codex/plan-6` (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
+> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5 and Plan 6 Tasks 1–3 on `main` (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
 
 ## System
 
