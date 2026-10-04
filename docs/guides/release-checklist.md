@@ -1,7 +1,7 @@
 # v1 release checklist
 
 > **Document type:** Release acceptance checklist
-> **Status:** In progress. Hosted release `6247a9f` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
+> **Status:** In progress. Hosted release `a3ff3e1` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
 > **Authority:** [Approved design](../designs/2026-10-02-v1-records-design.md), [proposed specification](../specs/v1.md) and [roadmap](../plans/2026-10-02-v1-roadmap.md).
 
 For every completed gate, record the date, operator, release commit, environment, command or procedure, observed result and a private evidence location. Record failures plainly. Do not copy credentials, tokens, contact data or private record content into this repository. Do not activate the specification or mark the design historical until the external gates are satisfied.
@@ -130,3 +130,19 @@ Post-rehearsal backup: source 2026-10-04T08:41:12.968Z, off-site verification 08
 Owner-provided dashboard evidence confirms Full (strict), two existing Workers identified by the owner as unrelated to BuiltBasis, and the Logpush subscription-offer screen. No configuration was changed. The HTTP requests screenshot shows normal request metadata and Dynamic cache status on visible BuiltBasis API requests; it does not prove absence of sensitive values in every upstream log field.
 
 A final SSH recheck still exposed only October 2–3 hosting log archives. Current-day hosting-log verification remains unavailable and is not marked passed. No further owner dashboard action is requested for these checks. The phone JPG investigation remains explicitly deferred; the completed recovery rehearsal and active backup schedules are unaffected.
+
+### Project management and location photos deployment — 2026-10-04
+
+Commits `296dd07`, `d942159` and `a3ff3e1` were fast-forwarded to main and pushed to GitHub. The merged release passed TypeScript, production build, 521 unit/server tests in 74 files and 61 browser tests. The build retains its existing bundle-size warning. Staging installed 78 production packages with no production audit findings and passed native SQLite/runtime checks. The staged server entrypoint and web shell matched the tested build hashes.
+
+The pre-upgrade server backup from 10:59:35.240 UTC was verified off-site in snapshot `4c3af4d4cb01a34c7f1e7c81f5768894`. The idle Windows backup task was paused while rebuilding its verifier. The owner disabled Node.js in konsoleH. The operator verified the application and database writers had stopped, took the final backup at 11:06:39.952 UTC, fingerprinted existing data, and switched the code symlink from `6247a9f` to `a3ff3e17a8a5ccdeec434c0c0952af292ee7d4bf`. The owner enabled Node.js with configuration unchanged.
+
+Startup retained the original data directory, created a pre-migration backup at 11:10:59.958 UTC and applied migrations 0005 and 0006. Integrity and foreign-key checks passed. All existing columns and rows across 25 business tables matched the stopped-service fingerprints. Owner credentials, existing records, managed lists and retained file metadata were unchanged.
+
+Actual HTTPS and desktop Chrome checks passed for project creation/editing/usage/deletion, direct managed-list actions and the expandable location tree. A temporary record accepted JPEG and HEIC location photos through the deployed browser without a tree selection. Uploads preserved unsaved Location Notes and title. Location photos stayed separate from work evidence. Anonymous sharing at phone viewport width showed the notes and photos without private notes or edit controls. The print projection and page included both location images and notes with loaded image resources. This was desktop browser verification, not a new physical-phone acceptance claim.
+
+The temporary project, record, photo occurrences, share link and verification session were removed. The original project list was unchanged, the deleted share returned 404, and the old acceptance project remained absent. Immutable uploaded bytes remain under the retention policy. WordPress still returned HTTPS 200.
+
+After cleanup, a new schema-0006 backup completed at 11:11:57.615 UTC. The Windows task was enabled and run successfully with result 0. Snapshot `0eb50ab024485777ce7ecea62187bee1` was hash/schema/freshness-verified at 11:12:26.785 UTC and its server export pin was released. The task returned to Ready with its regular schedule enabled; the server nightly schedule was unchanged. The previous release and pre-upgrade backups were retained. A schema rollback must follow the recovery guide rather than pointing old code at the upgraded database.
+
+Private evidence is under `.superpowers/project-management-refresh/`: `deploy-local-checks.json`, `deploy-before.json`, `deploy-activation.json`, `deploy-preservation.json`, `deploy-live-check.json` and `live-*.png`. Local verification logs are in the operator's temporary directory as `builtbasis-release-*.log`; PC transfer evidence is in the private destination's `operations/scheduled-pull.log`.

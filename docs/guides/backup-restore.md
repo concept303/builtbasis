@@ -1,7 +1,7 @@
 # Backup and restore
 
 > **Document type:** Operator guide
-> **Status:** Active for deployed release `6247a9f`. Actual off-site restore and hosted cutover/return rehearsal passed on 2026-10-04.
+> **Status:** Active for deployed release `a3ff3e1`. Actual off-site restore and hosted cutover/return rehearsal passed on 2026-10-04. The post-upgrade scheduled PC pull also passed with schema 0006.
 > **Contracts:** [Approved design](../designs/2026-10-02-v1-records-design.md) and [access guide](share-key-management.md).
 
 Backups contain the database and retained evidence, including private content. Keep the server data directory outside the web root. Restrict the owner's offsite directory and SSH key to the owner. Keep `SHARE_LINK_KEY` in the separate secret store. These commands never copy `.env` or export secrets.

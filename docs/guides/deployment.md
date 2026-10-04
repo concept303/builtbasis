@@ -1,7 +1,7 @@
 # Deploy and release BuiltBasis v1
 
 > **Document type:** Operator guide
-> **Status:** Active for deployed release `6247a9f`. Remaining release acceptance is tracked in the release checklist.
+> **Status:** Active for deployed release `a3ff3e1`. Remaining release acceptance is tracked in the release checklist.
 > **Contracts:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), [access guide](share-key-management.md), [backup and recovery](backup-restore.md).
 
 ## Build and stage
@@ -41,6 +41,8 @@ The password is prompted; never place it in the command line. Other deployed too
 ## Subsequent activation and rollback
 
 Take and verify a completed database backup before activation. In konsoleH deactivate BuiltBasis, confirm the exact Node process has stopped, then repoint `current` to the staged release. Keep the recorded previous symlink target. Reactivate and make a request; startup applies migrations after the existing pre-migration backup. This deliberate stop prevents the platform restarting the old release during a switch. WordPress is a separate domain and must remain untouched.
+
+For a schema upgrade, complete the pre-upgrade PC pull with the old matching verifier before rebuilding the PC tools. Pause the idle Windows pull task during the transition. After activation and data checks, create a fresh backup with the new schema, then enable and run the Windows task using the newly built matching tools. Verify its result and source-backup timestamp. A successful transfer with an incompatible verifier does not complete the backup.
 
 The trial also proved that stopping the exact running Node process triggers restart on the next request. Use that for restarting the same release after a configuration change; never use `killall node` or a guessed PID. For release switching this guide uses deactivation so the switch happens while writes are stopped.
 

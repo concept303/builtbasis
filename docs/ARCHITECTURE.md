@@ -1,6 +1,6 @@
 # Architecture
 
-> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5, Plan 6 and the locally verified project/managed-list refresh (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
+> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5, Plan 6, project/managed-list refresh and record location photos/notes, deployed as `a3ff3e1` (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
 
 ## System
 
