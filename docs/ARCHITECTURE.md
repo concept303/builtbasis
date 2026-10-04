@@ -35,7 +35,7 @@ See the [web interface guide](guides/web-interface.md) for commands and browser 
 
 ## Boundaries
 
-- Plans 0–4 are merged to main. Plan 5 browser delivery is implemented on `feat/plan-5-web-interface`, not merged; final integration review is pending.
+- Plans 0–5 are merged to main. Plan 5 browser delivery was merged at `a681e53`; final integration review passed.
 - Owner screens use owner detail routes. Contributor screens use assigned-record public projections and independent Upload/Add Log grants. Anonymous shared screens use public projections and send the fragment token only as a bearer header. Account administration stays in the CLI.
 - The owner alone edits record fields, Notes and existing content. Anonymous share links stay read-only. Both contributor and share responses exclude private content.
 - The data folder (database, files, backups) is separate from the application folder and never touched by deployment.

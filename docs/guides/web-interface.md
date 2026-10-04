@@ -1,7 +1,7 @@
 # Web interface — local operation and browser checks
 
 > **Document type:** Operator guide
-> **Status:** Active for the implemented Plan 5 browser; not merged or deployed.
+> **Status:** Active for the implemented Plan 5 browser, merged to main at `a681e53`; not deployed.
 > **Governing contracts:** [v1 design](../designs/2026-10-02-v1-records-design.md) and [access/evidence guide](share-key-management.md)
 
 ## Run the compiled interface locally

@@ -7,12 +7,12 @@
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
 > **Implemented by:** Runtime commits `b80dbcb` through `1e6bd06` on `feat/plan-5-web-interface`, from base `e04189a`; documentation closeout in `bf5cc9e`.
 > **Verified:** 2026-10-04 — build and typecheck passed; 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files passed. Documentation reconciled. Final integration review passed. Planning replay remains separate below.
-> **Merged to main:** Browser implementation not merged
+> **Merged to main:** `a681e53` — Merge Plan 5 web interface
 > **Checklist note:** The original unchecked execution lists are preserved as history, not outstanding work. Tasks 1–6 and final integration review are completed.
 
 ## Actual implementation and closeout
 
-Tasks 1–6 were executed on 2026-10-04 in the isolated `feat/plan-5-web-interface` worktree from `e04189a`. Runtime delivery spans `b80dbcb` through `1e6bd06`. Task reviews 1–5 and the final integration/documentation review passed. The branch is not merged or deployed.
+Tasks 1–6 were executed on 2026-10-04 in the isolated `feat/plan-5-web-interface` worktree from `e04189a`. Runtime delivery spans `b80dbcb` through `1e6bd06`. Task reviews 1–5 and the final integration/documentation review passed. The branch was merged to main at `a681e53`. The merged result passed the production build, TypeScript check, all 464 unit/API tests and all 39 Chrome browser tests. Production deployment remains Plan 6 work.
 
 The implementation build and TypeScript check passed. The complete unit/API suite passed **464 tests across 64 files**. Installed Chrome passed **39 browser tests across 9 spec files** against the production build and isolated fixture servers. Desktop and phone screenshots, responsive overflow and visible keyboard focus were checked. This is actual implementation evidence, separate from the planning replay below. Task 1 preserved all 262 existing dependency resolutions. All 83 non-guide extracted payloads match the approved hashes.
 

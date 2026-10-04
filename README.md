@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–4 are implemented and merged to `main`. Plan 5 is implemented on `feat/plan-5-web-interface` and is not merged. Verification on 2026-10-04 passed the browser build, TypeScript check, 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files. Final integration review is pending. Production deployment remains Plan 6 work.
+**Status:** Plans 0–5 are implemented and merged to `main`. Plan 5 was merged at `a681e53`. Verification on 2026-10-04 passed the browser build, TypeScript check, 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files. Final integration review passed. Production deployment remains Plan 6 work.
 
 ## Local dependency installation
 
