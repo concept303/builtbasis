@@ -17,15 +17,17 @@ Finish the approved v1 scope: owner A3 print/PDF output, tested production packa
 
 Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API tests, 39 browser tests). It uses a separate scratch checkout. All proposed application/scripts/tests are included completely, once per file. Runtime payloads are not installed on main by publishing this document. The extraction helper checks SHA-256 before writing selected files. The lockfile is generated from the existing one, never embedded as a replacement snapshot.
 
+**Review follow-up still open:** the source-freshness, transfer, print-refresh and packaging corrections below have been replayed. The concrete operator-alert mechanism still needs the owner's choice: an owner-screen backup/storage warning plus Windows failure notification, or monitoring through operational tools only. The existing guide/checklist alert requirements are not yet backed by an implemented notification mechanism. Resolve that gap before executing this plan. Optional printing without a QR is also awaiting the owner's decision; the current snapshots retain the approved mandatory-QR rule.
+
 ## Global constraints and settled decisions
 
 - Keep React/Vite, Fastify/TypeScript and SQLite/better-sqlite3. No server-side Chromium: Plan 0 proved the needed system libraries are absent. PDF means desktop browser Save as PDF from the A3 landscape print view.
 - Printing is owner-only. Its dedicated GET response uses a strict §12 allowlist. Both Notes fields, Log, Activity and private/commercial data are absent. It never creates a share link. QR selection and link creation are explicit owner actions. Draft records have no usable public QR; publish the record before producing a QR-bearing sheet. No empty/failing-resource sheet is represented as ready.
 - Pin existing QR encoder `qrcode` 1.5.4 and types 1.5.6. Test decoding independently with `jsqr` 1.4.0. Pin esbuild 0.28.2, already present transitively in the baseline, for local Node bundle generation. Do not upgrade unrelated dependencies.
-- Compile the server and operational CLIs locally. Hosting installs only production dependencies and executes `.mjs` entrypoints. Source npm commands using tsx and the private Excel seed importer remain local development commands. The production package excludes data, environment files, keys, source contacts and node_modules.
+- Compile the server and operational CLIs locally. Hosting installs only production dependencies and executes `.mjs` entrypoints. Bundled browser packages remain development dependencies. Source npm commands using tsx and the private Excel seed importer remain local development commands. The production package excludes data, environment files, keys, source contacts and node_modules.
 - Keep the 100,000,000-byte whole-request ceiling, immutable blobs and configured total budget/reserve. Actual hosting quota and reserve values must be recorded at execution; free filesystem bytes are not the account quota. No per-user quotas or deletion of published evidence.
 - Nightly backup retains the latest snapshot for each of 14 UTC days and eight Monday-start UTC weeks, taking their union. Protect database pinning against rotation. A backup/export or pull lock fails closed on collision; remove a stale lock only after confirming its job stopped. Unreleased export pins are operational cleanup, not timed eviction of possibly active transfers.
-- Off-site order is pinned completed database and manifest first, then missing immutable files, then full hash/size/database verification, then COMPLETE. Shared local file pool is never pruned in v1. A restored directory is fresh; the live directory is never overwritten by the restore command.
+- Off-site order is pinned completed database and manifest first, then missing immutable files, then full hash/size/database and source-freshness verification, then COMPLETE. Use two SFTP batches, not a connection per file. Preserve the source backup filename and creation timestamp separately from export and verification times. Scheduled verification rejects a source older than the configurable 36-hour default. Deliberate restore can use an older completed recovery point. Shared local file pool is never pruned in v1. A restored directory is fresh; the live directory is never overwritten by the restore command.
 - Restore checks exact schema compatibility and all bytes before publication, then deletes sessions/grants, revokes links and disables nonowners atomically. Preserve the owner. Emit only the system reset reason and counts. Reset contributor passwords before enabling and deliberately granting access again. Keep the dedicated share key outside code, data and backups.
 - Separate local replay from live evidence. Tasks 4–5 require hosting access, private configuration, Windows scheduler access and actual off-site drill results. Do not mark release complete until those gates pass. No production change is authorized merely by publishing or reviewing this plan.
 
@@ -36,6 +38,8 @@ Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API t
 | Private record content or a revoked QR leaks into a PDF | Strict projection; deliberate valid QR; refresh immediately before native print | Task 1 API/browser privacy, decoded QR and revocation tests |
 | Long Greek text, delayed image loads or page breaks truncate output | A3 landscape, continuing pages, ready resources | Task 1 actual generated PDF dimensions/text and browser readiness tests; physical output Task 4 |
 | Rotation races a slow PC pull | Pinned database survives rotation; immutable references remain available | Task 2 pin/retention test; scheduled transfer Task 5 |
+| Nightly backups stop but old snapshots keep transferring | Source timestamp stays unchanged; stale verification fails without a new COMPLETE report | Task 2 repeated-export regression and Task 3 failed-pull test |
+| A referenced person or location changes without touching the record timestamp | Print adopts every refreshed value and waits for that snapshot's resources | Task 1 unchanged-record-timestamp browser regression |
 | Corrupt/missing bytes, wrong schema or restored old access | No completed candidate; all old access reset before publication | Task 2 integrity/schema/access-reset/cleanup tests; real drill Task 5 |
 | Development works but production omits tsx or hosting differs | Compiled runtime works with production-only packages; live failures block release | Task 3 process/production-only probe; Task 4 hosted checklist |
 
@@ -76,13 +80,13 @@ Ports 3490 and 5174 must be free. Use synthetic local fixtures, never a producti
 
 **Depends on:** verified Plan 5 baseline.
 
-Owner-only print projection, explicit existing-link QR selection and resource-ready A3 landscape output. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. A direct browser print before resources are ready produces no incomplete record sheet.
+Owner-only print projection, explicit existing-link QR selection and resource-ready A3 landscape output. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design.
 
-- [ ] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
+- [ ] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Move bundled browser-only packages to development dependencies without changing their versions. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
 
 #### File: `package.json`
 
-<!-- replay task=1 phase=setup encoding=text sha256=a73ab33c742fe069e21a24699e0b6c090c0a5d945396d8d4280b895cf60d9f3b -->
+<!-- replay task=1 phase=setup encoding=text sha256=cb9f967004574667a2105afba3659d5135454542c6f71aa3b276af7c6f4d4a49 -->
 
 ``````json
 {
@@ -119,6 +123,7 @@ Owner-only print projection, explicit existing-link QR selection and resource-re
     "better-sqlite3@13.0.3": true
   },
   "devDependencies": {
+    "@kenjiuno/msgreader": "1.28.0",
     "@playwright/test": "1.63.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.20.5",
@@ -127,7 +132,15 @@ Owner-only print projection, explicit existing-link QR selection and resource-re
     "@types/react-dom": "19.3.0",
     "esbuild": "0.28.2",
     "exceljs": "^4.4.0",
+    "exifr": "7.1.3",
+    "heic-to": "1.6.5",
+    "htmlparser2": "12.0.0",
     "jsqr": "1.4.0",
+    "pdfjs-dist": "6.3.289",
+    "postal-mime": "4.0.2",
+    "qrcode": "1.5.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "7.3.6",
@@ -137,17 +150,8 @@ Owner-only print projection, explicit existing-link QR selection and resource-re
     "@fastify/cookie": "^11.1.2",
     "@fastify/multipart": "9.3.0",
     "@fastify/static": "10.1.5",
-    "@kenjiuno/msgreader": "1.28.0",
     "better-sqlite3": "13.0.3",
-    "exifr": "7.1.3",
     "fastify": "^5.12.5",
-    "heic-to": "1.6.5",
-    "htmlparser2": "12.0.0",
-    "pdfjs-dist": "6.3.289",
-    "postal-mime": "4.0.2",
-    "qrcode": "1.5.4",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
     "zod": "^4.6.5"
   }
 }
@@ -157,7 +161,7 @@ Owner-only print projection, explicit existing-link QR selection and resource-re
 
 #### File: `tests/server/print-api.test.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=8803c738c9ff5ce7ad02ee29d4822577955d0b293e23e0e728d8e6ee94b77686 -->
+<!-- replay task=1 phase=test encoding=text sha256=5cd331f9264e3d721f96d5e22dfff9e69c6c601abf90e277288b0b370b5b13bf -->
 
 ``````typescript
 import { afterEach, beforeEach, expect, it } from 'vitest';
@@ -182,7 +186,7 @@ it('returns only printable fields and GET never creates a share or changes recor
   expect(f.ctx.db.serialize()).toEqual(before);
 });
 
-it('prints at most four Before and After photos in upload order, excluding During', async () => {
+it('prints at most four Before and After photos most recent first, excluding During', async () => {
   const record = await postRecord(f, { subtype: 'task' });
   for (const phase of ['before', 'after', 'during']) for (let i = 1; i <= 5; i++) await addPhoto(f, record.id, { phase, caption: `${phase}-${i}` });
   const response = await get(f.ctx, f.cookie, recordUrl(f, record.id, '/print'));
@@ -233,7 +237,7 @@ it('allows only usable, non-revoked, strictly unexpired links and none for Draft
 
 #### File: `tests/browser/print.spec.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=1111be687973f749fbd755bf1d20b7281bab4554d1edf0ad312b0abf2a3db245 -->
+<!-- replay task=1 phase=test encoding=text sha256=e90c2f5540a75e83d7857f0da8efe67ac3e4d27d66a20adb14dc0222c5566db7 -->
 
 ``````typescript
 import Database from 'better-sqlite3';
@@ -241,6 +245,50 @@ import jsQR from 'jsqr';
 import { readFileSync } from 'node:fs';
 import { test, expect, login, seed } from './fixture';
 const origin = 'http://127.0.0.1:3490';
+
+test('print refreshes renamed people and locations from another session without a record timestamp change', async ({ page, browser }) => {
+  await login(page);
+  const { projectId } = seed();
+  const project = `/api/projects/${projectId}`;
+  const personResponse = await page.request.post(project + '/people', { headers: { origin }, data: { code: 'PRINT-RENAME', name: 'Original print person', role: 'other' } });
+  expect(personResponse.status()).toBe(201);
+  const person = await personResponse.json() as { id: number };
+  const locationResponse = await page.request.post(project + '/locations', { headers: { origin }, data: { kind: 'building', nameEn: 'Original print location' } });
+  expect(locationResponse.status()).toBe(201);
+  const location = await locationResponse.json() as { id: number };
+  const created = await page.request.post(project + '/records', { headers: { origin }, data: { subtype: 'task', title: 'Fresh print snapshot', ballInCourtId: person.id, locationIds: [location.id] } });
+  expect(created.status()).toBe(201);
+  const record = await created.json() as { id: number };
+  const base = project + `/records/${record.id}`;
+  expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
+  expect((await page.request.post(base + '/share-links', { headers: { origin }, data: { label: 'Fresh print QR' } })).status()).toBe(201);
+  await page.goto(`/projects/${projectId}/records/${record.id}/print`);
+  await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Fresh print QR' });
+  const printButton = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
+  await expect(printButton).toBeEnabled();
+  await expect(page.locator('.print-sheet')).toContainText('Original print person');
+  const before = await (await page.request.get(base)).json() as { updatedAt: string };
+  const other = await browser.newContext({ baseURL: origin });
+  try {
+    const editor = await other.newPage(); await login(editor);
+    expect((await editor.request.patch(project + `/people/${person.id}`, { headers: { origin }, data: { name: 'Renamed print person' } })).status()).toBe(200);
+    expect((await editor.request.patch(project + `/locations/${location.id}`, { headers: { origin }, data: { nameEn: 'Renamed print location' } })).status()).toBe(200);
+    expect((await (await editor.request.get(base)).json()).updatedAt).toBe(before.updatedAt);
+  } finally { await other.close(); }
+  await page.evaluate(() => { window.print = () => {
+    const sheet = document.querySelector('.print-sheet')!;
+    document.body.dataset.printSnapshot = JSON.stringify({ text: sheet.textContent, generatedAt: sheet.querySelector('footer time')?.getAttribute('datetime'), ready: document.querySelector('.print-page')!.classList.contains('print-ready') });
+  }; });
+  const response = page.waitForResponse(response => response.url().endsWith(base + '/print'));
+  await printButton.click();
+  const snapshot = await (await response).json() as { generatedAt: string };
+  await expect(page.locator('body')).toHaveAttribute('data-print-snapshot', /Renamed print person/);
+  const printed = JSON.parse((await page.locator('body').getAttribute('data-print-snapshot'))!) as { text: string; generatedAt: string; ready: boolean };
+  expect(printed.text).toContain('Renamed print location');
+  expect(printed.text).not.toContain('Original print person');
+  expect(printed.generatedAt).toBe(snapshot.generatedAt);
+  expect(printed.ready).toBe(true);
+});
 
 test('owner print excludes Notes and Log from both DOM and its payload, and requires deliberate QR selection', async ({ page }) => {
   await login(page);
@@ -278,6 +326,38 @@ test('owner print excludes Notes and Log from both DOM and its payload, and requ
   expect(first.view[2]! - first.view[0]!).toBeCloseTo(1190.55, -1);
   expect(first.view[3]! - first.view[1]!).toBeCloseTo(841.89, -1);
   await loading.destroy();
+});
+
+test('one print action adopts a changed record and waits for its newly added photo', async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const created = await page.request.post(`/api/projects/${projectId}/records`, { headers: { origin }, data: { subtype: 'task', title: 'Before fresh snapshot' } });
+  expect(created.status()).toBe(201);
+  const record = await created.json() as { id: number };
+  const base = `/api/projects/${projectId}/records/${record.id}`;
+  expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
+  expect((await page.request.post(base + '/share-links', { headers: { origin }, data: { label: 'Changed print QR' } })).status()).toBe(201);
+  await page.goto(`/projects/${projectId}/records/${record.id}/print`);
+  await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Changed print QR' });
+  const button = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
+  await expect(button).toBeEnabled();
+  const file = { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: readFileSync('tests/browser/fixtures/media-oriented.jpg') };
+  expect((await page.request.post(base + '/photos', { headers: { origin }, multipart: { metadata: JSON.stringify({ phase: 'after', caption: 'New print photo' }), original: file, display: file, thumbnail: file } })).status()).toBe(201);
+  expect((await page.request.patch(base, { headers: { origin }, data: { title: 'After fresh snapshot' } })).status()).toBe(200);
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route(base + '/photos/*/display', async route => { await gate; await route.continue(); });
+  await page.evaluate(() => { window.print = () => {
+    const image = document.querySelector('.print-photos img') as HTMLImageElement | null;
+    document.body.dataset.printSnapshot = JSON.stringify({ text: document.querySelector('.print-sheet')!.textContent, photoReady: !!image?.complete && image.naturalWidth > 0, ready: document.querySelector('.print-page')!.classList.contains('print-ready') });
+  }; });
+  await button.click();
+  await expect(page.locator('.print-sheet')).toContainText('After fresh snapshot');
+  await expect(button).toBeDisabled();
+  await expect(page.locator('body')).not.toHaveAttribute('data-print-snapshot');
+  release();
+  await expect(page.locator('body')).toHaveAttribute('data-print-snapshot', /After fresh snapshot/);
+  const printed = JSON.parse((await page.locator('body').getAttribute('data-print-snapshot'))!) as { photoReady: boolean; ready: boolean };
+  expect(printed).toMatchObject({ photoReady: true, ready: true });
 });
 
 test('no link is created on GET and long text continues onto further A3 pages', async ({ page }) => {
@@ -344,6 +424,276 @@ test('printing waits for photo resources and excludes revoked and expired QR cho
   await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeDisabled();
   await expect(page.locator('body')).not.toHaveAttribute('data-print-called');
+});
+``````
+
+#### File: `tests/browser/record.spec.ts`
+
+<!-- replay task=1 phase=test encoding=text sha256=213c4b2dfe302eb4e5695afb4ffe98c2f59284c2637353c85884b7cc61e2ad98 -->
+
+``````typescript
+import type { Page } from '@playwright/test';
+import { test, expect, login, seed } from './fixture';
+
+const origin = 'http://127.0.0.1:3490';
+async function create(page: Page, subtype = 'task', extra: Record<string, unknown> = {}) {
+  const { projectId } = seed();
+  const response = await page.request.post(`/api/projects/${projectId}/records`, { headers: { origin }, data: { subtype, title: `Synthetic ${subtype} ${Date.now()}`, ...extra } });
+  expect(response.ok()).toBeTruthy();
+  const record = await response.json() as { id: number; title: string };
+  await page.goto(`/projects/${projectId}/records/${record.id}`);
+  await expect(page.getByRole('heading', { name: record.title, exact: true })).toBeVisible();
+  return { ...record, base: `/api/projects/${projectId}/records/${record.id}` };
+}
+async function tab(page: Page, name: string) { await page.getByRole('navigation', { name: 'Record sections' }).getByRole('button', { name, exact: true }).click(); }
+async function transition(page: Page, target: string) {
+  await page.getByRole('button', { name: 'Change status', exact: true }).click();
+  await page.getByRole('combobox', { name: 'New status', exact: true }).selectOption(target);
+}
+async function applyStatus(page: Page) {
+  await page.getByRole('button', { name: 'Apply status', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+}
+async function saved(page: Page, button: string) {
+  await page.getByRole('button', { name: button, exact: true }).click();
+  await expect(page.getByRole('button', { name: button, exact: true })).toHaveCount(0);
+}
+
+test('owner editor preserves exact text across language changes, confirms cancellation and keeps saved hidden estimates', async ({ page }) => {
+  await login(page); const record = await create(page, 'task', { outsideScope: true, estimatedCost: 19.25 });
+  await page.getByRole('button', { name: 'Edit record', exact: true }).click();
+  const exact = '  Owner wording\n  remains unchanged  ';
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill(exact);
+  const locations = page.getByRole('group', { name: 'Locations', exact: true });
+  await locations.locator('summary').filter({ hasText: /^Villa 1$/ }).click();
+  await locations.getByRole('checkbox', { name: 'Kitchen', exact: true }).check();
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('el');
+  await expect(page.getByRole('textbox', { name: 'Περιγραφή', exact: true })).toHaveValue(exact);
+  await page.getByRole('combobox', { name: 'Γλώσσα', exact: true }).selectOption('en');
+  await page.getByLabel('Estimated cost (€)', { exact: true }).fill('42.90');
+  await page.getByLabel('Outside contract scope', { exact: true }).uncheck();
+  await saved(page, 'Save record');
+  const response = await page.request.get(record.base);
+  expect(await response.json()).toMatchObject({ description: exact, outsideScope: false, estimatedCost: 19.25 });
+  await page.getByRole('button', { name: 'Edit record', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Unsaved');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Unsaved');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('heading', { name: record.title, exact: true })).toBeVisible();
+});
+
+test('QI classification and chosen options require an accountable decision; DC keeps its own classification', async ({ page }) => {
+  await login(page); const qi = await create(page, 'quality_issue');
+  await page.getByRole('button', { name: 'Add option', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Option label', exact: true }).fill('Repair carefully');
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Preserve the original proposal.');
+  await saved(page, 'Save option');
+  await page.getByRole('button', { name: 'Edit record', exact: true }).click();
+  await page.getByRole('group', { name: 'Type of problem', exact: true }).getByRole('checkbox').first().check();
+  await page.getByRole('combobox', { name: 'Disposition', exact: true }).selectOption('repair');
+  await page.getByRole('combobox', { name: 'Chosen option', exact: true }).selectOption({ label: 'Repair carefully' });
+  await page.getByRole('textbox', { name: 'Instruction text', exact: true }).fill('  Issued wording\nDo not translate.  ');
+  await saved(page, 'Save record');
+  await transition(page, 'open');
+  await page.getByRole('button', { name: 'Apply status', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Record who decided');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit record', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Decided by', exact: true }).selectOption(String(seed().architectId));
+  await page.getByLabel('Decided on', { exact: true }).fill('2026-10-02');
+  await saved(page, 'Save record');
+  await transition(page, 'open'); await applyStatus(page);
+  expect(await (await page.request.get(qi.base)).json()).toMatchObject({ status: 'open', instructionText: '  Issued wording\nDo not translate.  ' });
+  await create(page, 'detail_clarification');
+  await page.getByRole('button', { name: 'Edit record', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Disposition', exact: true })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Question', exact: true }).fill('How should the edge be finished?');
+  await page.getByRole('combobox', { name: 'Issued by', exact: true }).selectOption(String(seed().architectId));
+  await page.getByRole('combobox', { name: 'Route', exact: true }).selectOption({ index: 1 });
+  await saved(page, 'Save record'); await transition(page, 'open'); await applyStatus(page);
+  await expect(page.getByText('How should the edge be finished?', { exact: true })).toBeVisible();
+});
+
+test('status hold reasons and failed then passed verification are explicit and localized', async ({ page }) => {
+  await login(page); await create(page); await transition(page, 'open'); await applyStatus(page);
+  await transition(page, 'on_hold');
+  await page.getByRole('combobox', { name: 'Reason', exact: true }).selectOption('other');
+  await page.getByRole('textbox', { name: 'Reason note', exact: true }).fill('Waiting for access.');
+  await applyStatus(page);
+  await expect(page.getByText('Waiting for access.', { exact: true })).toBeVisible();
+  await transition(page, 'open'); await applyStatus(page);
+  await transition(page, 'in_progress'); await applyStatus(page);
+  await transition(page, 'ready_for_verification'); await applyStatus(page);
+  for (const target of ['in_progress', 'closed']) {
+    await transition(page, target);
+    await page.getByRole('combobox', { name: 'Checked by', exact: true }).selectOption(String(seed().architectId));
+    await page.getByLabel('Date', { exact: true }).fill('2026-10-03');
+    await page.getByRole('combobox', { name: 'Method', exact: true }).selectOption({ index: 1 });
+    await page.getByRole('textbox', { name: 'Verification note', exact: true }).fill(target === 'closed' ? 'Passed after correction.' : 'Needs another correction.');
+    await applyStatus(page);
+    if (target === 'in_progress') { await transition(page, 'ready_for_verification'); await applyStatus(page); }
+  }
+  await page.getByText('Verification history (2)', { exact: true }).click();
+  await expect(page.getByText('Needs another correction.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Passed after correction.', { exact: true })).toBeVisible();
+});
+
+test('measurement sets reject normalized duplicates and show exact signed comparisons in date order', async ({ page }) => {
+  await login(page); const record = await create(page); await tab(page, 'Measurements');
+  await page.getByRole('button', { name: 'Add measurement set', exact: true }).click();
+  await page.getByLabel('Date', { exact: true }).fill('2026-10-01');
+  await page.getByRole('combobox', { name: 'Item', exact: true }).fill(' Left ');
+  await page.getByRole('combobox', { name: 'Quantity', exact: true }).fill('Offset');
+  await page.getByLabel('Value', { exact: true }).fill('-1.25');
+  await page.getByRole('button', { name: 'Add row', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Item', exact: true }).nth(1).fill('left');
+  await page.getByRole('combobox', { name: 'Quantity', exact: true }).nth(1).fill(' offset ');
+  await page.getByLabel('Value', { exact: true }).nth(1).fill('2.5');
+  await page.getByRole('button', { name: 'Save measurements', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('only once');
+  await page.getByRole('combobox', { name: 'Item', exact: true }).nth(1).fill('Right');
+  await saved(page, 'Save measurements');
+  await page.locator('summary').filter({ hasText: /Between items.*offset.*mm/i }).click();
+  await expect(page.getByRole('cell', { name: '3.75', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add measurement set', exact: true }).click();
+  await page.getByLabel('Date', { exact: true }).fill('2026-10-02');
+  await page.getByRole('combobox', { name: 'Phase', exact: true }).selectOption('after');
+  await page.getByRole('combobox', { name: 'Item', exact: true }).fill('left');
+  await page.getByRole('combobox', { name: 'Quantity', exact: true }).fill('offset');
+  await page.getByLabel('Value', { exact: true }).fill('0.125');
+  await saved(page, 'Save measurements');
+  await page.locator('summary').filter({ hasText: /Before vs after.*Left.*Offset/ }).click();
+  await expect(page.getByRole('cell', { name: '1.375', exact: true })).toBeVisible();
+  const sets = await (await page.request.get(record.base + '/measurement-sets')).json() as { rows: { value: number }[] }[];
+  expect(sets.map(set => set.rows[0]?.value)).toEqual([-1.25, 0.125]);
+});
+
+test('owner Log CRUD retains private content and share links support explicit copy and revoke', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await login(page); const record = await create(page); await transition(page, 'open'); await applyStatus(page);
+  await tab(page, 'Log'); await page.getByRole('button', { name: 'Add Log entry', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Entry', exact: true }).fill('Private synthetic entry');
+  await page.getByLabel('Private · owner only', { exact: true }).check();
+  await saved(page, 'Save entry');
+  await page.getByRole('button', { name: 'Edit entry', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Entry', exact: true }).fill('Private synthetic edited');
+  await saved(page, 'Save entry');
+  await tab(page, 'Sharing'); await page.getByText('Create a share link', { exact: true }).click();
+  await page.getByRole('textbox', { name: 'Link label', exact: true }).fill('Synthetic reader');
+  await page.getByRole('button', { name: 'Create link', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Share URL', exact: true })).toBeVisible();
+  const url = await page.getByRole('textbox', { name: 'Share URL', exact: true }).inputValue();
+  await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
+  const shared = await context.newPage(); await shared.goto(url);
+  await expect(shared.getByRole('heading', { name: record.title, exact: true })).toBeVisible();
+  await expect(shared.locator('body')).not.toContainText('Private synthetic');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Revoke link', exact: true }).click();
+  await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
+  await shared.getByRole('button', { name: 'Ανανέωση', exact: true }).click();
+  await expect(shared.getByRole('heading', { name: record.title, exact: true })).toHaveCount(0);
+  await expect(shared.getByRole('alert')).toBeVisible();
+  await tab(page, 'Log'); page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete entry', exact: true }).click();
+  await expect(page.getByText('Private synthetic edited', { exact: true })).toHaveCount(0);
+});
+
+test('independent contributor permissions allow uploader attachment and logger public creation, then revoke visible access', async ({ page, browser }) => {
+  await login(page); const record = await create(page); await transition(page, 'open'); await applyStatus(page);
+  await tab(page, 'Log'); await page.getByRole('button', { name: 'Add Log entry', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Entry', exact: true }).fill('Public entry for contributor evidence'); await saved(page, 'Save entry');
+  await tab(page, 'Sharing');
+  for (const [username, permission] of [['uploader', 'Upload photos and attachments'], ['logger', 'Add Log entries']] as const) {
+    await page.getByRole('combobox', { name: 'User', exact: true }).selectOption(String(seed().users[username]));
+    await page.getByLabel(permission, { exact: true }).check();
+    await page.getByRole('button', { name: 'Save access', exact: true }).click();
+    await expect(page.getByRole('heading', { name: `Sample ${username}`, exact: true })).toBeVisible();
+  }
+  const uploadContext = await browser.newContext(); const uploader = await uploadContext.newPage();
+  const logContext = await browser.newContext(); const logger = await logContext.newPage();
+  try {
+    await login(uploader, 'uploader'); await uploader.goto(`/assigned/${record.id}`); await tab(uploader, 'Log');
+    await expect(uploader.getByRole('button', { name: 'Add Log entry', exact: true })).toHaveCount(0);
+    await uploader.getByText('Attach a file to this entry', { exact: true }).click();
+    await uploader.getByLabel('Attachment file', { exact: true }).setInputFiles({ name: 'synthetic.txt', mimeType: 'text/plain', buffer: Buffer.from('Synthetic attachment. No personal data.') });
+    await uploader.getByRole('button', { name: 'Upload attachment', exact: true }).click();
+    await expect(uploader.getByText('Attachment: synthetic.txt', { exact: true })).toBeVisible();
+    await login(logger, 'logger'); await logger.goto(`/assigned/${record.id}`); await tab(logger, 'Log');
+    await expect(logger.getByText('Attach a file to this entry', { exact: true })).toHaveCount(0);
+    await logger.getByRole('button', { name: 'Add Log entry', exact: true }).click();
+    await expect(logger.getByLabel('Private · owner only', { exact: true })).toHaveCount(0);
+    await logger.getByRole('textbox', { name: 'Entry', exact: true }).fill('Public contributor statement'); await saved(logger, 'Save entry');
+    await expect(logger.getByRole('button', { name: 'Edit entry', exact: true })).toHaveCount(0);
+    const article = page.locator('article').filter({ has: page.getByRole('heading', { name: 'Sample uploader', exact: true }) });
+    page.once('dialog', dialog => dialog.accept()); await article.getByRole('button', { name: 'Remove access', exact: true }).click();
+    await expect(article).toHaveCount(0);
+    await uploader.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(uploader.getByRole('heading', { name: record.title, exact: true })).toHaveCount(0);
+    await expect(uploader.locator('body')).not.toContainText('Public entry for contributor evidence');
+    await expect(uploader.getByRole('alert')).toBeVisible();
+  } finally { await uploadContext.close(); await logContext.close(); }
+});
+
+test('transient refresh failure keeps evidence form and remaining uploads mounted', async ({ page }) => {
+  await login(page); const record = await create(page); await tab(page, 'Evidence');
+  await page.getByRole('combobox', { name: 'Upload type', exact: true }).selectOption('attachments');
+  await page.getByRole('textbox', { name: 'Attachment title', exact: true }).fill('Pending evidence wording');
+  await page.getByLabel('Files', { exact: true }).setInputFiles([
+    { name: 'first-synthetic.txt', mimeType: 'text/plain', buffer: Buffer.from('First synthetic file') },
+    { name: 'second-synthetic.txt', mimeType: 'text/plain', buffer: Buffer.from('Second synthetic file') },
+  ]);
+  let posts = 0;
+  await page.route(`**${record.base}`, route => route.fulfill({ status: 500, json: { error: 'temporary_failure' } }));
+  await page.route(`**${record.base}/attachments`, route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    posts++;
+    return posts === 2 ? route.fulfill({ status: 507, json: { error: 'storage_capacity' } }) : route.continue();
+  });
+  await page.getByRole('button', { name: 'Upload evidence', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Storage is full' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: record.title, exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Attachment title', exact: true })).toHaveValue('Pending evidence wording');
+  await expect(page.getByRole('button', { name: 'Upload evidence', exact: true })).toBeEnabled();
+  expect(posts).toBe(2);
+  await page.unroute(`**${record.base}`); await page.unroute(`**${record.base}/attachments`);
+  await page.getByRole('button', { name: 'Upload evidence', exact: true }).click();
+  await expect(page.getByText('Upload complete.', { exact: true })).toBeVisible();
+  const files = await (await page.request.get(record.base + '/attachments')).json() as { originalFilename: string }[];
+  expect(files.map(file => file.originalFilename).sort()).toEqual(['first-synthetic.txt', 'second-synthetic.txt']);
+});
+
+test('inline tag creation and collision recovery retain unsaved record text', async ({ page }) => {
+  await login(page); const record = await create(page);
+  await page.getByRole('button', { name: 'Edit record', exact: true }).click();
+  const wording = '  Unsubmitted record wording\nKeep it intact.  ';
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill(wording);
+  await page.getByText('Add a new tag', { exact: true }).click();
+  await page.getByRole('combobox', { name: 'Tag name in English', exact: true }).fill('Stone');
+  await page.getByRole('button', { name: 'Create and select tag', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Use existing tag/ })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(wording);
+  await page.getByRole('button', { name: /Use existing tag/ }).click();
+  await expect(page.getByRole('group', { name: 'Tags', exact: true }).getByRole('checkbox', { name: 'Stone', exact: true })).toBeChecked();
+  const label = `Synthetic new tag ${Date.now()}`;
+  await page.getByRole('combobox', { name: 'Tag name in English', exact: true }).fill(label);
+  const tagUrl = `**/api/projects/${seed().projectId}/tags`;
+  await page.route(tagUrl, route => route.request().method() === 'POST' ? route.fulfill({ status: 503, json: { error: 'temporary_failure' } }) : route.continue());
+  await page.getByRole('button', { name: 'Create and select tag', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Tag name in English', exact: true })).toHaveValue(label);
+  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(wording);
+  await page.unroute(tagUrl);
+  await page.getByRole('button', { name: 'Create and select tag', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Tags', exact: true }).getByRole('checkbox', { name: label, exact: true })).toBeChecked();
+  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(wording);
+  await saved(page, 'Save record');
+  const result = await (await page.request.get(record.base)).json() as { description: string; tagIds: number[] };
+  expect(result.description).toBe(wording); expect(result.tagIds).toHaveLength(2);
 });
 ``````
 
@@ -514,10 +864,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
 #### File: `src/server/web.ts`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=f2c4f292ebc5206a3aedf267a3a907f3424c42456ca1d5564e79fea8d46bffad -->
+<!-- replay task=1 phase=implementation encoding=text sha256=9527b3478fe16a33f9f3eba41c116e14bb0499ffcb5bd62df8d4a36488d1dfe5 -->
 
 ``````typescript
-﻿import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import serveStatic from '@fastify/static';
@@ -536,7 +886,7 @@ export async function registerWeb(app: FastifyInstance, directory: string): Prom
 
 #### File: `src/web/printing/PrintPage.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=191d6c2af7be7212e20f687aab2bef1c173a93e6522bc911e48d1873c96fa1dc -->
+<!-- replay task=1 phase=implementation encoding=text sha256=ef94b180dc57e742aa074e910a0aeeffd1ced443c54714cc19d65af1c1847221 -->
 
 ``````typescript
 import { useEffect, useState, type ReactNode } from 'react';
@@ -559,6 +909,7 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
   const [data, setData] = useState<PrintRecord | null>(null); const [links, setLinks] = useState<ShareLinkOut[]>([]);
   const [selected, setSelected] = useState(''); const [qr, setQr] = useState(''); const [label, setLabel] = useState('');
   const [error, setError] = useState<unknown>(null); const [busy, setBusy] = useState(false); const [loaded, setLoaded] = useState<string[]>([]);
+  const [snapshotVersion, setSnapshotVersion] = useState(0); const [printPending, setPrintPending] = useState(false);
   const [now, setNow] = useState(Date.now()); const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); void document.fonts.ready.then(() => setFontsReady(true)); return () => clearInterval(timer); }, []);
   useEffect(() => { const abort = new AbortController(); void Promise.all([api<PrintRecord>(base + '/print', { signal: abort.signal }), api<ShareLinkOut[]>(base + '/share-links', { signal: abort.signal })]).then(([record, shares]) => { setData(record); setLinks(shares); }).catch(reason => { if (!abort.signal.aborted) setError(reason); }); return () => abort.abort(); }, [base]);
@@ -567,14 +918,26 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
   useEffect(() => { let cancelled = false; setQr(''); setLoaded(old => old.filter(key => key !== 'qr')); if (link?.url) void QRCode.toDataURL(link.url, { errorCorrectionLevel: 'M', margin: 4, width: 256 }).then(url => { if (!cancelled) setQr(url); }).catch(reason => { if (!cancelled) setError(reason); }); return () => { cancelled = true; }; }, [link?.url]);
   const markLoaded = (key: string) => setLoaded(old => old.includes(key) ? old : [...old, key]);
   const ready = !!data && !!link && !!qr && loaded.includes('qr') && data.photos.every(photo => loaded.includes(String(photo.id))) && fontsReady && !busy && !error;
+  useEffect(() => {
+    if (!printPending) return;
+    if (error || !link) { setPrintPending(false); return; }
+    if (!ready) return;
+    let cancelled = false;
+    void (async () => {
+      await document.fonts.ready;
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      if (!cancelled) { setPrintPending(false); window.print(); }
+    })();
+    return () => { cancelled = true; };
+  }, [printPending, ready, error, link]);
   const print = async () => {
     setBusy(true); setError(null);
     try {
       const [freshLinks, freshData] = await Promise.all([api<ShareLinkOut[]>(base + '/share-links'), api<PrintRecord>(base + '/print')]);
       setLinks(freshLinks);
+      setData(freshData); setLoaded([]); setSnapshotVersion(version => version + 1);
       if (freshData.record.status === 'draft' || !activePrintLinks(freshLinks, false).some(item => String(item.id) === selected)) { setSelected(''); return; }
-      if (freshData.record.updatedAt !== data?.record.updatedAt) { setData(freshData); setLoaded([]); return; }
-      setBusy(false); await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); window.print();
+      setPrintPending(true);
     } catch (reason) { setError(reason); } finally { setBusy(false); }
   };
   return <div className={`print-page${ready ? ' print-ready' : ''}`}>
@@ -584,11 +947,11 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
         <Field label={t('QR share link', 'Σύνδεσμος κοινοποίησης QR')}><select aria-label={t('QR share link', 'Σύνδεσμος κοινοποίησης QR')} value={selected} onChange={event => { setSelected(event.target.value); setError(null); }}><option value="">{t('Choose a link', 'Επιλέξτε σύνδεσμο')}</option>{active.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
         {data && !active.length && <form onSubmit={async event => { event.preventDefault(); setBusy(true); setError(null); try { await api(base + '/share-links', { method: 'POST', body: { label } }); setLinks(await api(base + '/share-links')); setLabel(''); } catch (reason) { setError(reason); } finally { setBusy(false); } }}><Field label={t('Link label', 'Τίτλος συνδέσμου')}><input required maxLength={200} value={label} onChange={event => setLabel(event.target.value)} /></Field><button disabled={busy} type="submit">{t('Create share link', 'Δημιουργία συνδέσμου κοινοποίησης')}</button></form>}
       </>}
-      <button disabled={!ready} onClick={() => void print()}>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</button>
+      <button disabled={!ready || printPending} onClick={() => void print()}>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</button>
       {data && !ready && <p role="status">{t('Printing is available after a valid link is selected and all images load.', 'Η εκτύπωση είναι διαθέσιμη αφού επιλεγεί έγκυρος σύνδεσμος και φορτωθούν όλες οι εικόνες.')}</p>}
     </div>
     <p className="print-blocker">{t('Print view is not ready. Select a valid share link and wait for images to load.', 'Η προβολή εκτύπωσης δεν είναι έτοιμη. Επιλέξτε έγκυρο σύνδεσμο και περιμένετε τη φόρτωση εικόνων.')}</p>
-    {data && <PrintSheet key={data.record.updatedAt} data={data} base={base} qr={qr} shareUrl={link?.url ?? ''} onLoaded={markLoaded} onError={() => setError(new Error(t('An image could not load. Reload this page before printing.', 'Μια εικόνα δεν φορτώθηκε. Ανανεώστε τη σελίδα πριν εκτυπώσετε.')))} />}
+    {data && <PrintSheet key={snapshotVersion} data={data} base={base} qr={qr} shareUrl={link?.url ?? ''} onLoaded={markLoaded} onError={() => setError(new Error(t('An image could not load. Reload this page before printing.', 'Μια εικόνα δεν φορτώθηκε. Ανανεώστε τη σελίδα πριν εκτυπώσετε.')))} />}
   </div>;
 }
 
@@ -604,7 +967,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
     <dl className="print-header">{field('Subtype', 'Υποκατηγορία', fixed('subtype', r.subtype))}{field('Status', 'Κατάσταση', fixed('status', r.status))}{field('Severity', 'Σοβαρότητα', fixed('severity', r.severity))}{field('Priority', 'Προτεραιότητα', fixed('priority', r.priority))}{field('Due date', 'Προθεσμία', dateText(r.dueDate, lang))}{field('Ball in court', 'Επόμενη ενέργεια από', person(r.ballInCourtId))}{field('Responsible', 'Υπεύθυνος', person(r.responsibleId))}</dl>
     <dl className="print-header">{field('Location', 'Θέση', data.locations.map(path => path.map(name).join(' / ')).join('\n'))}{field('Trades', 'Ειδικότητες', data.trades.map(name).join(', '))}{field('Tags', 'Ετικέτες', data.tags.map(name).join(', '))}{field('Reference', 'Αναφορά', r.reference)}</dl>
     <section><h2>{r.subtype === 'detail_clarification' ? t('Question', 'Ερώτημα') : t('Description', 'Περιγραφή')}</h2><p className="print-text">{r.subtype === 'detail_clarification' ? r.question : r.description}</p></section>
-    {r.subtype !== 'task' && <><section><h2>{t('Classification', 'Ταξινόμηση')}</h2><dl>{r.subtype === 'quality_issue' ? <>{field('Problem types', 'Τύποι προβλήματος', r.problemTypes.map(code => fixed('problemType', code)).join(', '))}{field('Stage', 'Στάδιο', fixed('stage', r.stage))}{field('Disposition', 'Τρόπος αντιμετώπισης', fixed('disposition', r.disposition))}{field('Correction', 'Διόρθωση', r.correction)}</> : <>{field('Route', 'Διαδρομή', fixed('route', r.route))}{field('Issued by', 'Εκδόθηκε από', person(r.issuedById))}</>}</dl></section>
+    {r.subtype !== 'task' && <><section><h2>{t('Classification', 'Ταξινόμηση')}</h2><dl>{r.subtype === 'quality_issue' ? <>{field('Type of problem', 'Είδος προβλήματος', r.problemTypes.map(code => fixed('problemType', code)).join(', '))}{field('Stage', 'Στάδιο', fixed('stage', r.stage))}{field('Disposition', 'Τρόπος αντιμετώπισης', fixed('disposition', r.disposition))}{field('Correction', 'Διόρθωση', r.correction)}</> : <>{field('Route', 'Διαδικασία', fixed('route', r.route))}{field('Issued by', 'Εκδόθηκε από', person(r.issuedById))}</>}</dl></section>
     <section><h2>{t('Decision and instruction', 'Απόφαση και εντολή')}</h2><dl>{field('Chosen option', 'Επιλεγμένη λύση', r.chosenOption && <>{r.chosenOption.label}{'\n'}{r.chosenOption.description}</>)}{field('Decided by', 'Αποφάσισε', person(r.decidedById))}{field('Decided on', 'Ημερομηνία απόφασης', dateText(r.decidedOn, lang))}{field('Instruction text', 'Κείμενο εντολής', r.instructionText)}</dl></section></>}
     {data.measurements.length > 0 && <section><h2>{t('Measurements', 'Μετρήσεις')}</h2>{data.measurements.map(set => <div key={set.id}><h3>{fixed('measurementPhase', set.phase)} · {dateText(set.date, lang)} · {person(set.measuredById)}</h3><p className="print-text">{set.note}</p><table><thead><tr>{[t('Item', 'Αντικείμενο'), t('Quantity', 'Μέγεθος'), t('Value', 'Τιμή'), t('Unit', 'Μονάδα'), t('Note', 'Σημείωση')].map(text => <th key={text}>{text}</th>)}</tr></thead><tbody>{set.rows.map((row, i) => <tr key={i}><td>{row.item}</td><td>{row.quantity}</td><td>{number(row.value)}</td><td>{fixed('unit', row.unit)}</td><td>{row.note}</td></tr>)}</tbody></table>
       {[...new Map(set.rows.map(row => [JSON.stringify([normalizeLabel(row.quantity), row.unit]), row])).values()].map(row => <div key={JSON.stringify([row.quantity, row.unit])}><h4>{t('Between items', 'Μεταξύ αντικειμένων')} · {row.quantity} ({fixed('unit', row.unit)})</h4><table><thead><tr><th>{t('Item', 'Αντικείμενο')}</th><th>{t('Value', 'Τιμή')}</th><th>{t('Difference from first item', 'Διαφορά από το πρώτο αντικείμενο')}</th></tr></thead><tbody>{compareItems(set, row.quantity, row.unit).map((item, i) => <tr key={i}><td>{item.item}</td><td>{number(item.value)}</td><td>{number(item.diffFromFirst)}</td></tr>)}</tbody></table></div>)}
@@ -612,7 +975,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
     {(['before', 'after'] as const).map(phase => data.photos.some(photo => photo.phase === phase) && <section key={phase}><h2>{fixed('photoPhase', phase)}</h2><div className="print-photos">{data.photos.filter(photo => photo.phase === phase).map(photo => <figure key={photo.id}><img src={`${base}/photos/${photo.id}/display`} alt={photo.caption ?? fixed('photoPhase', phase)} onLoad={() => onLoaded(String(photo.id))} onError={onError} /><figcaption>{photo.caption}</figcaption></figure>)}</div></section>)}
     {data.verifications.length > 0 && <section><h2>{t('Verification entries', 'Καταχωρίσεις επαλήθευσης')}</h2>{data.verifications.map(entry => <div key={entry.id}><h3>{dateText(entry.date, lang)} · {person(entry.checkedById)} · {fixed('verificationMethod', entry.method)} · {fixed('verificationOutcome', entry.outcome)}</h3><p className="print-text">{entry.note}</p></div>)}</section>}
     {qr && shareUrl && <div className="print-qr"><a href={shareUrl}><img src={qr} alt={t('Share QR code', 'Κωδικός QR κοινοποίησης')} onLoad={() => onLoaded('qr')} onError={onError} /></a></div>}
-    <footer>{t('Generated', 'Δημιουργία')} {dateText(data.generatedAt, lang)} · {t('Record updated', 'Ενημέρωση καταγραφής')} {dateText(r.updatedAt, lang)}</footer>
+    <footer>{t('Generated', 'Δημιουργία')} <time dateTime={data.generatedAt}>{dateText(data.generatedAt, lang)}</time> · {t('Record updated', 'Ενημέρωση καταγραφής')} <time dateTime={r.updatedAt}>{dateText(r.updatedAt, lang)}</time></footer>
   </article>;
 }
 ``````
@@ -621,7 +984,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
 
 <!-- replay task=1 phase=implementation encoding=text sha256=0b3e2741cc95800646dd1aecf896c91a2dbaa5681850bf954c8801ea3ce7dd8e -->
 
-``````typescript
+``````css
 .print-controls { margin-bottom: 1.5rem; }
 .print-blocker { display: none; }
 .print-sheet { background: white; color: #111; padding: 10mm; max-width: 400mm; margin: auto; font-size: 10pt; line-height: 1.3; }
@@ -660,10 +1023,10 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
 
 #### File: `src/web/App.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=2668c0e423be51276f7d1721a5916c36dbe2b2ab5d33b5b4b6b348da0b04b1d3 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=1a60d3d3bab2df1099a313a86721cc940ec29c2feeb20be374009919850c1287 -->
 
 ``````typescript
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Project } from '../server/lists/projects';
 import { api, ApiError } from './core/api';
 import { useI18n } from './core/i18n';
@@ -702,10 +1065,10 @@ export function App() {
 
 #### File: `src/web/record/Sharing.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=d8426f78bdf363611d03e6f4ce53052df719a7ef303920ec25e1559e4bc9a5a2 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=457f73f3476c332dab896fac5efc57306e16f04e3ef2a46b98c2454ed0c006c1 -->
 
 ``````typescript
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ShareLinkOut } from '../../domain';
 import { api } from '../core/api';
 import { BusyButton, ErrorNotice, Field } from '../core/forms';
@@ -732,9 +1095,100 @@ export function Sharing({ base, draft, onAccessLost, onDirty }: { base: string; 
 }
 ``````
 
+#### File: `src/web/record/Overview.tsx`
+
+<!-- replay task=1 phase=implementation encoding=text sha256=d3a92a164659885cb61d4a73639fda6608d729550c8868ec352d8aeab5f4f746 -->
+
+``````typescript
+import type { ReactNode } from 'react';
+import { definitionOf, isCode, labelOf, type ListKey } from '../../domain';
+import type { RecordDetail } from '../../server/records/records';
+import { useI18n } from '../core/i18n';
+import type { RecordData } from './data';
+import { dateText } from './helpers';
+
+export function RecordSummary({ data }: { data: RecordData }) {
+  const { t, lang } = useI18n(); const r = data.record;
+  const lastBallChange = data.activity.find(entry => entry.field === 'ballInCourtId');
+  const fixed = (list: ListKey, code: string | null) => code && isCode(list, code) ? <details className="value-definition"><summary>{labelOf(list, code, lang)}</summary>{definitionOf(list, code, lang)}</details> : '—';
+  return <dl className="summary-grid">
+    <div><dt>{t('Subtype', 'Υποκατηγορία')}</dt><dd>{fixed('subtype', r.subtype)}</dd></div><div><dt>{t('Status', 'Κατάσταση')}</dt><dd>{fixed('status', r.status)}</dd></div>
+    <div><dt>{t('Ball in court', 'Επόμενη ενέργεια από')}</dt><dd>{data.labels.people.find(person => person.id === r.ballInCourtId)?.name ?? '—'}{r.ballInCourtId !== null && lastBallChange && <small>{t('Since', 'Από')} {dateText(lastBallChange.at, lang)}</small>}</dd></div>
+    <div><dt>{t('Responsible', 'Υπεύθυνος')}</dt><dd>{data.labels.people.find(person => person.id === r.responsibleId)?.name ?? '—'}</dd></div>
+    <div><dt>{t('Due date', 'Προθεσμία')}</dt><dd>{dateText(r.dueDate, lang)}</dd></div><div><dt>{t('Priority', 'Προτεραιότητα')}</dt><dd>{fixed('priority', r.priority)}</dd></div><div><dt>{t('Severity', 'Σοβαρότητα')}</dt><dd>{fixed('severity', r.severity)}</dd></div>
+    <div><dt>{t('Completion', 'Ολοκλήρωση')}</dt><dd>{r.completion === null ? '—' : <><progress max={100} value={r.completion} /> {r.completion}%</>}</dd></div><div><dt>{t('Safety implications', 'Θέμα ασφαλείας')}</dt><dd>{r.safety ? t('Yes', 'Ναι') : t('No', 'Όχι')}</dd></div>
+  </dl>;
+}
+
+export function Overview({ data }: { data: RecordData }) {
+  const { t, lang } = useI18n(); const r = data.record;
+  const name = (item: { nameEn: string; nameEl: string }) => lang === 'el' ? item.nameEl || item.nameEn : item.nameEn || item.nameEl;
+  const person = (id: number | null) => data.labels.people.find(item => item.id === id)?.name ?? '—';
+  const value = (en: string, el: string, content: ReactNode) => <div><dt>{t(en, el)}</dt><dd className="user-text">{content || '—'}</dd></div>;
+  const vocab = (en: string, el: string, list: ListKey, code: string | null) => value(en, el, code && isCode(list, code) ? <details className="value-definition"><summary>{labelOf(list, code, lang)}</summary>{definitionOf(list, code, lang)}</details> : '—');
+  const selected = (ids: number[], list: { id: number; nameEn: string; nameEl: string }[]) => ids.map(id => list.find(item => item.id === id)).filter(item => item !== undefined).map(name).join(', ');
+  return <>
+    {r.statusReason && <section><h3>{t('Status reason', 'Αιτιολογία κατάστασης')}</h3>{r.statusReason.code && isCode(r.status === 'on_hold' ? 'onHoldReason' : 'cancellationReason', r.statusReason.code) && <p>{labelOf(r.status === 'on_hold' ? 'onHoldReason' : 'cancellationReason', r.statusReason.code, lang)}</p>}<p className="user-text">{r.statusReason.note}</p></section>}
+    <section><h2>{t('Description and location', 'Περιγραφή και θέση')}</h2><p className="user-text">{r.description || '—'}</p><dl>{value('Location', 'Θέση', r.locationIds.map(id => data.labels.locations.find(item => item.id === id)?.path.map(name).join(' / ')).filter(Boolean).join('\n'))}{value('Trades', 'Ειδικότητες', selected(r.tradeIds, data.labels.trades))}{value('Tags', 'Ετικέτες', selected(r.tagIds, data.labels.tags))}{value('Reference', 'Αναφορά', r.reference)}</dl></section>
+    <section><h2>{t('Classification', 'Ταξινόμηση')}</h2><dl>{r.subtype === 'quality_issue' && <>{value('Type of problem', 'Είδος προβλήματος', r.problemTypes.map(code => <details key={code}><summary>{labelOf('problemType', code, lang)}</summary>{definitionOf('problemType', code, lang)}</details>))}{vocab('Stage', 'Στάδιο', 'stage', r.stage)}{vocab('Disposition', 'Τρόπος αντιμετώπισης', 'disposition', r.disposition)}{value('Correction', 'Διόρθωση', r.correction)}</>}{r.subtype === 'detail_clarification' && <>{value('Question', 'Ερώτημα', r.question)}{vocab('Route', 'Διαδικασία', 'route', r.route)}{value('Issued by', 'Εκδόθηκε από', person(r.issuedById))}</>}{r.subtype === 'task' && value('Subtype', 'Υποκατηγορία', labelOf('subtype', r.subtype, lang))}</dl></section>
+    {r.subtype !== 'task' && <section><h2>{t('Decision and instruction', 'Απόφαση και εντολή')}</h2><dl>{value('Chosen option', 'Επιλεγμένη λύση', data.options.find(option => option.id === r.chosenOptionId)?.label)}{value('Decided by', 'Αποφάσισε', person(r.decidedById))}{value('Decided on', 'Ημερομηνία απόφασης', dateText(r.decidedOn, lang))}{value('Instruction text', 'Κείμενο εντολής', r.instructionText)}</dl></section>}
+    <details><summary>{t('Sequence and dates', 'Σειρά εργασιών και ημερομηνίες')}</summary><dl>{value('Must be done before', 'Να γίνει πριν', r.mustBeDoneBefore.map(item => `${item.humanId} ${item.title ?? ''}`).join('\n'))}{value('Requires first', 'Απαιτείται πρώτα', r.requiresFirst.map(item => `${item.humanId} ${item.title ?? ''}`).join('\n'))}{value('Created', 'Δημιουργία', dateText(r.createdAt, lang))}{value('Updated', 'Ενημέρωση', dateText(r.updatedAt, lang))}</dl></details>
+    <section><h2>{t('Public Notes', 'Δημόσιες σημειώσεις')}</h2><p className="user-text">{r.publicNotes || '—'}</p></section>
+    {data.owner && <details><summary>{t('Private · owner only', 'Ιδιωτικά · μόνο για τον ιδιοκτήτη')}</summary><dl>{value('Private Notes', 'Ιδιωτικές σημειώσεις', (r as RecordDetail).notes)}{value('Outside contract scope', 'Εκτός σύμβασης', (r as RecordDetail).outsideScope ? t('Yes', 'Ναι') : t('No', 'Όχι'))}{(r as RecordDetail).outsideScope && value('Estimated cost', 'Εκτιμώμενο κόστος', (r as RecordDetail).estimatedCost === null ? '—' : new Intl.NumberFormat(lang, { style: 'currency', currency: 'EUR' }).format((r as RecordDetail).estimatedCost!))}</dl></details>}
+    <details><summary>{t('Verification history', 'Ιστορικό επαλήθευσης')} ({data.verifications.length})</summary>{data.verifications.map(entry => <article key={entry.id}><h3>{dateText(entry.date, lang)} · {labelOf('verificationOutcome', entry.outcome, lang)}</h3><p>{person(entry.checkedById)} · {labelOf('verificationMethod', entry.method, lang)}</p><p className="user-text">{entry.note}</p><details><summary>{t('Definitions', 'Ορισμοί')}</summary><p>{definitionOf('verificationMethod', entry.method, lang)}</p><p>{definitionOf('verificationOutcome', entry.outcome, lang)}</p></details></article>)}</details>
+  </>;
+}
+``````
+
+#### File: `src/web/record/RecordEditor.tsx`
+
+<!-- replay task=1 phase=implementation encoding=text sha256=ef14d1e43a2d3bdd4488a8565bfc73225a3a043a39911dde9d7f4d5861016440 -->
+
+``````typescript
+import { useState } from 'react';
+import { entriesOf, definitionOf, labelOf, type ListKey, type RecordPatchInput } from '../../domain';
+import type { RecordDetail } from '../../server/records/records';
+import { Field, MultiPick, PersonSelect, VocabSelect, BusyButton } from '../core/forms';
+import { LocationPicker } from '../core/LocationPicker';
+import { useI18n } from '../core/i18n';
+import type { RecordData } from './data';
+import { changedPatch } from './helpers';
+import { TagPicker } from './TagPicker';
+
+export function RecordEditor({ data, busy, onSave, onCancel, onDirty }: { data: RecordData; busy: boolean; onSave: (patch: RecordPatchInput) => Promise<void>; onCancel: () => void; onDirty: () => void }) {
+  const { t, lang } = useI18n(); const record = data.record as RecordDetail;
+  const [draft, setDraft] = useState<RecordPatchInput>(() => ({ title: record.title, description: record.description, reference: record.reference, publicNotes: record.publicNotes, notes: record.notes, ballInCourtId: record.ballInCourtId, responsibleId: record.responsibleId, tradeIds: record.tradeIds, severity: record.severity, priority: record.priority, dueDate: record.dueDate, completion: record.completion, safety: record.safety, tagIds: record.tagIds, locationIds: record.locationIds, mustBeDoneBeforeIds: record.mustBeDoneBefore.map(item => item.id), outsideScope: record.outsideScope, estimatedCost: record.estimatedCost, ...(record.subtype === 'quality_issue' ? { problemTypes: record.problemTypes, stage: record.stage, disposition: record.disposition, correction: record.correction } : {}), ...(record.subtype === 'detail_clarification' ? { question: record.question, route: record.route, issuedById: record.issuedById } : {}), ...(record.subtype !== 'task' ? { chosenOptionId: record.chosenOptionId, decidedById: record.decidedById, decidedOn: record.decidedOn, instructionText: record.instructionText } : {}) }));
+  const [initial] = useState(draft);
+  const set = <K extends keyof RecordPatchInput,>(field: K, value: RecordPatchInput[K]) => { setDraft(old => ({ ...old, [field]: value })); onDirty(); };
+  const text = (field: keyof RecordPatchInput, en: string, el: string, multiline = false, maxLength = 20_000) => <Field label={t(en, el)} key={field}>{multiline ? <textarea maxLength={maxLength} value={String(draft[field] ?? '')} onChange={e => set(field, e.target.value)} /> : <input maxLength={maxLength} value={String(draft[field] ?? '')} onChange={e => set(field, e.target.value)} />}</Field>;
+  const vocab = (field: keyof RecordPatchInput, list: ListKey, en: string, el: string) => <VocabSelect key={field} list={list} label={t(en, el)} value={draft[field] as string | null} onChange={value => set(field, value as never)} />;
+  const person = (field: 'ballInCourtId' | 'responsibleId' | 'decidedById' | 'issuedById', en: string, el: string) => <PersonSelect key={field} label={t(en, el)} people={data.owner!.people} value={draft[field] ?? null} onChange={value => set(field, value)} />;
+  const date = (field: 'dueDate' | 'decidedOn', en: string, el: string) => <Field label={t(en, el)}><input type="date" value={draft[field] ?? ''} onChange={e => set(field, e.target.value || null)} /></Field>;
+  const name = (item: { nameEn: string; nameEl: string }) => lang === 'el' ? item.nameEl || item.nameEn : item.nameEn || item.nameEl;
+  return <form onSubmit={e => { e.preventDefault(); void onSave(changedPatch(initial, draft)); }}>
+    <fieldset disabled={busy}><legend>{t('Edit record', 'Επεξεργασία εγγραφής')}</legend>
+      {text('title', 'Title', 'Τίτλος', false, 200)}{text('description', 'Description', 'Περιγραφή', true)}{text('reference', 'Reference', 'Αναφορά', false, 2000)}
+      <div className="form-grid">{person('ballInCourtId', 'Ball in court', 'Επόμενη ενέργεια από')}{person('responsibleId', 'Responsible', 'Υπεύθυνος')}{vocab('severity', 'severity', 'Severity', 'Σοβαρότητα')}{vocab('priority', 'priority', 'Priority', 'Προτεραιότητα')}{date('dueDate', 'Due date', 'Προθεσμία')}
+      <Field label={t('Completion (%)', 'Ολοκλήρωση (%)')}><input type="number" min="0" max="100" step="10" value={draft.completion ?? ''} onChange={e => set('completion', e.target.value === '' ? null : Number(e.target.value))} /></Field></div>
+      <label><input type="checkbox" checked={draft.safety} onChange={e => set('safety', e.target.checked)} />{t('Safety implications', 'Θέμα ασφαλείας')}</label>
+      <MultiPick label={t('Trades', 'Ειδικότητες')} items={data.owner!.trades.map(item => ({ ...item, label: name(item) }))} value={draft.tradeIds ?? []} onChange={ids => set('tradeIds', ids)} />
+      <TagPicker projectId={record.projectId} initial={data.owner!.tags} value={draft.tagIds ?? []} onChange={ids => set('tagIds', ids)} onDirty={onDirty} />
+      <LocationPicker label={t('Locations', 'Θέσεις')} nodes={data.owner!.locations} value={draft.locationIds ?? []} onChange={ids => set('locationIds', ids)} />
+      <MultiPick label={t('Must be done before', 'Να γίνει πριν')} items={data.owner!.records.filter(item => item.id !== record.id).map(item => ({ id: item.id, label: `${item.humanId} ${item.title ?? ''}` }))} value={draft.mustBeDoneBeforeIds ?? []} onChange={ids => set('mustBeDoneBeforeIds', ids)} />
+      {record.subtype === 'quality_issue' && <><fieldset><legend>{t('Type of problem', 'Είδος προβλήματος')}</legend>{entriesOf('problemType').map(item => <div key={item.code}><label><input type="checkbox" checked={draft.problemTypes?.includes(item.code as never)} onChange={e => set('problemTypes', (e.target.checked ? [...draft.problemTypes ?? [], item.code] : draft.problemTypes?.filter(code => code !== item.code)) as RecordDetail['problemTypes'])} />{labelOf('problemType', item.code, lang)}</label><details><summary>{t('Definition', 'Ορισμός')}</summary>{definitionOf('problemType', item.code, lang)}</details></div>)}</fieldset>{vocab('stage', 'stage', 'Stage', 'Στάδιο')}{vocab('disposition', 'disposition', 'Disposition', 'Τρόπος αντιμετώπισης')}{text('correction', 'Correction', 'Διόρθωση', true)}</>}
+      {record.subtype === 'detail_clarification' && <>{text('question', 'Question', 'Ερώτημα', true)}{vocab('route', 'route', 'Route', 'Διαδικασία')}{person('issuedById', 'Issued by', 'Εκδόθηκε από')}</>}
+      {record.subtype !== 'task' && <><Field label={t('Chosen option', 'Επιλεγμένη λύση')}><select value={draft.chosenOptionId ?? ''} onChange={e => set('chosenOptionId', e.target.value ? Number(e.target.value) : null)}><option value="">{t('None', 'Καμία')}</option>{data.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>{person('decidedById', 'Decided by', 'Αποφάσισε')}{date('decidedOn', 'Decided on', 'Ημερομηνία απόφασης')}{text('instructionText', 'Instruction text', 'Κείμενο εντολής', true)}</>}
+      {text('publicNotes', 'Public Notes', 'Δημόσιες σημειώσεις', true)}
+      <fieldset><legend>{t('Private · owner only', 'Ιδιωτικά · μόνο για τον ιδιοκτήτη')}</legend>{text('notes', 'Private Notes', 'Ιδιωτικές σημειώσεις', true)}<label><input type="checkbox" checked={draft.outsideScope} onChange={e => set('outsideScope', e.target.checked)} />{t('Outside contract scope', 'Εκτός σύμβασης')}</label>{draft.outsideScope && <Field label={t('Estimated cost (€)', 'Εκτιμώμενο κόστος (€)')}><input type="number" min="0" step="0.01" value={draft.estimatedCost ?? ''} onChange={e => set('estimatedCost', e.target.value === '' ? null : Number(e.target.value))} /></Field>}</fieldset>
+      <BusyButton busy={busy} type="submit">{t('Save record', 'Αποθήκευση εγγραφής')}</BusyButton><button type="button" onClick={onCancel}>{t('Cancel', 'Ακύρωση')}</button>
+    </fieldset>
+  </form>;
+}
+``````
+
 - [ ] GREEN: run `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts` and require success.
 
-- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect five focused unit/API tests and three browser tests. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
+- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect five focused unit/API tests and five print browser tests. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
 
 - [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files and generated package lock. Preserve synthetic PDF fixture whitespace from Plan 5.
 
@@ -742,13 +1196,13 @@ export function Sharing({ base, draft, onAccessLost, onDirty }: { base: string; 
 
 **Depends on:** Task 1.
 
-Use the existing data-directory configuration. Durable nightly VACUUM INTO backups retain the latest 14 UTC days and eight Monday-start UTC weeks (union, at most 22 names). Pre-migration backups are separate. A completed database inode is pinned before transfer; only its database and manifest are staged, never another copy of all server blobs. Restore publishes a fresh verified candidate after resetting all restored access.
+Use the existing data-directory configuration. Durable nightly VACUUM INTO backups retain the latest 14 UTC days and eight Monday-start UTC weeks (union, at most 22 names). Pre-migration backups are separate. A completed database inode is pinned before transfer; only its database and manifest are staged, never another copy of all server blobs. Preserve source backup identity and timestamp separately from export and verification time; scheduled verification rejects sources older than the configurable 36-hour default, while deliberate restore may use an older completed recovery point. Restore publishes a fresh verified candidate after resetting all restored access.
 
 - [ ] Write/extract the tests first.
 
 #### File: `tests/server/operations.test.ts`
 
-<!-- replay task=2 phase=test encoding=text sha256=e3a68c0623552a84652ef95bfb63e35c6d13961ce290645a00ab5a112742638d -->
+<!-- replay task=2 phase=test encoding=text sha256=482ad759622beab3192dfec97a9900c06bc369f95ed0c22eca7f4f85b964408a -->
 
 ``````typescript
 import { createHash } from 'node:crypto';
@@ -756,7 +1210,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { openDatabase, type Db } from '../../src/server/db/connection';
 import { migrate } from '../../src/server/db/migrate';
 import { backupDatabase } from '../../src/server/db/backup';
@@ -768,10 +1222,80 @@ vi.mock('node:fs', async (original) => ({ ...await original<typeof import('node:
 
 const dirs: string[] = [];
 const databases: Db[] = [];
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-02T01:00:00Z')); });
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   for (const db of databases.splice(0)) if (db.open) db.close();
   for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+it('does not make an old snapshot fresh by re-exporting it after live writes', async () => {
+  const f = fixture();
+  const first = await beginExport(f.backups, f.files);
+  await completeBundle(first.path, f.files);
+  const firstReport = JSON.parse(fs.readFileSync(join(first.path, 'COMPLETE'), 'utf8'));
+  expect(firstReport.sourceCreatedAt).toBe('2026-10-01T01:00:00.000Z');
+  f.db.prepare('UPDATE projects SET name = ?').run('New live data not backed up');
+  vi.setSystemTime(new Date('2026-10-04T01:00:00Z'));
+  const repeated = await beginExport(f.backups, f.files);
+  expect(repeated).toMatchObject({ sourceBackup: 'builtbasis-nightly-2026-10-01T01-00-00-000Z.db',
+    sourceCreatedAt: '2026-10-01T01:00:00.000Z', exportedAt: '2026-10-04T01:00:00.000Z' });
+  await expect(completeBundle(repeated.path, f.files)).rejects.toThrow('stale_source_backup');
+  expect(fs.existsSync(join(repeated.path, 'COMPLETE'))).toBe(false);
+  await expect(completeBundle(first.path, f.files)).rejects.toThrow('stale_source_backup');
+  expect(JSON.parse(fs.readFileSync(join(first.path, 'COMPLETE'), 'utf8'))).toEqual(firstReport);
+  // An earlier verified recovery point stays restorable even after its scheduling freshness expires.
+  await restoreBundle(first.path, join(f.dir, 'restore-old'), true, f.files);
+  const restored = openDatabase(join(f.dir, 'restore-old', 'builtbasis.db'));
+  databases.push(restored);
+  expect(restored.prepare('SELECT name FROM projects').pluck().get()).toBe('Synthetic drill');
+});
+
+it('records source and verification time separately and accepts unchanged recent backup bytes', async () => {
+  const f = fixture();
+  const original = join(f.backups, completedBackups(f.backups)[0]!);
+  const recent = 'builtbasis-nightly-2026-10-02T00-00-00-000Z.db';
+  fs.copyFileSync(original, join(f.backups, recent));
+  const exported = await beginExport(f.backups, f.files);
+  const manifest = JSON.parse(fs.readFileSync(join(exported.path, 'manifest.json'), 'utf8'));
+  expect(manifest).toMatchObject({ sourceBackup: recent, sourceCreatedAt: '2026-10-02T00:00:00.000Z', exportedAt: '2026-10-02T01:00:00.000Z' });
+  vi.setSystemTime(new Date('2026-10-02T02:00:00Z'));
+  await completeBundle(exported.path, f.files);
+  expect(JSON.parse(fs.readFileSync(join(exported.path, 'COMPLETE'), 'utf8'))).toEqual({
+    sourceBackup: recent, sourceCreatedAt: '2026-10-02T00:00:00.000Z',
+    exportedAt: '2026-10-02T01:00:00.000Z', verifiedAt: '2026-10-02T02:00:00.000Z',
+  });
+  expect(await fingerprint(join(exported.path, 'builtbasis.db'))).toEqual(await fingerprint(original));
+});
+
+it('rejects future source dates and configurable-age violations before completion', async () => {
+  const f = fixture();
+  const exported = await beginExport(f.backups, f.files);
+  await expect(completeBundle(exported.path, f.files, { maxAgeHours: 12 })).rejects.toThrow('stale_source_backup');
+  await expect(completeBundle(exported.path, f.files, { maxAgeHours: 0 })).rejects.toThrow('invalid_max_age_hours');
+  await expect(completeBundle(exported.path, f.files, { maxAgeHours: Infinity })).rejects.toThrow('invalid_max_age_hours');
+  await expect(completeBundle(exported.path, f.files, { maxAgeHours: 25 })).resolves.toMatchObject({ sourceCreatedAt: '2026-10-01T01:00:00.000Z' });
+  const recent = join(f.backups, completedBackups(f.backups)[0]!);
+  fs.copyFileSync(recent, join(f.backups, 'builtbasis-nightly-2026-10-03T00-00-00-000Z.db'));
+  const future = await beginExport(f.backups, f.files);
+  await expect(completeBundle(future.path, f.files)).rejects.toThrow('future_source_backup');
+  expect(fs.existsSync(join(future.path, 'COMPLETE'))).toBe(false);
+});
+
+it('rejects manifest source-time relabelling and unstructured completion markers', async () => {
+  const f = fixture();
+  const exported = await beginExport(f.backups, f.files);
+  const manifestPath = join(exported.path, 'manifest.json');
+  const original = fs.readFileSync(manifestPath, 'utf8');
+  const manifest = JSON.parse(original);
+  manifest.sourceCreatedAt = '2026-10-02T01:00:00.000Z';
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  await expect(completeBundle(exported.path, f.files)).rejects.toThrow('source_timestamp_mismatch');
+  fs.writeFileSync(manifestPath, original);
+  fs.writeFileSync(join(exported.path, 'COMPLETE'), 'old unstructured marker');
+  await expect(restoreBundle(exported.path, join(f.dir, 'restored'), true, f.files)).rejects.toThrow();
+  expect(fs.existsSync(join(f.dir, 'restored'))).toBe(false);
 });
 function fixture() {
   const dir = fs.mkdtempSync(join(tmpdir(), 'builtbasis-operations-'));
@@ -936,7 +1460,7 @@ it('closes a failed integrity-check connection and never publishes the bad backu
 });
 ``````
 
-- [ ] Run the focused test before implementation: `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts`. The new operations suite fails to import the missing operations modules. Existing database tests remain green. Then extract the implementation and verify all fourteen focused operations/database tests.
+- [ ] Run the focused test before implementation: `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts`. The new operations suite fails to import the missing operations modules. Existing database tests remain green. Then extract the implementation and verify all eighteen focused operations/database tests.
 
 - [ ] Write/extract the complete implementation files.
 
@@ -1052,7 +1576,7 @@ export function nightlyBackup(db: Db, dir: string, now = new Date()): string {
 
 #### File: `src/server/operations/bundles.ts`
 
-<!-- replay task=2 phase=implementation encoding=text sha256=c6dfacc8fff5d198c814003d5c338e4816d8dd8a06fd391d2e5a5a9f856596a4 -->
+<!-- replay task=2 phase=implementation encoding=text sha256=3491ad0a6ce99cc593c42b52fec4e3faa4deed698204c86143105737a9eda241 -->
 
 ``````typescript
 import Database from 'better-sqlite3';
@@ -1065,7 +1589,36 @@ import { completedBackups, withBackupLock } from './backups';
 import { syncDirectory, syncFile } from './durability';
 
 interface Fingerprint { hash: string; size: number }
-interface Manifest { version: 1; database: Fingerprint; blobs: Fingerprint[] }
+interface SourceMetadata { sourceBackup: string; sourceCreatedAt: string; exportedAt: string }
+interface Manifest extends SourceMetadata { version: 1; database: Fingerprint; blobs: Fingerprint[] }
+export interface CompletionReport extends SourceMetadata { verifiedAt: string }
+export const DEFAULT_MAX_AGE_HOURS = 36;
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+function timestamp(value: string): number {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time) || new Date(time).toISOString() !== value) throw new Error('invalid_backup_timestamp');
+  return time;
+}
+function sourceTimestamp(name: string): string {
+  const match = /^builtbasis-nightly-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.db$/.exec(name);
+  if (!match) throw new Error('invalid_source_backup');
+  const value = `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`;
+  timestamp(value);
+  return value;
+}
+function sourceMetadata(manifest: Manifest): SourceMetadata {
+  if (sourceTimestamp(manifest.sourceBackup) !== manifest.sourceCreatedAt) throw new Error('source_timestamp_mismatch');
+  timestamp(manifest.exportedAt);
+  return { sourceBackup: manifest.sourceBackup, sourceCreatedAt: manifest.sourceCreatedAt, exportedAt: manifest.exportedAt };
+}
+function completionReport(bundle: string, manifest: Manifest): CompletionReport {
+  const report = JSON.parse(readFileSync(join(bundle, 'COMPLETE'), 'utf8')) as CompletionReport;
+  if (report.sourceBackup !== manifest.sourceBackup || report.sourceCreatedAt !== manifest.sourceCreatedAt ||
+      report.exportedAt !== manifest.exportedAt) throw new Error('completion_metadata_mismatch');
+  timestamp(report.verifiedAt);
+  return report;
+}
 export async function fingerprint(path: string): Promise<Fingerprint> {
   const hash = createHash('sha256');
   let size = 0;
@@ -1098,26 +1651,29 @@ function copyDurable(source: string, target: string): void {
   syncDirectory(dirname(target));
 }
 
-export async function beginExport(backupsDir: string, filesDir: string): Promise<{ id: string; path: string; filesPath: string }> {
+export async function beginExport(backupsDir: string, filesDir: string): Promise<{ id: string; path: string; filesPath: string } & SourceMetadata> {
   const id = randomBytes(16).toString('hex');
   const path = join(backupsDir, '.exports', id);
-  withBackupLock(backupsDir, () => {
+  const source = withBackupLock(backupsDir, () => {
     const name = completedBackups(backupsDir)[0];
     if (!name) throw new Error('no_completed_backup');
+    const sourceCreatedAt = sourceTimestamp(name);
     mkdirSync(path, { recursive: true, mode: 0o700 });
     // Hard link pins the completed inode even if rotation subsequently removes its original name.
     linkSync(join(backupsDir, name), join(path, 'builtbasis.db'));
     syncDirectory(path);
+    return { sourceBackup: name, sourceCreatedAt };
   });
   try {
     const blobs = inspectDatabase(join(path, 'builtbasis.db'));
     for (const blob of blobs) {
       await checkFile(blobPath(filesDir, blob.hash), blob);
     }
-    const manifest: Manifest = { version: 1, database: await fingerprint(join(path, 'builtbasis.db')), blobs };
+    const metadata = { ...source, exportedAt: new Date().toISOString() };
+    const manifest: Manifest = { version: 1, ...metadata, database: await fingerprint(join(path, 'builtbasis.db')), blobs };
     writeDurable(join(path, 'manifest.json'), JSON.stringify(manifest));
     syncDirectory(join(backupsDir, '.exports'));
-    return { id, path: resolve(path), filesPath: resolve(filesDir) };
+    return { id, path: resolve(path), filesPath: resolve(filesDir), ...metadata };
   } catch (error) { rmSync(path, { recursive: true, force: true }); throw error; }
 }
 export function releaseExport(backupsDir: string, id: string): void {
@@ -1128,16 +1684,28 @@ export function releaseExport(backupsDir: string, id: string): void {
 export async function verifyBundle(bundle: string, filesDir = join(bundle, 'files')): Promise<Manifest> {
   const manifest = JSON.parse(readFileSync(join(bundle, 'manifest.json'), 'utf8')) as Manifest;
   if (manifest.version !== 1) throw new Error('unsupported_bundle');
+  sourceMetadata(manifest);
   await checkFile(join(bundle, 'builtbasis.db'), manifest.database);
   const blobs = inspectDatabase(join(bundle, 'builtbasis.db'));
   if (JSON.stringify(blobs) !== JSON.stringify(manifest.blobs)) throw new Error('manifest_reference_mismatch');
   for (const blob of blobs) await checkFile(blobPath(filesDir, blob.hash), blob);
   return manifest;
 }
-export async function completeBundle(bundle: string, filesDir = join(bundle, 'files')): Promise<void> {
-  await verifyBundle(bundle, filesDir);
+export async function completeBundle(bundle: string, filesDir = join(bundle, 'files'),
+  options: { maxAgeHours?: number } = {}): Promise<CompletionReport> {
+  const maxAgeHours = options.maxAgeHours ?? DEFAULT_MAX_AGE_HOURS;
+  if (!Number.isFinite(maxAgeHours) || maxAgeHours <= 0 || !Number.isFinite(maxAgeHours * 3600000)) throw new Error('invalid_max_age_hours');
+  const manifest = await verifyBundle(bundle, filesDir);
+  const now = new Date();
+  const sourceAge = now.getTime() - timestamp(manifest.sourceCreatedAt);
+  if (sourceAge < -CLOCK_SKEW_MS) throw new Error('future_source_backup');
+  if (timestamp(manifest.exportedAt) > now.getTime() + CLOCK_SKEW_MS) throw new Error('future_export');
+  if (sourceAge > maxAgeHours * 3600000) throw new Error('stale_source_backup');
   const marker = join(bundle, 'COMPLETE');
-  if (!existsSync(marker)) writeDurable(marker, 'Verified database and every referenced blob.\n');
+  if (existsSync(marker)) return completionReport(bundle, manifest);
+  const report = { ...sourceMetadata(manifest), verifiedAt: now.toISOString() };
+  writeDurable(marker, JSON.stringify(report));
+  return report;
 }
 
 export interface RestoreResult {
@@ -1155,6 +1723,7 @@ export async function restoreBundle(bundle: string, destination: string, offline
   if (!existsSync(join(bundle, 'COMPLETE'))) throw new Error('incomplete_bundle');
   if (existsSync(destination)) throw new Error('destination_exists');
   const manifest = await verifyBundle(bundle, filesDir);
+  completionReport(bundle, manifest);
   const candidate = `${resolve(destination)}.candidate-${randomBytes(16).toString('hex')}`;
   mkdirSync(candidate, { mode: 0o700 });
   try {
@@ -1209,7 +1778,7 @@ try {
 
 #### File: `scripts/backup-export.ts`
 
-<!-- replay task=2 phase=implementation encoding=text sha256=a0ea0a4ca2df5ebfd00b4dd6a591c05074e39f0261f996066c6ec795b1914d9d -->
+<!-- replay task=2 phase=implementation encoding=text sha256=d264c77257a6884f2e8d3d7d092e7df29ae2eb6f81b30be6fdcbe78681d2a054 -->
 
 ``````typescript
 import { loadEnvFile } from '../src/server/bootstrap';
@@ -1217,18 +1786,32 @@ import { loadConfig } from '../src/server/config';
 import { beginExport, completeBundle, releaseExport } from '../src/server/operations/bundles';
 
 try {
-  const [command, target, flag, filesDir, ...extra] = process.argv.slice(2);
-  if (command === 'verify' && target && !extra.length && (flag === undefined || (flag === '--files-dir' && filesDir))) {
-    await completeBundle(target, filesDir);
-    console.log(JSON.stringify({ complete: true }));
+  const [command, target, ...flags] = process.argv.slice(2);
+  if (command === 'verify' && target) {
+    let filesDir: string | undefined;
+    let maxAgeHours: number | undefined;
+    for (let i = 0; i < flags.length; i += 2) {
+      const value = flags[i + 1];
+      if (!value || value.startsWith('--')) throw new Error('invalid_arguments');
+      if (flags[i] === '--files-dir' && filesDir === undefined) filesDir = value;
+      else if (flags[i] === '--max-age-hours' && maxAgeHours === undefined && /^\d+(?:\.\d+)?$/.test(value)) maxAgeHours = Number(value);
+      else throw new Error('invalid_arguments');
+    }
+    const report = await completeBundle(target, filesDir, { maxAgeHours });
+    console.log(JSON.stringify({ complete: true, ...report }));
   } else {
     loadEnvFile();
     const config = loadConfig();
     if (command === 'begin' && target === undefined) console.log(JSON.stringify(await beginExport(config.backupsDir, config.filesDir)));
-    else if (command === 'release' && target && flag === undefined) { releaseExport(config.backupsDir, target); console.log(JSON.stringify({ released: true })); }
+    else if (command === 'release' && target && flags.length === 0) { releaseExport(config.backupsDir, target); console.log(JSON.stringify({ released: true })); }
     else throw new Error('invalid_arguments');
   }
-} catch { console.error('backup_export_failed'); process.exitCode = 1; }
+} catch (error) {
+  const reasons = ['stale_source_backup', 'future_source_backup', 'future_export', 'invalid_max_age_hours'];
+  const reason = error instanceof Error && reasons.includes(error.message) ? error.message : 'verification_or_transfer_failed';
+  console.error(JSON.stringify({ event: 'backup_export_failed', reason }));
+  process.exitCode = 1;
+}
 ``````
 
 #### File: `scripts/restore.ts`
@@ -1249,7 +1832,7 @@ try {
 
 #### File: `docs/guides/backup-restore.md`
 
-<!-- replay task=2 phase=implementation encoding=text sha256=70deba52b50daee8e0df0d220b6100851426178be0f6dd1ed6103621423cbe67 -->
+<!-- replay task=2 phase=implementation encoding=text sha256=97c97994e952dfb99a801d264daf8539a81cb311dade4fabbf1503b739db1268 -->
 
 ``````markdown
 # Backup and restore
@@ -1264,41 +1847,45 @@ Backups contain the database and retained evidence, including private content. K
 
 From the installed release, with `BUILTBASIS_DATA_DIR` set, run `/usr/local/nodejs/24/bin/node dist/server/backup.mjs`. The deployed archive contains compiled commands; source npm commands require a local development checkout. Configure cron only after verifying the hosting account's Node path and private data directory. The command opens the existing database without migrating it. It uses `VACUUM INTO`, checks integrity, syncs the temporary file and publishes the completed name. It retains the latest copy from each of 14 UTC days and eight Monday-based UTC weeks. A copy can satisfy both daily and weekly retention. Pre-migration copies and partial files are outside this rotation.
 
-Use an absolute Node executable, an absolute path to the existing private external configuration and the stable current-release directory in cron. Adapt this example to the verified account paths and the host's cron timezone:
+Use an absolute Node executable, an absolute path to the private external non-secret operations configuration and the stable current-release directory in cron. Adapt this example to the verified account paths and the host's cron timezone:
 
 ```sh
-0 2 * * * cd /home/ACCOUNT/builtbasis/current && /usr/local/nodejs/24/bin/node --env-file=/home/ACCOUNT/builtbasis-config/runtime.env dist/server/backup.mjs >> /home/ACCOUNT/builtbasis-logs/backup.log 2>&1
+0 2 * * * cd /home/ACCOUNT/builtbasis/current && /usr/local/nodejs/24/bin/node --env-file=/home/ACCOUNT/builtbasis-config/operations.env dist/server/backup.mjs >> /home/ACCOUNT/builtbasis-logs/backup.log 2>&1
 ```
 
-Create the private log directory first. Keep configuration outside release, data, backup and offsite-copy directories. Restrict its permissions to the service account. Reuse the existing configuration file; do not duplicate `SHARE_LINK_KEY` into the cron entry or another backup configuration. If server commands run in an SSH shell without the application environment, pass that same absolute `--env-file` before the compiled script path.
+Create the private log directory first. Keep operations.env outside release, data, backup and offsite-copy directories and restrict its permissions to the service account. It contains only `BUILTBASIS_DATA_DIR` and any other required non-secret CLI settings. Keep `SHARE_LINK_KEY` solely in the konsoleH HTTP application settings; never copy it into operations.env, cron or backup configuration. Backup, export and restore need no share key. If server commands run in an SSH shell without the data-path setting, pass that same absolute `--env-file` before the compiled script path.
 
 The `.operations-lock` directory excludes concurrent nightly backup and export pin selection. A busy lock fails the command for monitoring/retry. Following a crash, stop jobs and prove no backup/export process remains before removing only that lock directory. Inspect partial `.tmp` files separately. Never remove retained immutable files to regain capacity. Raise capacity or move storage through a planned operation.
 
 ## Offsite pull protocol
 
-1. From the current release, run `/usr/local/nodejs/24/bin/node dist/server/backup-export.mjs begin` over SSH with `BUILTBASIS_DATA_DIR` set. Parse the sole JSON response with `id`, `path` and `filesPath`. The server first pins the newest completed nightly database with a hard link under the rotation lock. It verifies every referenced immutable file and writes `manifest.json`. The export directory contains only that database and manifest.
-2. Copy `builtbasis.db` and `manifest.json` from the returned export path into a new, private offsite bundle directory. This database copy must precede file transfer. The manifest format is `{version:1,database:{hash,size},blobs:[{hash,size}]}`. Each blob is at `filesPath/<first-two-hash-characters>/<hash>` on the server. Hashes are lowercase SHA-256. Sizes are byte counts.
-3. Transfer missing blobs into the offsite shared `files/` pool. Use temporary destination filenames and publish each file after transfer. Existing blobs are immutable. A truncated or corrupt existing blob must be quarantined and downloaded again after verification reports failure. Never mark the bundle complete on transfer success alone.
-4. On the owner PC, run `node dist/server/backup-export.mjs verify <bundle> --files-dir <offsite-files>` from the matching locally built checkout. It checks the database hash, integrity, foreign keys, exact schema migration list and every referenced file's size and SHA-256. Only success writes `COMPLETE`. Keep failed bundles incomplete and report failure. A marker is never a substitute for verification at restore time.
+1. From the current release, run `/usr/local/nodejs/24/bin/node dist/server/backup-export.mjs begin` over SSH with `BUILTBASIS_DATA_DIR` set. Parse the sole JSON response with `id`, `path`, `filesPath`, `sourceBackup`, `sourceCreatedAt` and `exportedAt`. The server first pins the newest completed nightly database with a hard link under the rotation lock. It preserves that backup's filename and UTC creation timestamp rather than using export time as backup freshness. It verifies every referenced immutable file and writes `manifest.json`. The export directory contains only that database and manifest.
+2. Copy `builtbasis.db` and `manifest.json` from the returned export path into a new, private offsite bundle directory. This database copy must precede file transfer. The manifest format is `{version:1,sourceBackup,sourceCreatedAt,exportedAt,database:{hash,size},blobs:[{hash,size}]}`. The source timestamp must match the pinned nightly filename. Each blob is at `filesPath/<first-two-hash-characters>/<hash>` on the server. Hashes are lowercase SHA-256. Sizes are byte counts.
+3. Transfer missing blobs into the offsite shared `files/` pool. The Windows script uses one SFTP batch for the pinned database and manifest first, followed by one SFTP batch for all missing blobs. It does not open a new SSH connection for each blob. Use temporary destination filenames and publish each file after transfer. Existing blobs are immutable. A truncated or corrupt existing blob must be quarantined and downloaded again after verification reports failure. Never mark the bundle complete on transfer success alone.
+4. On the owner PC, run `node dist/server/backup-export.mjs verify <bundle> --files-dir <offsite-files> --max-age-hours 36` from the matching locally built checkout. The positive maximum source age is configurable and defaults to 36 hours; choose it deliberately for the schedule. Verification checks the database hash, integrity, foreign keys, exact schema migration list and every referenced file's size and SHA-256. It rejects an expired source backup and a source timestamp more than five minutes in the future. Only success writes structured JSON `COMPLETE` containing `sourceBackup`, `sourceCreatedAt`, `exportedAt` and `verifiedAt`. Keep failed bundles incomplete and report failure. A marker is never a substitute for verification at restore time.
 5. Run `/usr/local/nodejs/24/bin/node dist/server/backup-export.mjs release <id>` over SSH with the same data configuration when transfer ends, including failures. This removes only the bounded export staging directory. If a network failure prevents release, record the id and retry it. Never use an automatic timeout to delete an export that might still be transferring.
 
 The export pin survives server rotation. File transfer and hashing hold no SQLite transaction. Offsite copies may share the immutable pool; keep every blob required by every retained bundle. This procedure does not delete published files. An interrupted pull is not a completed backup. Alert on command failure, absent recent completed backups, failed scheduled tasks and insufficient storage. The owner PC must be running for its scheduled pull.
 
+Monitor the JSON `sourceCreatedAt` age against the selected maximum. `exportedAt`, `verifiedAt`, directory names and filesystem modification times do not establish a new recovery point. Re-exporting yesterday's snapshot after new live writes does not update its source date. Identical database hashes on two genuinely separate recent snapshots are valid when no data changed. An existing COMPLETE report is not rewritten by repeat verification; a stale repeat fails without making the earlier report appear current.
+
 From the matching built checkout on the owner PC, invoke the supplied Windows pull script. Replace all example paths and the SSH alias with the verified operator configuration:
 
 ```powershell
-powershell.exe -NoProfile -NonInteractive -File "C:\path\to\builtbasis\scripts\pull-backup.ps1" -SshAlias "builtbasis-host" -RemoteRelease "/home/ACCOUNT/builtbasis/current" -RemoteData "/home/ACCOUNT/builtbasis-data" -Destination "X:\chosen-private-backup-folder"
+powershell.exe -NoProfile -NonInteractive -File "C:\path\to\builtbasis\scripts\pull-backup.ps1" -SshAlias "builtbasis-host" -RemoteRelease "/home/ACCOUNT/builtbasis/current" -RemoteData "/home/ACCOUNT/builtbasis-data" -Destination "X:\chosen-private-backup-folder" -MaxAgeHours 36
 ```
 
-Configure Task Scheduler to run this command under the owner account with the checkout as its working directory. Select the nightly schedule deliberately; this example creates no task. Build the matching tools first. Verify `node`, `ssh` and `scp` resolve in that account's unattended environment. Establish the host key deliberately and verify BatchMode SSH authentication succeeds without prompts. Keep the SSH private key separate from the backup destination. Do not weaken host-key checking to make scheduling work.
+Configure Task Scheduler to run this command under the owner account with the checkout as its working directory. Select the nightly schedule deliberately; this example creates no task. Build the matching tools first. Verify `node`, `ssh` and `sftp` resolve in that account's unattended environment. Establish the host key deliberately and verify BatchMode SSH authentication succeeds without prompts. Keep the SSH private key separate from the backup destination. Do not weaken host-key checking to make scheduling work.
 
-Test the task using its actual scheduled identity and logon mode. Confirm X: exists and is writable in that context; an interactive mapped drive may not exist in a background task. Set `-Destination` to the verified private location. Configure no overlapping runs. Record the task's exit code and capture diagnostic output in a private log. Alert on nonzero results and on a newest COMPLETE marker older than the selected schedule's tolerance. An old COMPLETE file does not prove the latest pull succeeded. Investigate incomplete snapshot folders and failed export release. If `.pull-lock` remains after a crash, prove no pull is active before removing only that lock.
+Test the task using its actual scheduled identity and logon mode. Confirm X: exists and is writable in that context; an interactive mapped drive may not exist in a background task. Set `-Destination` to the verified private location. Configure no overlapping runs. Record the task's exit code and capture diagnostic output in a private log. Alert on nonzero results, missing completion reports and sourceCreatedAt older than the configured maximum. Check verifiedAt separately for task execution monitoring; never use COMPLETE file modification time for source freshness. An old COMPLETE file does not prove the latest pull succeeded. Investigate incomplete snapshot folders and failed export release. If `.pull-lock` remains after a crash, prove no pull is active before removing only that lock.
 
 ## Offline restore
 
 Stop the application, server cron and owner-PC pull jobs first. Confirm all writing processes have exited. Keep them stopped through verification, restore and cutover. Run only one restore operator at a time. `--offline-confirmed` records that operator prerequisite; it cannot stop an external service.
 
-Use the application release with the exact migration list contained in the backup. Restore refuses older, newer, corrupt or incomplete bundles. Do not let startup migrate an unverified database. Keep the separate share key available for configured application startup, or use the existing key-loss procedure. No restored share links are reopened.
+Use the application release with the exact migration list contained in the backup. Restore refuses older or newer schemas, corrupt data and incomplete bundles. Do not let startup migrate an unverified database. Keep the separate share key available for configured application startup, or use the existing key-loss procedure. No restored share links are reopened.
+
+The schema must match, but deliberate offline restore is allowed from an old recovery point. The scheduled 36-hour freshness limit does not block restoring a previously completed, fully verified older bundle. The operator must review its preserved sourceCreatedAt and accept the corresponding recovery point. Restore validates the structured completion metadata and rechecks all bytes.
 
 From the compatible installed release, run `/usr/local/nodejs/24/bin/node dist/server/restore.mjs <bundle> <fresh-data-directory> --offline-confirmed --files-dir <offsite-files>`. On the owner PC, use the local Node executable with that same compiled script and arguments. Restore verification needs no share key or application environment. The destination must not exist and its parent must already exist on the intended filesystem. Never pass the live data directory. The command verifies the bundle, copies into a private candidate, verifies the candidate bytes and resets access in one database transaction. It deletes all sessions, revokes every share link, disables every non-owner account and deletes every record grant. The owner's account and password remain unchanged. Only the validated candidate is renamed to the requested destination.
 
@@ -1321,7 +1908,7 @@ Successful restore emits a system diagnostic with reason `database_restore` and 
 
 **Depends on:** Task 2.
 
-Build Node ESM entrypoints locally with esbuild while keeping runtime packages external. Stage only compiled assets and package manifests; npm ci --omit=dev runs with the hosting Node 24 directory on PATH. Staging never switches the running release. Windows pull pins the database, downloads database/manifest, copies only missing immutable blobs into a shared local pool, verifies all references and only then creates COMPLETE.
+Build Node ESM entrypoints locally with esbuild while keeping runtime packages external. Stage only compiled assets and package manifests; npm ci --omit=dev runs with the hosting Node 24 directory on PATH. Staging never switches the running release. Windows pull pins the database, downloads database/manifest, copies only missing immutable blobs into a shared local pool, uses one SFTP batch for database/manifest and one for all missing blobs, verifies all references and source freshness, and only then creates COMPLETE. Windows tests exercise batch orchestration with mocked commands; they do not establish real SSH behavior.
 
 - [ ] Write/extract the tests first.
 
@@ -1368,7 +1955,104 @@ test('compiled production entrypoints run without tsx and serve a real health re
 }, 15000);
 ``````
 
-- [ ] Run the focused test before implementation: `npx vitest run tests/server/production-build.test.ts`. The production test fails because scripts/build-server.mjs does not exist. It must pass after extraction, exercising a real compiled process and HTTP health request without invoking tsx.
+#### File: `tests/server/pull-script.test.ts`
+
+<!-- replay task=3 phase=test encoding=text sha256=dc14c11d25a989dc3db40cb70eb5c4113df734285b33d8aedacac6cd6f032b0b -->
+
+``````typescript
+import { afterEach, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, copyFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+
+const roots: string[] = [];
+afterEach(() => { roots.splice(0).forEach(p => rmSync(p, { recursive: true, force: true })); });
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), 'bb-pull-script-')); roots.push(root);
+  const source = join(root, 'source'); mkdirSync(source);
+  const repo = join(root, 'repo'); mkdirSync(join(repo, 'dist/server'), { recursive: true });
+  mkdirSync(join(repo, 'scripts'));
+  copyFileSync('scripts/pull-backup.ps1', join(repo, 'scripts/pull-backup.ps1'));
+  writeFileSync(join(repo, 'dist/server/backup-export.mjs'), 'throw new Error("verifier must be mocked");');
+  // The test mocks SSH, SFTP and the verifier process. Actual byte/freshness verification is covered by operations tests.
+  writeFileSync(join(source, 'builtbasis.db'), 'synthetic metadata');
+  const blobs = Array.from({ length: 128 }, (_, i) => {
+    const data = Buffer.from(`blob-${i}`); const hash = createHash('sha256').update(data).digest('hex');
+    writeFileSync(join(source, hash), data); return { hash, size: data.length };
+  });
+  writeFileSync(join(source, 'manifest.json'), JSON.stringify({ blobs }));
+  return { root, source, blobs, repo };
+}
+function run(f: ReturnType<typeof fixture>, mode = 'success') {
+  const destination = join(f.root, 'backup with spaces');
+  const output = execFileSync('powershell.exe', ['-NoProfile', '-File', resolve('tests/operations/pull-harness.ps1'),
+    '-Repo', f.repo, '-Fixture', f.source, '-Destination', destination, '-Mode', mode], { encoding: 'utf8' });
+  return { report: JSON.parse(output.trim()), destination };
+}
+it.skipIf(process.platform !== 'win32')('uses two SFTP batches for 128 new blobs, metadata first, and skips existing blobs on the next pull', () => {
+  const f = fixture(); const first = run(f);
+  expect(first.report).toMatchObject({ batches: [2, 128], released: true, age: '24', failed: false, locked: false });
+  expect(first.report.order.slice(0, 2)).toEqual(['builtbasis.db', 'manifest.json']);
+  for (const b of f.blobs) expect(existsSync(join(first.destination, 'files', b.hash.slice(0, 2), b.hash))).toBe(true);
+  const second = run(f);
+  expect(second.report.batches).toEqual([2]);
+}, 15000);
+it.skipIf(process.platform !== 'win32')('fails an overdue-source verifier result, releases its pin and never publishes COMPLETE', () => {
+  const { report, destination } = run(fixture(), 'stale');
+  expect(report).toMatchObject({ failed: true, released: true, locked: false });
+  expect(existsSync(join(destination, 'snapshots', 'a'.repeat(32), 'COMPLETE'))).toBe(false);
+}, 15000);
+``````
+
+#### File: `tests/operations/pull-harness.ps1`
+
+<!-- replay task=3 phase=test encoding=text sha256=749a148aa8d7313a023473ea46c6b3d4ef23c742ac7e43178faa6d27e1346766 -->
+
+``````powershell
+param([string]$Repo, [string]$Fixture, [string]$Destination, [string]$Mode = 'success')
+$ErrorActionPreference = 'Stop'
+$global:TransferBatches = [Collections.Generic.List[object]]::new()
+$global:Released = $false
+$global:VerifiedAge = $null
+$global:CopyOrder = [Collections.Generic.List[string]]::new()
+function global:ssh {
+  $global:LASTEXITCODE = 0
+  if ($args[-1] -like '* begin') { return '{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' }
+  if ($args[-1] -like '* release *') { $global:Released = $true; return }
+  throw 'Unexpected SSH command in mock'
+}
+function global:scp { throw 'Per-file SCP is forbidden in this test' }
+function global:sftp {
+  $index = [Array]::IndexOf($args, '-b')
+  if ($index -lt 0) { throw 'Missing SFTP batch file' }
+  $lines = @(Get-Content -LiteralPath $args[$index + 1])
+  $global:TransferBatches.Add($lines.Count)
+  foreach ($line in $lines) {
+    if ($line -notmatch '^get "([^"]+)" "([^"]+)"$') { throw 'Unexpected SFTP operation' }
+    $remote = $Matches[1]; $local = $Matches[2]
+    $name = ($remote -split '/')[-1]
+    $global:CopyOrder.Add($name)
+    Copy-Item -LiteralPath (Join-Path $Fixture $name) -Destination $local
+  }
+  $global:LASTEXITCODE = 0
+}
+function global:node {
+  $index = [Array]::IndexOf($args, '--max-age-hours')
+  if ($index -lt 0) { throw 'Missing source freshness limit' }
+  $global:VerifiedAge = $args[$index + 1]
+  if ($Mode -eq 'stale') { $global:LASTEXITCODE = 1; return }
+  [IO.File]::WriteAllText((Join-Path $args[2] 'COMPLETE'), '{"sourceCreatedAt":"2026-10-04T00:00:00Z"}')
+  $global:LASTEXITCODE = 0
+}
+$failed = $false
+try { & (Join-Path $Repo 'scripts/pull-backup.ps1') -SshAlias fixture -RemoteRelease /fixture/release -RemoteData /fixture/data -Destination $Destination -MaxAgeHours 24 | Out-Null }
+catch { $failed = $true }
+[ordered]@{ batches = $global:TransferBatches.ToArray(); released = $global:Released; age = $global:VerifiedAge; failed = $failed; order = $global:CopyOrder.ToArray(); locked = Test-Path (Join-Path $Destination '.pull-lock') } | ConvertTo-Json -Compress
+``````
+
+- [ ] Run the focused test before implementation: `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts`. The production test fails because scripts/build-server.mjs does not exist. It must pass after extraction, exercising a real compiled process and HTTP health request without invoking tsx.
 
 - [ ] Write/extract the complete implementation files.
 
@@ -1376,7 +2060,7 @@ test('compiled production entrypoints run without tsx and serve a real health re
 
 <!-- replay task=3 phase=implementation encoding=text sha256=efb2d0f87059177c85b3ff666ef7fd73fa5962d68665b0c3998998c48b411832 -->
 
-``````typescript
+``````javascript
 import { build } from 'esbuild';
 await build({
   entryPoints: {
@@ -1442,14 +2126,15 @@ try {
 
 #### File: `scripts/pull-backup.ps1`
 
-<!-- replay task=3 phase=implementation encoding=text sha256=0064e674586f6e0d0ff7970d84f919b5076ba185e04cb29163704bebfc968e38 -->
+<!-- replay task=3 phase=implementation encoding=text sha256=9dc770b2ce55b2420ea904408715f12e68010dc0d4570f21060d8f355920498c -->
 
 ``````powershell
 param(
   [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]*$')][string]$SshAlias,
   [Parameter(Mandatory)][ValidatePattern('^/[A-Za-z0-9_/-]+$')][string]$RemoteRelease,
   [Parameter(Mandatory)][ValidatePattern('^/[A-Za-z0-9_/-]+$')][string]$RemoteData,
-  [Parameter(Mandatory)][string]$Destination
+  [Parameter(Mandatory)][string]$Destination,
+  [ValidateScript({ $_ -gt 0 -and -not [double]::IsInfinity($_) -and -not [double]::IsNaN($_) })][double]$MaxAgeHours = 36
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -1464,6 +2149,19 @@ $lock = Join-Path $root '.pull-lock'
 New-Item -ItemType Directory -Path $lock -ErrorAction Stop | Out-Null
 $exportId = $null
 $remoteCommand = "cd '$RemoteRelease' && BUILTBASIS_DATA_DIR='$RemoteData' /usr/local/nodejs/24/bin/node dist/server/backup-export.mjs"
+# One SFTP process handles a batch; never open one SSH connection per blob.
+function Invoke-BatchTransfer([string[]]$Lines) {
+  $batch = Join-Path ([IO.Path]::GetTempPath()) ('builtbasis-sftp-' + [guid]::NewGuid().ToString('N') + '.txt')
+  try {
+    [IO.File]::WriteAllLines($batch, $Lines, [Text.UTF8Encoding]::new($false))
+    & sftp -q -o BatchMode=yes -b $batch -- $SshAlias
+    if ($LASTEXITCODE -ne 0) { throw 'SFTP transfer failed; copy is incomplete' }
+  } finally { if (Test-Path -LiteralPath $batch) { Remove-Item -LiteralPath $batch -Force } }
+}
+function Sftp-Quote([string]$Path) {
+  if ($Path.IndexOfAny([char[]]"`r`n`"``") -ge 0) { throw 'Unsupported transfer path' }
+  return '"' + $Path.Replace('\','/') + '"'
+}
 try {
   $response = & ssh -o BatchMode=yes -- $SshAlias "$remoteCommand begin"
   if ($LASTEXITCODE -ne 0) { throw 'Cannot pin a completed server backup' }
@@ -1473,12 +2171,14 @@ try {
   $bundle = Join-Path $root "snapshots/$exportId"
   [IO.Directory]::CreateDirectory($bundle) | Out-Null
   $remoteBundle = "$RemoteData/backups/.exports/$exportId"
-  foreach ($name in @('builtbasis.db','manifest.json')) {
-    & scp -o BatchMode=yes -- "${SshAlias}:$remoteBundle/$name" (Join-Path $bundle $name)
-    if ($LASTEXITCODE -ne 0) { throw "Failed pinned $name transfer" }
+  $metadataBatch = foreach ($name in @('builtbasis.db','manifest.json')) {
+    'get ' + (Sftp-Quote "$remoteBundle/$name") + ' ' + (Sftp-Quote (Join-Path $bundle $name))
   }
+  Invoke-BatchTransfer $metadataBatch
   $manifest = Get-Content -LiteralPath (Join-Path $bundle 'manifest.json') -Raw | ConvertFrom-Json
   $pool = Join-Path $root 'files'
+  $fileBatch = [Collections.Generic.List[string]]::new()
+  $downloads = [Collections.Generic.List[object]]::new()
   foreach ($blob in $manifest.blobs) {
     if ($blob.hash -notmatch '^[a-f0-9]{64}$' -or $blob.size -lt 0) { throw 'Invalid blob manifest' }
     $prefix = $blob.hash.Substring(0,2)
@@ -1487,13 +2187,16 @@ try {
     $target = Join-Path $folder $blob.hash
     if (-not (Test-Path -LiteralPath $target)) {
       $partial = "$target.part"
-      & scp -o BatchMode=yes -- "${SshAlias}:$RemoteData/files/$prefix/$($blob.hash)" $partial
-      if ($LASTEXITCODE -ne 0) { throw 'Blob transfer failed' }
-      if ((Get-Item -LiteralPath $partial).Length -ne $blob.size -or (Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash.ToLowerInvariant() -ne $blob.hash) { throw 'Blob integrity failed' }
-      Move-Item -LiteralPath $partial -Destination $target
+      $fileBatch.Add('get ' + (Sftp-Quote "$RemoteData/files/$prefix/$($blob.hash)") + ' ' + (Sftp-Quote $partial))
+      $downloads.Add(@{ Partial = $partial; Target = $target; Hash = $blob.hash; Size = $blob.size })
     }
   }
-  & node (Join-Path $repo 'dist/server/backup-export.mjs') verify $bundle --files-dir $pool
+  if ($fileBatch.Count) { Invoke-BatchTransfer $fileBatch.ToArray() }
+  foreach ($download in $downloads) {
+    if ((Get-Item -LiteralPath $download.Partial).Length -ne $download.Size -or (Get-FileHash -LiteralPath $download.Partial -Algorithm SHA256).Hash.ToLowerInvariant() -ne $download.Hash) { throw 'Blob integrity failed' }
+    Move-Item -LiteralPath $download.Partial -Destination $download.Target
+  }
+  & node (Join-Path $repo 'dist/server/backup-export.mjs') verify $bundle --files-dir $pool --max-age-hours $MaxAgeHours.ToString([Globalization.CultureInfo]::InvariantCulture)
   if ($LASTEXITCODE -ne 0) { throw 'Off-site verification failed; copy is incomplete' }
   Write-Output "Verified off-site backup: $bundle"
 } finally {
@@ -1505,7 +2208,7 @@ try {
 }
 ``````
 
-- [ ] GREEN: run `npx vitest run tests/server/production-build.test.ts` and require success.
+- [ ] GREEN: run `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts` and require success.
 
 - [ ] Run npm run build and npm run typecheck. Parse both PowerShell scripts with System.Management.Automation.Language.Parser and require zero errors. Follow the production-only probe below. Actual SSH upload, scheduling and live activation remain Task 4/5; local tests do not claim those passed.
 
@@ -1521,7 +2224,7 @@ This task requires the owner’s actual hosting settings and live acceptance evi
 
 #### File: `docs/guides/deployment.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=61ad1359eb51842253ef7c7aba0ae9f5aa302ca7d0d7a38fd8a924744d5fd684 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=eba51f11d6f0e8822ec1f7fcc149b5bf6c5bf1c6a35a3975b19381824367d19b -->
 
 ``````markdown
 # Deploy and release BuiltBasis v1
@@ -1545,11 +2248,11 @@ The script transfers only built assets, compiled server tools and the package ma
 
 ## First activation and configuration
 
-Use separate directories: `/usr/home/ktimana/builtbasis/releases/<commit>` for code, `/usr/home/ktimana/builtbasis/current` for its symlink, `/usr/home/ktimana/builtbasis-data` for data, and `/usr/home/ktimana/builtbasis-config/runtime.env` for configuration. The configuration directory and file are owner-readable only (700 and 600). They are outside code, data and backup transfers. Preserve the dedicated share key across releases. Do not put real configuration or account passwords in this repository.
+Use separate directories: `/usr/home/ktimana/builtbasis/releases/<commit>` for code, `/usr/home/ktimana/builtbasis/current` for its symlink, `/usr/home/ktimana/builtbasis-data` for data, and `/usr/home/ktimana/builtbasis-config/operations.env` for non-secret command-line configuration. The configuration directory and file are owner-readable only (700 and 600). They are outside code, data and backup transfers. Preserve the dedicated share key across releases. Do not put real configuration or account passwords in this repository.
 
 Record the actual account quota and current usage from konsoleH before setting `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`. Budget for immutable files, the database, 14 daily/8 weekly backups, export pins, two releases and other sites. The filesystem free-space value is not the account quota. No default budget is assumed. Record the chosen values and rationale privately in the release checklist.
 
-Set `BUILTBASIS_DATA_DIR`, `PUBLIC_BASE_URL=https://builtbasis.ktimanet.com`, `SHARE_LINK_KEY`, `BEHIND_CLOUDFLARE=1`, both storage settings, and `NODE_ENV=production`. Leave `PORT` unset: Hetzner supplies its socket. Match HTTP configuration in konsoleH to `runtime.env` for administrative commands; keep one controlled copy of the values. Never print the key in logs. Cloudflare Full (strict) remains enabled.
+Set `BUILTBASIS_DATA_DIR`, `PUBLIC_BASE_URL=https://builtbasis.ktimanet.com`, `SHARE_LINK_KEY`, `BEHIND_CLOUDFLARE=1`, both storage settings, and `NODE_ENV=production`. Leave `PORT` unset: Hetzner supplies its socket. Keep `SHARE_LINK_KEY` only in the HTTP application settings in konsoleH. The command-line tools do not need it. Put only `BUILTBASIS_DATA_DIR` and any other needed non-secret settings in `operations.env`; keep the data path aligned with konsoleH. Never duplicate the share key into that file. Never print the key in logs. Cloudflare Full (strict) remains enabled.
 
 Provision real project data locally using the existing `seed:gennadi` command against a fresh private data directory. Source contact CSV/workbook and the resulting database are private. Do not include them in the release archive. Transfer the closed initial database to the production data folder only while Node is deactivated and only when no production database exists. Preserve any existing database instead of replacing it. Verify its schema/integrity on the server. Once the app has live data, use the restore procedure for data replacement.
 
@@ -1557,7 +2260,7 @@ For first activation, deactivate the spike in konsoleH. Create `current` as a sy
 
 ```sh
 cd /usr/home/ktimana/builtbasis/current
-/usr/local/nodejs/24/bin/node --env-file=/usr/home/ktimana/builtbasis-config/runtime.env dist/server/owner.mjs OWNER_LOGIN "Owner display name"
+/usr/local/nodejs/24/bin/node --env-file=/usr/home/ktimana/builtbasis-config/operations.env dist/server/owner.mjs OWNER_LOGIN "Owner display name"
 ```
 
 The password is prompted; never place it in the command line. Other deployed tools use `node --env-file=... dist/server/user.mjs`, `backup.mjs`, `backup-export.mjs`, `restore.mjs`, or `revoke-share-links.mjs`. Source-level npm administration commands require the development checkout and are not used in the staged production directory.
@@ -1667,7 +2370,7 @@ For every completed gate, record the date, operator, release commit, environment
 
 **Depends on:** Task 4.
 
-Install nightly server cron and the Windows scheduled pull using the operating guide from Task 2. Verify the scheduled jobs actually run under their real identities, including X: availability and unattended SSH. Pin/copy database first, copy immutable files, verify, then mark complete. Monitor failed jobs and stale successful snapshots. Perform the drill from that actual off-site copy into a new isolated data directory.
+Install nightly server cron and the Windows scheduled pull using the operating guide from Task 2. Verify the scheduled jobs actually run under their real identities, including X: availability and unattended SSH. Pin/copy database first, copy immutable files, verify, then mark complete. Monitor failed jobs and the source backup timestamp. New transfer or COMPLETE times cannot make an old recovery point current. Perform the drill from that actual off-site copy into a new isolated data directory.
 
 - [ ] Record integrity/hash verification, restored records/files, owner access, zero old sessions/grants, revoked links and disabled contributors. Demonstrate password reset before enable and deliberate regrant. A real production cutover requires app and jobs stopped through access reset and verification; the drill must not replace production data. Keep the key outside backups. Complete all backup/recovery gates before v1 delivery.
 
@@ -2435,7 +3138,7 @@ Do not rerun passing suites for documentation-only edits. Repeat affected checks
 
 ### Production-only package probe
 
-Create a fresh scratch directory outside the application data paths. Copy only `dist`, `package.json` and `package-lock.json`. In that directory run `npm ci --omit=dev --ignore-scripts` on the Windows replay machine, then `node dist/server/runtime-check.mjs`. Confirm tsx is absent. Start `node dist/server/main.mjs` using a new temporary data directory, synthetic share key, loopback PORT/origin and explicit test storage budget/reserve. Require `/api/health` and `/` to return 200 and the shell to load built assets. Stop the exact child process and remove only that disposable data directory. This checks package contents locally; it does not replace the normal hosting install or its Linux native-module check.
+Create a fresh scratch directory outside the application data paths. Copy only `dist`, `package.json` and `package-lock.json`. In that directory run `npm ci --omit=dev --ignore-scripts` on the Windows replay machine, then `node dist/server/runtime-check.mjs`. Confirm tsx and bundled browser-only packages are absent. Start `node dist/server/main.mjs` using a new temporary data directory, synthetic share key, loopback PORT/origin and explicit test storage budget/reserve. Require `/api/health` and `/` to return 200 and the shell to load built assets. Stop the exact child process and remove only that disposable data directory. This checks package contents locally; it does not replace the normal hosting install or its Linux native-module check.
 
 Parse both PowerShell files without executing their SSH operations:
 
@@ -2452,23 +3155,25 @@ Their real remote and scheduled execution is checked in Tasks 4–5. Use PowerSh
 
 ## Planning replay evidence
 
-On 2026-10-04 the complete plan was extracted into a fresh detached checkout of `59f04d0`, separately from the authoring checkout. All **28 full-file payloads** were verified by hash. The checkout contains proposed code only; main still runs Plan 5.
+On 2026-10-04 the initial publication was replayed from `59f04d0`, passing 480 unit/API tests and 42 browser tests. After the two external reviews of `7997780`, the revised plan was extracted into a new detached checkout of `7997780`, separately from the authoring checkout. All **33 full-file payloads** were verified by hash. The runtime baseline of those commits is identical. The checkout contains proposed code only; main still runs Plan 5. The table below reports the revised replay.
 
 | Check | Actual result |
 |---|---|
-| Task 1 RED/GREEN | Missing print route/module, then five focused tests passed; typecheck passed |
-| Task 2 RED/GREEN | Missing operations module while existing DB tests passed, then all fourteen focused tests passed; typecheck passed |
-| Task 3 RED/GREEN | Missing build script, then real compiled-process HTTP test passed |
+| Task 1 RED/GREEN | Initial missing print route/module, then five focused tests passed. Review regressions failed on stale names and missing automatic print, then all five print browser tests passed |
+| Task 2 RED/GREEN | Initial missing operations module. Review regressions failed on missing source metadata/freshness checks, then all eighteen focused operations/database tests passed |
+| Task 3 RED/GREEN | Initial missing build script, then real compiled-process HTTP test passed. Added Windows batch-transfer success and stale-verification failure tests passed |
 | Full Node/browser production builds and TypeScript | Passed |
-| Complete unit/API suite | **480 tests passed across 68 files** |
-| Complete Chrome browser suite | **42 tests passed across 10 spec files** |
+| Complete unit/API suite | **486 tests passed across 69 files** |
+| Complete Chrome browser suite | **44 tests passed across 10 spec files** |
 | Print output | Independent QR decode, Greek A3 dimensions, 180-paragraph multipage text completeness and photo readiness passed; screenshot inspected |
-| Production-only installation | 126 packages installed with dev dependencies omitted; tsx absent; native runtime check, real health request and built shell passed |
+| Production-only installation | 78 packages installed with dev dependencies omitted, down from 126; tsx and bundled browser packages absent; native runtime check, real health request and built shell passed |
 | Existing dependency resolutions | All 316 existing package-path version/resolved/integrity values preserved |
 | Production dependency audit | Zero vulnerabilities reported; four existing moderate findings remain in the complete development dependency tree |
-| Windows tooling | Both PowerShell scripts parsed without errors; actual remote execution and Task Scheduler operation remain Tasks 4–5 |
+| Windows tooling | Release/pull scripts and test harness parsed without errors on PowerShell 5.1. Mocked transfer tests used two SFTP batches for 128 missing blobs and one metadata batch on repeat; stale verification failed without COMPLETE and released its pin. Real remote execution and Task Scheduler operation remain Tasks 4–5 |
 
 Environment: Windows, Node 24.12.0, npm 11.6.2, Playwright 1.63.0 and installed Chrome 154.0.8037.58. Browser tests start private local fixture servers. No command connected to the hosting account or altered production. The synthetic restore is a local fixture drill, not the required actual off-site drill.
+
+The review corrections preserve source backup identity and creation time, reject stale scheduled copies, always adopt fresh printable data before printing, batch missing-file transfers, keep the share key solely in the HTTP application settings, and align Greek field labels with the design. Long-lived recovery points remain restorable. The package change preserves every existing dependency version and integrity value. Code blocks use their correct language tags and contain no leading BOM.
 
 Authoring caught and corrected one full-suite timeout: a rotation test originally made 74 VACUUM copies. It now uses validated historical snapshots and one real rotation, preserving the race/retention assertion without the unnecessary I/O. Restore diagnostics were reconciled with §5.12 to include only system reason and reset counts. A reviewer questioned the existing ignore-scripts installation workaround; the clean production-only native/runtime probe confirmed the pinned package includes usable prebuilds on this machine. Linux installation remains a separate hosted check.
 
