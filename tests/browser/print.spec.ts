@@ -131,10 +131,13 @@ test('owner print excludes Notes and Log from both DOM and its payload, and requ
   }
   await page.getByLabel('Language', { exact: true }).selectOption('el');
   await expect(page.getByRole('heading', { name: 'Περιγραφή', exact: true })).toBeVisible();
+  await page.evaluate(() => { delete document.body.dataset.printedLinks; });
+  await page.getByRole('button', { name: 'Εκτύπωση / Αποθήκευση PDF', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-printed-links', '1');
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('.site-header')).toBeHidden();
   await expect(page.locator('.print-controls')).toBeHidden();
-  await expect(page.locator('.print-sheet')).toBeVisible();
+  await expect(page.locator('.print-sheet')).toBeHidden();
   const pdf = await page.pdf({ preferCSSPageSize: true, path: 'test-results/print-greek-a3.pdf' });
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const loading = getDocument({ data: new Uint8Array(pdf), useSystemFonts: true });
@@ -197,6 +200,9 @@ test('no link is created on GET and long text continues onto further A3 pages', 
   await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Printed handover' });
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeEnabled();
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printRequested = 'yes'; }; });
+  await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-print-requested', 'yes');
   const pdf = await page.pdf({ preferCSSPageSize: true, path: 'test-results/print-multipage-a3.pdf' });
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const loading = getDocument({ data: new Uint8Array(pdf), useSystemFonts: true });
@@ -246,4 +252,48 @@ test('printing waits for photo resources and excludes revoked and expired QR cho
   await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeDisabled();
   await expect(page.locator('body')).not.toHaveAttribute('data-print-called');
+});
+
+
+test('native printing cannot bypass refresh or reuse a completed print authorization', async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const created = await page.request.post('/api/projects/' + projectId + '/records', { headers: { origin }, data: { subtype: 'task', title: 'Original native print title' } });
+  expect(created.status()).toBe(201);
+  const { id: recordId } = await created.json() as { id: number };
+  const base = '/api/projects/' + projectId + '/records/' + recordId;
+  expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
+  expect((await page.request.post(base + '/share-links', { headers: { origin }, data: { label: 'Native print reader' } })).status()).toBe(201);
+  await page.goto('/projects/' + projectId + '/records/' + recordId + '/print');
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
+  await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Native print reader' });
+  const button = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
+  await expect(button).toBeEnabled();
+  const pdfText = async () => {
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const task = getDocument({ data: new Uint8Array(await page.pdf({ preferCSSPageSize: true })), useSystemFonts: true });
+    try {
+      const document = await task.promise;
+      let text = '';
+      for (let i = 1; i <= document.numPages; i++) text += (await (await document.getPage(i)).getTextContent()).items.map(item => 'str' in item ? item.str : '').join(' ');
+      return text;
+    } finally { await task.destroy(); }
+  };
+  expect((await page.request.patch(base, { headers: { origin }, data: { title: 'Refreshed native print title' } })).status()).toBe(200);
+  const blocked = await pdfText();
+  expect(blocked).toContain('Print / Save PDF');
+  expect(blocked).not.toContain('Original native print title');
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printRequested = 'yes'; }; });
+  await button.click();
+  await expect(page.locator('body')).toHaveAttribute('data-print-requested', 'yes');
+  expect(await pdfText()).toContain('Refreshed native print title');
+  expect(await pdfText()).not.toContain('Refreshed native print title');
+  const shares = await (await page.request.get(base + '/share-links')).json() as { id: number; label: string }[];
+  expect((await page.request.post(base + '/share-links/' + shares.find(link => link.label === 'Native print reader')!.id + '/revoke', { headers: { origin }, data: {} })).status()).toBe(200);
+  expect(await pdfText()).not.toContain('Refreshed native print title');
+  await page.evaluate(() => { delete document.body.dataset.printRequested; });
+  await button.click();
+  await expect(button).toBeDisabled();
+  await expect(page.locator('body')).not.toHaveAttribute('data-print-requested');
+  expect(await pdfText()).not.toContain('Refreshed native print title');
 });

@@ -6,7 +6,7 @@
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §5.12, §11.6–11.8, §12–13; [roadmap](2026-10-02-v1-roadmap.md); DOCS-STANDARD v1.4 §2.
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
 > **Implemented by:** Tasks 1–3: `e915b44`, `83a869c`, `c21a279` on `codex/plan-6`. Tasks 4–6 remain pending live acceptance and closeout.
-> **Verified:** 2026-10-04 local implementation: 501 unit/API tests in 70 files, 51 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. No live release or scheduled recovery acceptance is claimed.
+> **Verified:** 2026-10-04 local implementation: 501 unit/API tests in 70 files, 52 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. No live release or scheduled recovery acceptance is claimed.
 > **Merged to main:** Implementation remains on `codex/plan-6`; not merged.
 > **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The embedded file snapshots retain their original checklist text.
 > **Execution:** Use subagent-driven-development or inline executing-plans task by task. Use Astra Medium for delegated work, as the owner requested.
@@ -82,7 +82,7 @@ Ports 3490 and 5174 must be free. Use synthetic local fixtures, never a producti
 
 **Depends on:** verified Plan 5 baseline.
 
-Owner-only print projection and resource-ready A3 landscape output. The single print screen defaults to no QR and permits Drafts; an optional Include QR link checkbox enables explicit existing-link selection. No-QR printing needs no sharing request. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design. Add owner-only Administration with always-available backup/storage details. Other working pages show only a compact warning and an Administration link; healthy status and loading indicators remain hidden. The configurable remaining-file threshold defaults to 5 GB. The read-only API and live capacity snapshot are independent of the Task 2 scheduler. Missing, overdue, unavailable and unsafe-capacity states also warn. Extra storage details stay collapsed by default; printing and readers never show this owner information.
+Owner-only print projection and resource-ready A3 landscape output. The single print screen defaults to no QR and permits Drafts; an optional Include QR link checkbox enables explicit existing-link selection. No-QR printing needs no sharing request. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print shows an instruction to use the page button. Only the freshly validated, resource-ready button flow authorizes one native print invocation; beforeprint consumes that authorization and afterprint clears the visible sheet. Align the existing editor and overview Greek labels with the design. Add owner-only Administration with always-available backup/storage details. Other working pages show only a compact warning and an Administration link; healthy status and loading indicators remain hidden. The configurable remaining-file threshold defaults to 5 GB. The read-only API and live capacity snapshot are independent of the Task 2 scheduler. Missing, overdue, unavailable and unsafe-capacity states also warn. Extra storage details stay collapsed by default; printing and readers never show this owner information.
 
 - [x] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Move bundled browser-only packages to development dependencies without changing their versions. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
 
@@ -239,7 +239,7 @@ it('allows only usable, non-revoked, strictly unexpired links and none for Draft
 
 #### File: `tests/browser/print.spec.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=f3622c248c2482980b7b071f8b50f450ec0c40890c2e7a63a64b8abd5a841ab5 -->
+<!-- replay task=1 phase=test encoding=text sha256=3cebb37728185877d9255348b62f1e2e4d1c54ffbda013381ffd50b62e801084 -->
 
 ``````typescript
 import Database from 'better-sqlite3';
@@ -375,10 +375,13 @@ test('owner print excludes Notes and Log from both DOM and its payload, and requ
   }
   await page.getByLabel('Language', { exact: true }).selectOption('el');
   await expect(page.getByRole('heading', { name: 'Περιγραφή', exact: true })).toBeVisible();
+  await page.evaluate(() => { delete document.body.dataset.printedLinks; });
+  await page.getByRole('button', { name: 'Εκτύπωση / Αποθήκευση PDF', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-printed-links', '1');
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('.site-header')).toBeHidden();
   await expect(page.locator('.print-controls')).toBeHidden();
-  await expect(page.locator('.print-sheet')).toBeVisible();
+  await expect(page.locator('.print-sheet')).toBeHidden();
   const pdf = await page.pdf({ preferCSSPageSize: true, path: 'test-results/print-greek-a3.pdf' });
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const loading = getDocument({ data: new Uint8Array(pdf), useSystemFonts: true });
@@ -441,6 +444,9 @@ test('no link is created on GET and long text continues onto further A3 pages', 
   await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
   await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Printed handover' });
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeEnabled();
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printRequested = 'yes'; }; });
+  await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-print-requested', 'yes');
   const pdf = await page.pdf({ preferCSSPageSize: true, path: 'test-results/print-multipage-a3.pdf' });
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const loading = getDocument({ data: new Uint8Array(pdf), useSystemFonts: true });
@@ -490,6 +496,50 @@ test('printing waits for photo resources and excludes revoked and expired QR cho
   await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Print / Save PDF', exact: true })).toBeDisabled();
   await expect(page.locator('body')).not.toHaveAttribute('data-print-called');
+});
+
+
+test('native printing cannot bypass refresh or reuse a completed print authorization', async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const created = await page.request.post('/api/projects/' + projectId + '/records', { headers: { origin }, data: { subtype: 'task', title: 'Original native print title' } });
+  expect(created.status()).toBe(201);
+  const { id: recordId } = await created.json() as { id: number };
+  const base = '/api/projects/' + projectId + '/records/' + recordId;
+  expect((await page.request.post(base + '/transitions', { headers: { origin }, data: { to: 'open' } })).status()).toBe(200);
+  expect((await page.request.post(base + '/share-links', { headers: { origin }, data: { label: 'Native print reader' } })).status()).toBe(201);
+  await page.goto('/projects/' + projectId + '/records/' + recordId + '/print');
+  await page.getByRole('checkbox', { name: 'Include QR link', exact: true }).check();
+  await page.getByLabel('QR share link', { exact: true }).selectOption({ label: 'Native print reader' });
+  const button = page.getByRole('button', { name: 'Print / Save PDF', exact: true });
+  await expect(button).toBeEnabled();
+  const pdfText = async () => {
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const task = getDocument({ data: new Uint8Array(await page.pdf({ preferCSSPageSize: true })), useSystemFonts: true });
+    try {
+      const document = await task.promise;
+      let text = '';
+      for (let i = 1; i <= document.numPages; i++) text += (await (await document.getPage(i)).getTextContent()).items.map(item => 'str' in item ? item.str : '').join(' ');
+      return text;
+    } finally { await task.destroy(); }
+  };
+  expect((await page.request.patch(base, { headers: { origin }, data: { title: 'Refreshed native print title' } })).status()).toBe(200);
+  const blocked = await pdfText();
+  expect(blocked).toContain('Print / Save PDF');
+  expect(blocked).not.toContain('Original native print title');
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printRequested = 'yes'; }; });
+  await button.click();
+  await expect(page.locator('body')).toHaveAttribute('data-print-requested', 'yes');
+  expect(await pdfText()).toContain('Refreshed native print title');
+  expect(await pdfText()).not.toContain('Refreshed native print title');
+  const shares = await (await page.request.get(base + '/share-links')).json() as { id: number; label: string }[];
+  expect((await page.request.post(base + '/share-links/' + shares.find(link => link.label === 'Native print reader')!.id + '/revoke', { headers: { origin }, data: {} })).status()).toBe(200);
+  expect(await pdfText()).not.toContain('Refreshed native print title');
+  await page.evaluate(() => { delete document.body.dataset.printRequested; });
+  await button.click();
+  await expect(button).toBeDisabled();
+  await expect(page.locator('body')).not.toHaveAttribute('data-print-requested');
+  expect(await pdfText()).not.toContain('Refreshed native print title');
 });
 ``````
 
@@ -1217,10 +1267,10 @@ export async function registerWeb(app: FastifyInstance, directory: string): Prom
 
 #### File: `src/web/printing/PrintPage.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=f0f8fd5668892fa7aeba7eb3826946305882d7f1a656ef9fbbf6aba2eaf8cafc -->
+<!-- replay task=1 phase=implementation encoding=text sha256=b40de1ceaa3b0a199bfbcd262557628a79f63aa537a864503aeeca153783ac83 -->
 
 ``````typescript
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import { compareItems, isCode, labelOf, normalizeLabel, type ListKey, type ShareLinkOut } from '../../domain';
 import type { PrintRecord } from '../../server/printing/routes';
@@ -1236,6 +1286,16 @@ export function activePrintLinks(links: ShareLinkOut[], draft: boolean, now = Da
 }
 
 export function PrintPage({ projectId, recordId }: { projectId: number; recordId: number }) {
+  const printPage = useRef<HTMLDivElement>(null); const printAuthorized = useRef(false);
+  useEffect(() => {
+    const beforePrint = () => {
+      printPage.current?.classList.toggle('print-approved', printAuthorized.current);
+      printAuthorized.current = false;
+    };
+    const afterPrint = () => { printAuthorized.current = false; printPage.current?.classList.remove('print-approved'); };
+    window.addEventListener('beforeprint', beforePrint); window.addEventListener('afterprint', afterPrint);
+    return () => { window.removeEventListener('beforeprint', beforePrint); window.removeEventListener('afterprint', afterPrint); };
+  }, []);
   const { t } = useI18n(); const base = `/api/projects/${projectId}/records/${recordId}`;
   const [data, setData] = useState<PrintRecord | null>(null); const [links, setLinks] = useState<ShareLinkOut[]>([]);
   const [includeQr, setIncludeQr] = useState(false); const [shareError, setShareError] = useState<unknown>(null); const [linksLoaded, setLinksLoaded] = useState(false);
@@ -1264,11 +1324,12 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
     void (async () => {
       await document.fonts.ready;
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      if (!cancelled) { setPrintPending(false); window.print(); }
+      if (!cancelled) { setPrintPending(false); printAuthorized.current = true; window.print(); }
     })();
     return () => { cancelled = true; };
   }, [printPending, ready, error, includeQr, shareError, link]);
   const print = async () => {
+    printAuthorized.current = false;
     setBusy(true); setError(null);
     try {
       const freshData = await api<PrintRecord>(base + '/print');
@@ -1284,7 +1345,7 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
       setPrintPending(true);
     } catch (reason) { setError(reason); } finally { setBusy(false); }
   };
-  return <div className={`print-page${ready ? ' print-ready' : ''}`}>
+  return <div ref={printPage} className={`print-page${ready ? ' print-ready' : ''}`}>
     <div className="print-controls"><h1>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</h1><p>{t('Print in A3 landscape. Select Save as PDF and turn off browser headers and footers. A QR link is optional.', 'Εκτυπώστε σε A3 οριζόντια. Επιλέξτε αποθήκευση ως PDF και απενεργοποιήστε κεφαλίδες και υποσέλιδα του προγράμματος περιήγησης. Ο σύνδεσμος QR είναι προαιρετικός.')}</p><ErrorNotice error={error} />
       <a href={`/projects/${projectId}/records/${recordId}`}>{t('Back to record', 'Επιστροφή στην καταγραφή')}</a>
       <label><input type="checkbox" checked={includeQr} disabled={!data || data.record.status === 'draft' || busy || printPending} onChange={event => { setIncludeQr(event.target.checked); setSelected(''); setShareError(null); }} />{t('Include QR link', 'Συμπερίληψη συνδέσμου QR')}</label>
@@ -1296,7 +1357,7 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
       <button disabled={!ready || printPending} onClick={() => void print()}>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</button>
       {data && !ready && <p role="status">{includeQr ? t('Select a valid QR link and wait for all images to load.', 'Επιλέξτε έγκυρο σύνδεσμο QR και περιμένετε τη φόρτωση όλων των εικόνων.') : t('Wait for the print view and all images to load.', 'Περιμένετε τη φόρτωση της προβολής εκτύπωσης και όλων των εικόνων.')}</p>}
     </div>
-    <p className="print-blocker">{t('Print view is not ready. Return to the print screen and check its status.', 'Η προβολή εκτύπωσης δεν είναι έτοιμη. Επιστρέψτε στην οθόνη εκτύπωσης και ελέγξτε την κατάστασή της.')}</p>
+    <p className="print-blocker">{t('Use Print / Save PDF on this page to refresh the record before printing.', 'Χρησιμοποιήστε το κουμπί Εκτύπωση / Αποθήκευση PDF σε αυτή τη σελίδα για να ανανεώσετε την καταγραφή πριν την εκτύπωση.')}</p>
     {data && <PrintSheet key={snapshotVersion} data={data} base={base} qr={includeQr ? qr : ''} shareUrl={link?.url ?? ''} onLoaded={markLoaded} onError={() => setError(new Error(t('An image could not load. Reload this page before printing.', 'Μια εικόνα δεν φορτώθηκε. Ανανεώστε τη σελίδα πριν εκτυπώσετε.')))} />}
   </div>;
 }
@@ -1328,7 +1389,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
 
 #### File: `src/web/printing/print.css`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=0b3e2741cc95800646dd1aecf896c91a2dbaa5681850bf954c8801ea3ce7dd8e -->
+<!-- replay task=1 phase=implementation encoding=text sha256=c4997e3cfea8302458bbaa0db0beefb8ae8b289a187157e93a3b01fb08314a4f -->
 
 ``````css
 .print-controls { margin-bottom: 1.5rem; }
@@ -1357,8 +1418,8 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
   body:has(.print-page) .site-header, body:has(.print-page) .site-nav, .print-controls { display: none !important; }
   body:has(.print-page) main { max-width: none; padding: 0; margin: 0; }
   .print-sheet { max-width: none; padding: 0; margin: 0; box-shadow: none; }
-  .print-page:not(.print-ready) .print-sheet { display: none; }
-  .print-page:not(.print-ready) .print-blocker { display: block; }
+  .print-page:not(.print-ready.print-approved) .print-sheet { display: none; }
+  .print-page:not(.print-ready.print-approved) .print-blocker { display: block; }
   .print-sheet section, .print-sheet dl > div, .print-sheet p { break-inside: auto; overflow: visible; }
   .print-sheet h1, .print-sheet h2, .print-sheet h3, .print-sheet h4, .print-sheet dt { break-after: avoid; }
   .print-sheet thead { display: table-header-group; }
@@ -3867,7 +3928,7 @@ Their real remote and scheduled execution is checked in Tasks 4–5. Use PowerSh
 
 ## Implementation progress — 2026-10-04
 
-Execution started from approved publication `472cf07` in the isolated `codex/plan-6` branch. The 464-test Plan 5 baseline passed before extraction. All runtime source snapshots were installed exactly as reviewed; no optional Draft banner or other product scope was added.
+Execution started from approved publication `472cf07` in the isolated `codex/plan-6` branch. The 464-test Plan 5 baseline passed before extraction. All runtime source snapshots were initially installed exactly as reviewed. The implementation review then identified a native-print bypass, corrected with a one-use print authorization and reconciled source/test payloads. No optional Draft banner or other product scope was added.
 
 | Task | Implementation evidence | State |
 |---|---|---|
@@ -3881,6 +3942,8 @@ Execution started from approved publication `472cf07` in the isolated `codex/pla
 The production-only package installed 78 packages, omitted tsx and browser libraries, passed native SQLite and real HTTP health/shell checks, and reported zero production dependency vulnerabilities. Existing four moderate development-only audit findings remain. PowerShell scripts and their harness parsed on Windows PowerShell 5.1; the operating guide's PowerShell 7 environment remains a deployment prerequisite. Browser tests used temporary loopback ports 3500/5184 to preserve the owner's preview, then restored their original source bytes. Print tests decoded QR output and checked Greek A3/multipage PDF text; the print screenshot was inspected. Physical-device and actual printed-output acceptance remain live gates.
 
 Execution logs and the progress ledger are in the ignored worktree folder `.superpowers/sdd/2026-10-04-plan-6-print-and-operations/`. These are implementation results, separate from the earlier planning replay below. The external release checklist remains uncompleted.
+
+The implementation review correction passed all 501 unit/API tests and 52 browser tests across 11 specs. The new browser regression uses its own record and link, rejects direct native printing after a remote record edit or link revocation, accepts the refreshed button flow, and rejects reuse of its print authorization. All nine print tests pass. The release build and TypeScript checks pass. The three changed print payloads and their checksums match the implemented files. The README lifecycle description was also corrected.
 
 ## Planning replay evidence
 

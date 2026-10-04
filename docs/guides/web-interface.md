@@ -53,7 +53,7 @@ Share recipients open the full `/share#token` URL. The fragment is used locally 
 
 ## Print and Administration
 
-Use Print / Save PDF from the record screen. Choose A3 landscape and disable browser headers/footers. Include QR link is off by default; enable it only when you want a selected active share link on the sheet. Drafts print without QR.
+Use Print / Save PDF from the record screen. Choose A3 landscape and disable browser headers/footers. Include QR link is off by default; enable it only when you want a selected active share link on the sheet. Drafts print without QR. Use the page’s Print / Save PDF button for each print; it refreshes the sheet and validates any QR link. Direct browser printing shows an instruction instead of an unrefreshed record.
 
 Administration is available only to the owner and always shows server-backup/storage status. Working pages display only warnings, with a link to Administration. The default low-file-allowance warning is 5 GB; the default overdue-backup age is 36 hours. The website does not certify the separate PC copy.
 

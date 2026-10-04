@@ -24,8 +24,8 @@
   body:has(.print-page) .site-header, body:has(.print-page) .site-nav, .print-controls { display: none !important; }
   body:has(.print-page) main { max-width: none; padding: 0; margin: 0; }
   .print-sheet { max-width: none; padding: 0; margin: 0; box-shadow: none; }
-  .print-page:not(.print-ready) .print-sheet { display: none; }
-  .print-page:not(.print-ready) .print-blocker { display: block; }
+  .print-page:not(.print-ready.print-approved) .print-sheet { display: none; }
+  .print-page:not(.print-ready.print-approved) .print-blocker { display: block; }
   .print-sheet section, .print-sheet dl > div, .print-sheet p { break-inside: auto; overflow: visible; }
   .print-sheet h1, .print-sheet h2, .print-sheet h3, .print-sheet h4, .print-sheet dt { break-after: avoid; }
   .print-sheet thead { display: table-header-group; }

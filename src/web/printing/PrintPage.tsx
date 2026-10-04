@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import { compareItems, isCode, labelOf, normalizeLabel, type ListKey, type ShareLinkOut } from '../../domain';
 import type { PrintRecord } from '../../server/printing/routes';
@@ -14,6 +14,16 @@ export function activePrintLinks(links: ShareLinkOut[], draft: boolean, now = Da
 }
 
 export function PrintPage({ projectId, recordId }: { projectId: number; recordId: number }) {
+  const printPage = useRef<HTMLDivElement>(null); const printAuthorized = useRef(false);
+  useEffect(() => {
+    const beforePrint = () => {
+      printPage.current?.classList.toggle('print-approved', printAuthorized.current);
+      printAuthorized.current = false;
+    };
+    const afterPrint = () => { printAuthorized.current = false; printPage.current?.classList.remove('print-approved'); };
+    window.addEventListener('beforeprint', beforePrint); window.addEventListener('afterprint', afterPrint);
+    return () => { window.removeEventListener('beforeprint', beforePrint); window.removeEventListener('afterprint', afterPrint); };
+  }, []);
   const { t } = useI18n(); const base = `/api/projects/${projectId}/records/${recordId}`;
   const [data, setData] = useState<PrintRecord | null>(null); const [links, setLinks] = useState<ShareLinkOut[]>([]);
   const [includeQr, setIncludeQr] = useState(false); const [shareError, setShareError] = useState<unknown>(null); const [linksLoaded, setLinksLoaded] = useState(false);
@@ -42,11 +52,12 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
     void (async () => {
       await document.fonts.ready;
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      if (!cancelled) { setPrintPending(false); window.print(); }
+      if (!cancelled) { setPrintPending(false); printAuthorized.current = true; window.print(); }
     })();
     return () => { cancelled = true; };
   }, [printPending, ready, error, includeQr, shareError, link]);
   const print = async () => {
+    printAuthorized.current = false;
     setBusy(true); setError(null);
     try {
       const freshData = await api<PrintRecord>(base + '/print');
@@ -62,7 +73,7 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
       setPrintPending(true);
     } catch (reason) { setError(reason); } finally { setBusy(false); }
   };
-  return <div className={`print-page${ready ? ' print-ready' : ''}`}>
+  return <div ref={printPage} className={`print-page${ready ? ' print-ready' : ''}`}>
     <div className="print-controls"><h1>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</h1><p>{t('Print in A3 landscape. Select Save as PDF and turn off browser headers and footers. A QR link is optional.', 'Εκτυπώστε σε A3 οριζόντια. Επιλέξτε αποθήκευση ως PDF και απενεργοποιήστε κεφαλίδες και υποσέλιδα του προγράμματος περιήγησης. Ο σύνδεσμος QR είναι προαιρετικός.')}</p><ErrorNotice error={error} />
       <a href={`/projects/${projectId}/records/${recordId}`}>{t('Back to record', 'Επιστροφή στην καταγραφή')}</a>
       <label><input type="checkbox" checked={includeQr} disabled={!data || data.record.status === 'draft' || busy || printPending} onChange={event => { setIncludeQr(event.target.checked); setSelected(''); setShareError(null); }} />{t('Include QR link', 'Συμπερίληψη συνδέσμου QR')}</label>
@@ -74,7 +85,7 @@ export function PrintPage({ projectId, recordId }: { projectId: number; recordId
       <button disabled={!ready || printPending} onClick={() => void print()}>{t('Print / Save PDF', 'Εκτύπωση / Αποθήκευση PDF')}</button>
       {data && !ready && <p role="status">{includeQr ? t('Select a valid QR link and wait for all images to load.', 'Επιλέξτε έγκυρο σύνδεσμο QR και περιμένετε τη φόρτωση όλων των εικόνων.') : t('Wait for the print view and all images to load.', 'Περιμένετε τη φόρτωση της προβολής εκτύπωσης και όλων των εικόνων.')}</p>}
     </div>
-    <p className="print-blocker">{t('Print view is not ready. Return to the print screen and check its status.', 'Η προβολή εκτύπωσης δεν είναι έτοιμη. Επιστρέψτε στην οθόνη εκτύπωσης και ελέγξτε την κατάστασή της.')}</p>
+    <p className="print-blocker">{t('Use Print / Save PDF on this page to refresh the record before printing.', 'Χρησιμοποιήστε το κουμπί Εκτύπωση / Αποθήκευση PDF σε αυτή τη σελίδα για να ανανεώσετε την καταγραφή πριν την εκτύπωση.')}</p>
     {data && <PrintSheet key={snapshotVersion} data={data} base={base} qr={includeQr ? qr : ''} shareUrl={link?.url ?? ''} onLoaded={markLoaded} onError={() => setError(new Error(t('An image could not load. Reload this page before printing.', 'Μια εικόνα δεν φορτώθηκε. Ανανεώστε τη σελίδα πριν εκτυπώσετε.')))} />}
   </div>;
 }
