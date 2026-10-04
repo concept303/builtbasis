@@ -2984,7 +2984,7 @@ This task requires the owner’s actual hosting settings and live acceptance evi
 
 #### File: `docs/guides/deployment.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=49b2535d9bc76ba6e42dfb61efe1f5dd8d7b9a884135f401387a4c254171b4ee -->
+<!-- replay task=4 phase=implementation encoding=text sha256=10a64b1d62f8d2ed7f66c1170b9f4e68184b87a36631f909ce32c48dfe579acf -->
 
 ``````markdown
 # Deploy and release BuiltBasis v1
@@ -2997,7 +2997,7 @@ This task requires the owner’s actual hosting settings and live acceptance evi
 
 Run locally from a clean implementation commit. Run `npm ci --ignore-scripts`, `npm rebuild esbuild`, `npm run build`, `npm run typecheck`, `npm test` and `npm run test:browser` (installed Chrome requires `PLAYWRIGHT_CHANNEL=chrome`). Node 22.13 is the minimum; the trial used Node 24 on hosting. `dist/server` contains compiled application and administrative entrypoints. It does not need tsx on hosting. The package lock is retained, not regenerated on the server.
 
-Stage with PowerShell 7 and OpenSSH:
+Stage with Windows PowerShell 5.1 or PowerShell 7 and OpenSSH. The release script has been tested on 5.1:
 
 ```powershell
 $release = git rev-parse HEAD
@@ -3935,15 +3935,17 @@ Execution started from approved publication `472cf07` in the isolated `codex/pla
 | 1 — print and Administration | `e915b44`; RED on missing routes/module/capacity snapshot and Draft print control; GREEN: 19 focused tests, 475 unit/API tests, 20 print/status/record browser tests, build and typecheck | Complete locally |
 | 2 — backups/export/restore | `83a869c`; RED on missing operations module; GREEN: 18 focused tests, 489 unit/API tests and typecheck; synthetic integrity/access-reset/rotation drill | Complete locally |
 | 3 — release and Windows tools | `c21a279`; RED on missing build/pull scripts; GREEN: 12 focused tests, final 501 unit/API tests and 51 browser tests, builds and typecheck | Complete locally |
-| 4 — hosted acceptance | Existing SSH alias verified read-only; remote BuiltBasis directory still contains trial data only. Hosting quota requested from owner; no production mutation or deployment performed | Pending |
+| 4 — hosted acceptance | Release `0e8743a` staged on Hetzner; production dependencies and native runtime passed. Private operations configuration prepared. SQLite locking/integrity and Linux file/directory sync passed on an isolated probe. Trial remains active; awaiting owner konsoleH deactivation before initial database installation | In progress |
 | 5 — scheduled backups and real recovery | No cron or Windows scheduled task installed; no actual off-site drill or desktop notification delivery claimed | Pending |
 | 6 — documentation closeout | Proposed specification and operating guides prepared; final activation, design Historical status and release acceptance await Tasks 4–5 | Pending |
 
-The production-only package installed 78 packages, omitted tsx and browser libraries, passed native SQLite and real HTTP health/shell checks, and reported zero production dependency vulnerabilities. Existing four moderate development-only audit findings remain. PowerShell scripts and their harness parsed on Windows PowerShell 5.1; the operating guide's PowerShell 7 environment remains a deployment prerequisite. Browser tests used temporary loopback ports 3500/5184 to preserve the owner's preview, then restored their original source bytes. Print tests decoded QR output and checked Greek A3/multipage PDF text; the print screenshot was inspected. Physical-device and actual printed-output acceptance remain live gates.
+The production-only package installed 78 packages, omitted tsx and browser libraries, passed native SQLite and real HTTP health/shell checks, and reported zero production dependency vulnerabilities. Existing four moderate development-only audit findings remain. PowerShell scripts and their harness parsed on Windows PowerShell 5.1; the staged release also verified the script on installed PowerShell 5.1, so the guide now permits either 5.1 or 7. Browser tests used temporary loopback ports 3500/5184 to preserve the owner's preview, then restored their original source bytes. Print tests decoded QR output and checked Greek A3/multipage PDF text; the print screenshot was inspected. Physical-device and actual printed-output acceptance remain live gates.
 
 Execution logs and the progress ledger are in the ignored worktree folder `.superpowers/sdd/2026-10-04-plan-6-print-and-operations/`. These are implementation results, separate from the earlier planning replay below. The external release checklist remains uncompleted.
 
 The implementation review correction passed all 501 unit/API tests and 52 browser tests across 11 specs. The new browser regression uses its own record and link, rejects direct native printing after a remote record edit or link revocation, accepts the refreshed button flow, and rejects reuse of its print authorization. All nine print tests pass. The release build and TypeScript checks pass. The three changed print payloads and their checksums match the implemented files. The README lifecycle description was also corrected.
+
+Hosted preparation on 2026-10-04: the owner supplied a 100 GB account allowance with 43.6 GB displayed used and selected `X:\1976KN\Sys\Software\builtbasis` for off-site copies. The initial file budget is 30 GB, the filesystem reserve 5 GB and the warning threshold 5 GB. These are configured application limits, not an automatic hosting-account quota check. Release `0e8743a0ff3421494772cf386bd350cd6d073de7` is staged but not activated. The remote production installation has 78 packages with zero audit findings. Runtime and isolated data-filesystem checks passed on hosting Node 24.21.0. The backup destination permissions are restricted to the operator, SYSTEM and administrators. No actual backup transfer, scheduled job or off-site drill is claimed yet.
 
 ## Planning replay evidence
 

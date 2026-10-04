@@ -8,7 +8,7 @@
 
 Run locally from a clean implementation commit. Run `npm ci --ignore-scripts`, `npm rebuild esbuild`, `npm run build`, `npm run typecheck`, `npm test` and `npm run test:browser` (installed Chrome requires `PLAYWRIGHT_CHANNEL=chrome`). Node 22.13 is the minimum; the trial used Node 24 on hosting. `dist/server` contains compiled application and administrative entrypoints. It does not need tsx on hosting. The package lock is retained, not regenerated on the server.
 
-Stage with PowerShell 7 and OpenSSH:
+Stage with Windows PowerShell 5.1 or PowerShell 7 and OpenSSH. The release script has been tested on 5.1:
 
 ```powershell
 $release = git rev-parse HEAD
