@@ -5,7 +5,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "tsx watch src/server/main.ts",
@@ -17,24 +17,40 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "vocabulary:extract": "node scripts/extract-vocabulary.mjs"
+    "vocabulary:extract": "node scripts/extract-vocabulary.mjs",
+    "web:dev": "vite",
+    "web:build": "vite build",
+    "test:browser": "playwright test"
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "exceljs": "^4.4.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
+    "vite": "7.3.6",
     "vitest": "^3.2.7"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
     "@fastify/multipart": "9.3.0",
+    "@fastify/static": "10.1.5",
+    "@kenjiuno/msgreader": "1.28.0",
     "better-sqlite3": "13.0.3",
+    "exifr": "7.1.3",
     "fastify": "^5.12.5",
+    "heic-to": "1.6.5",
+    "htmlparser2": "12.0.0",
+    "pdfjs-dist": "6.3.289",
+    "postal-mime": "4.0.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "zod": "^4.6.5"
   }
 }

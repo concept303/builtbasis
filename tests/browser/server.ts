@@ -1,0 +1,41 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { makeContext, OWNER } from '../server/helpers';
+import { setOwnerPassword } from '../../src/server/auth/users';
+import { createContributor } from '../../src/server/auth/contributors';
+import { createProject } from '../../src/server/lists/projects';
+import { createPerson } from '../../src/server/lists/people';
+import { createTrade } from '../../src/server/lists/trades';
+import { createTag } from '../../src/server/lists/tags';
+import { createLocation } from '../../src/server/lists/locations';
+import { createZoneType } from '../../src/server/lists/zone-types';
+import { createRecord } from '../../src/server/records/records';
+import { changeStatus } from '../../src/server/records/transitions';
+import { addLogEntry } from '../../src/server/records/log';
+import { createShareLink } from '../../src/server/sharing/links';
+
+const ctx = await makeContext({ publicBaseUrl: 'http://127.0.0.1:3490' });
+const owner = setOwnerPassword(ctx.db, OWNER.username, OWNER.password, new Date(), 'Project owner').userId;
+const projectId = createProject(ctx.db, { code: 'BROWSER', name: 'Browser test project' }).id;
+const architectId = createPerson(ctx.db, projectId, { code: 'ARCH', name: 'Sample architect', role: 'architect' }).id;
+createTrade(ctx.db, projectId, { code: 'MAS', nameEn: 'Stonework', nameEl: 'Λιθοδομές' });
+createTag(ctx.db, projectId, { nameEn: 'Stone', nameEl: 'Πέτρα' });
+const zone = createZoneType(ctx.db, projectId, { nameEn: 'Kitchen', nameEl: 'Κουζίνα' }).id;
+const villa = createLocation(ctx.db, projectId, { kind: 'building', nameEn: 'Villa 1', nameEl: 'Βίλα 1' }).id;
+createLocation(ctx.db, projectId, { parentId: villa, kind: 'space', nameEn: 'Kitchen', nameEl: 'Κουζίνα', zoneTypeId: zone });
+const recordId = createRecord(ctx.db, projectId, owner, { subtype: 'task', title: 'Public sample task', publicNotes: 'Public site note', notes: 'PRIVATE_SENTINEL', outsideScope: true, estimatedCost: 9876.54, ballInCourtId: architectId }).id;
+changeStatus(ctx.db, projectId, recordId, owner, { to: 'open' });
+addLogEntry(ctx.db, projectId, recordId, owner, { eventAt: new Date().toISOString(), text: 'Public log entry', private: false });
+addLogEntry(ctx.db, projectId, recordId, owner, { eventAt: new Date().toISOString(), text: 'PRIVATE_LOG_SENTINEL', private: true });
+const users: Record<string, number> = {};
+for (const [name, upload, log] of [['uploader', 1, 0], ['logger', 0, 1], ['reader', 0, 0]] as const) {
+  users[name] = createContributor(ctx.db, name, `Sample ${name}`, OWNER.password);
+  ctx.db.prepare('INSERT INTO record_grants VALUES (?,?,?,?)').run(recordId, users[name], upload, log);
+}
+const shareUrl = createShareLink(ctx.db, ctx.config, projectId, recordId, owner, { label: 'Browser synthetic reader' }).url!;
+mkdirSync(resolve('test-results'), { recursive: true });
+writeFileSync(resolve('test-results/browser-seed.json'), JSON.stringify({ projectId, recordId, shareUrl, dbPath: ctx.config.dbPath, architectId, users }));
+await ctx.app.listen({ host: '127.0.0.1', port: 3490 });
+let stopping = false;
+const stop = async () => { if (stopping) return; stopping = true; await ctx.close(); process.exit(0); };
+process.on('SIGINT', () => { void stop(); }); process.on('SIGTERM', () => { void stop(); });

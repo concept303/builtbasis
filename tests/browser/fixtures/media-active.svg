@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="60"><script>fetch('https://tracker.invalid/svg-script')</script><rect width="80" height="60" fill="green"/><image href="https://tracker.invalid/svg-image" width="20" height="20"/></svg>

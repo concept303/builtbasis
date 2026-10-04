@@ -26,3 +26,7 @@ Thumbs.db
 
 # Isolated implementation worktrees
 .worktrees/
+
+# Browser test output
+test-results/
+playwright-report/

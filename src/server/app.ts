@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+import { registerWeb } from './web';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
@@ -83,5 +85,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerFileRoutes(app, db, config, capacity);
   registerSharingRoutes(app, db, config);
   registerAccessRoutes(app, db, config, capacity);
+  await registerWeb(app, resolve('dist/web'));
   return app;
 }

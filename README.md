@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–4 are implemented and merged to `main`. Plan 4, including Tasks 17–19, was merged by fast-forward at `01a4477`. Verification passed 423 tests across 53 files and the TypeScript check. Plan 5 supplies the browser screens and viewers. Plan 4 is not deployed.
+**Status:** Plans 0–4 are implemented and merged to `main`. Plan 5 is implemented on `feat/plan-5-web-interface` and is not merged. Verification on 2026-10-04 passed the browser build, TypeScript check, 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files. Final integration review is pending. Production deployment remains Plan 6 work.
 
 ## Local dependency installation
 
@@ -15,15 +15,26 @@ npm rebuild esbuild
 
 On this Windows machine, ordinary `npm ci` with npm 11.6.2 and 11.19.0 incorrectly attempted a SQLite source build despite the package declaring `gypfile: false`. Reassess install scripts when dependencies change. Use each completed plan's verification record for current test counts.
 
+## Run the browser locally
+
+Use Node 22.13 or newer. Configure the local environment and accounts using the [web interface guide](docs/guides/web-interface.md).
+
+```sh
+npm run web:build
+npm start
+```
+
+For development, run `npm run dev` and `npm run web:dev` in separate terminals with the matching browser origin described in the guide. Verification uses `npm run typecheck`, `npm test` and `npm run test:browser` after building. The guide covers browser installation and isolated test servers.
+
 ## Access and evidence contract
 
 There is one owner and separately named contributor accounts. The owner grants access per record. Upload and Add Log are independent permissions. Contributors cannot edit record fields or either Notes field. Public Notes are visible to readers. Private Notes, commercial fields, private Log entries and their attachments remain owner-only. Both Notes fields are edited by the owner. Public share links remain read-only.
 
-Plan 4 adds interactive administrative commands to create, reset, disable and enable contributors. It adds grant APIs and assigned-record APIs. Plan 5 adds screens to display and select existing CLI-provisioned accounts, manage their record grants, and support contributor workflows. Account creation and password administration stay with the CLI. Display names identify contributors on visible evidence; login usernames are not public attribution.
+Plan 4 adds interactive administrative commands to create, reset, disable and enable contributors. It adds grant APIs and assigned-record APIs. The browser provides screens to display and select existing CLI-provisioned accounts, manage their record grants, and support contributor workflows. Account creation and password administration stay with the CLI. Display names identify contributors on visible evidence; login usernames are not public attribution.
 
 Uploads have a **100,000,000-byte total multipart request-body limit**, including metadata, part headers and boundaries. A file or photo original shares that budget with the rest of the request. Browser-generated photo display and thumbnail copies have separate 5,000,000 and 500,000-byte limits. The 145-extension catalog is exported by `src/domain/files.ts` for server validation and browser file pickers. Office, CAD/BIM and archive files are stored for download.
 
-Image, PDF, audio and video attachments have authorized native-view routes with download fallback. GET supports single byte ranges; HEAD returns headers without opening a file stream. Browser codec support still determines playback. EML/MSG viewing belongs to Plan 5's browser reader, using authorized original bytes. Plan 4 does not parse email on the server.
+Image, PDF, audio and video attachments have authorized native-view routes with download fallback. GET supports single byte ranges; HEAD returns headers without opening a file stream. Browser codec support still determines playback. The browser reads EML/MSG using authorized original bytes in a local worker. The server does not parse email.
 
 ## Documentation
 
@@ -34,8 +45,9 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
 | [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
-| [Plan 5 — Web interface](docs/plans/2026-10-04-plan-5-web-interface.md) | Full-code implementation plan and separate planning replay; browser implementation remains future work |
-| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Key/account operations, access rules and Plan 5/6 handoff |
+| [Plan 5 — Web interface](docs/plans/2026-10-04-plan-5-web-interface.md) | Historical execution plan, actual delivery evidence and separate planning replay |
+| [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Key/account operations, access rules and Plan 6 handoff |
+| [Web interface guide](docs/guides/web-interface.md) | Local build, development, browser checks and screen operation |
 | [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
 | [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research |
 

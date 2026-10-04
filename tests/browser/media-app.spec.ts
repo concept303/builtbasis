@@ -1,0 +1,62 @@
+import { test, expect, login, seed } from './fixture';
+import { resolve } from 'node:path';
+test('owner uploads genuine photo and CAD attachment, edits metadata and deletes occurrences', async({page})=>{
+  await login(page);const {projectId,recordId}=seed();
+  await page.goto(`/projects/${projectId}/records/${recordId}`);
+  await page.getByRole('button',{name:'Evidence',exact:true}).click();
+  await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-synthetic.heic'));
+  await page.getByLabel('Caption',{exact:true}).fill('Oriented test capture');
+  await page.getByRole('button',{name:'Upload evidence',exact:true}).click();
+  await expect(page.getByText('Upload complete.',{exact:true})).toBeVisible();
+  await expect(page.locator('.photo-grid')).toContainText('Oriented test capture');
+  await page.getByRole('button',{name:'Edit photo',exact:true}).click();
+  await page.locator('dialog').getByLabel('Caption',{exact:true}).fill('Revised caption');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.keyboard.press('Escape');
+  await expect(page.locator('dialog').getByLabel('Caption',{exact:true})).toHaveValue('Revised caption');
+  await page.locator('dialog').getByRole('button',{name:'Save evidence',exact:true}).click();
+  await expect(page.locator('.photo-grid')).toContainText('Revised caption');
+  await page.getByRole('combobox',{name:'Upload type',exact:true}).selectOption('attachments');
+  await page.getByLabel('Attachment title',{exact:true}).fill('CAD design');
+  await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-design.dwg'));
+  await page.getByRole('button',{name:'Upload evidence',exact:true}).click();
+  await expect(page.getByRole('button',{name:'CAD design',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'CAD design',exact:true}).click();
+  await expect(page.locator('dialog')).toContainText('Preview unavailable');
+  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download original',exact:true}).click();
+  expect((await download).suggestedFilename()).toBe('media-design.dwg');
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  page.on('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Delete attachment',exact:true}).click();
+  await expect(page.getByRole('button',{name:'CAD design',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Delete photo',exact:true}).click();
+  await expect(page.locator('.photo-grid .evidence-card')).toHaveCount(0);
+});
+test('upload failures retain selections and localize capacity and envelope errors', async({page})=>{
+  await login(page);const {projectId,recordId}=seed();await page.goto(`/projects/${projectId}/records/${recordId}`);await page.getByRole('button',{name:'Evidence',exact:true}).click();
+  await page.getByRole('combobox',{name:'Upload type',exact:true}).selectOption('attachments');
+  await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-design.dwg'));
+  await page.route(`**/api/projects/${projectId}/records/${recordId}/attachments`,route=>route.request().method()==='POST'?route.fulfill({status:507,json:{error:'storage_capacity'}}):route.continue());
+  await page.getByRole('button',{name:'Upload evidence',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Storage is full or unavailable');
+  await expect(page.getByRole('button',{name:'Upload evidence',exact:true})).toBeEnabled();
+  await page.getByLabel('Language',{exact:true}).selectOption('el');
+  await expect(page.getByRole('alert')).toContainText('Ο χώρος αποθήκευσης');
+  await page.unroute(`**/api/projects/${projectId}/records/${recordId}/attachments`);
+  await page.route(`**/api/projects/${projectId}/records/${recordId}/attachments`,route=>route.request().method()==='POST'?route.fulfill({status:413,json:{error:'upload_too_large'}}):route.continue());
+  await page.getByRole('button',{name:'Μεταφόρτωση τεκμηρίων',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('100 MB');
+});
+
+
+test('uncertain upload failure requires evidence refresh before a user retry', async({page})=>{
+  await login(page);const {projectId,recordId}=seed();await page.goto(`/projects/${projectId}/records/${recordId}`);await page.getByRole('button',{name:'Evidence',exact:true}).click();
+  await page.getByRole('combobox',{name:'Upload type',exact:true}).selectOption('attachments');
+  await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-design.dwg'));
+  await page.route(`**/api/projects/${projectId}/records/${recordId}/attachments`,route=>route.request().method()==='POST'?route.abort():route.continue());
+  await page.getByRole('button',{name:'Upload evidence',exact:true}).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Upload evidence',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Refresh evidence before retrying',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Upload evidence',exact:true})).toBeEnabled();
+});

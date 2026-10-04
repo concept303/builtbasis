@@ -1,0 +1,45 @@
+import { test, expect, login, seed } from './fixture';
+test('owner login, desktop list, deep reload and phone quick capture retain language and saved draft', async ({ page }, testInfo) => {
+  await login(page); const { projectId } = seed();
+  await page.getByRole('link', { name: 'Browser test project' }).click();
+  await expect(page.getByRole('heading', { name: 'Records', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Language', { exact: true })).toHaveCSS('color', 'rgb(36, 55, 71)');
+  await page.screenshot({ path: testInfo.outputPath('desktop-record-list.png'), fullPage: true });
+  await page.getByLabel('Search title, description or ID').fill('Public sample');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Public sample task' })).toBeVisible();
+  await page.reload(); await expect(page.getByLabel('Search title, description or ID')).toHaveValue('Public sample');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'New record', exact: true }).click();
+  await page.getByLabel('Subtype', { exact: true }).selectOption('task');
+  await page.getByLabel('Title', { exact: true }).fill('Phone capture exact text');
+  await page.getByLabel('Language', { exact: true }).selectOption('el');
+  await expect(page.getByLabel('Τίτλος', { exact: true })).toHaveValue('Phone capture exact text');
+  await page.getByRole('button', { name: 'Αποθήκευση προχείρου' }).click();
+  await expect(page.getByText('Το πρόχειρο αποθηκεύτηκε.')).toBeVisible();
+  const recordLink = page.locator(`a[href^="/projects/${projectId}/records/"]`).filter({ hasText: /^T-/ }).first();
+  await recordLink.click(); await expect(page.getByRole('heading', { name: 'Phone capture exact text' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('phone-record.png'), fullPage: true });
+});
+test('public share renders only public projection, uses Greek initially and preserves token on language changes', async ({ page }) => {
+  const { shareUrl } = seed(); const requested: string[] = []; page.on('request', request => requested.push(request.url()));
+  await page.goto(shareUrl); await expect(page.getByRole('heading', { name: 'Public sample task' })).toBeVisible();
+  await expect(page.getByLabel('Γλώσσα')).toHaveValue('el');
+  await expect(page.locator('body')).not.toContainText('PRIVATE_SENTINEL');
+  await expect(page.locator('body')).not.toContainText('PRIVATE_LOG_SENTINEL');
+  await page.getByLabel('Γλώσσα').selectOption('en');
+  await expect(page.locator('body')).toContainText('Public site note');
+  expect(page.url()).toBe(shareUrl);
+  expect(requested.filter(url => url.includes('/api/shared/record'))).toHaveLength(1);
+  expect(requested.some(url => url.includes('/api/projects/') || url.includes('/api/auth/'))).toBe(false);
+  await expect(page.getByRole('button', { name: 'Edit record' })).toHaveCount(0);
+});
+test('contributor sees granted record without private notes or owner controls', async ({ page }) => {
+  await login(page, 'reader'); await expect(page.getByRole('heading', { name: 'Assigned records' })).toBeVisible();
+  await page.getByRole('link', { name: /Public sample task/ }).click();
+  await expect(page.getByRole('heading', { name: 'Public sample task' })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('PRIVATE_SENTINEL');
+  await expect(page.getByRole('button', { name: 'Edit record' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Managed lists' })).toHaveCount(0);
+});

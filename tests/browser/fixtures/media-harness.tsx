@@ -1,0 +1,15 @@
+import { createRoot } from 'react-dom/client';
+import { LanguageProvider } from '../../../src/web/core/i18n';
+import { EvidencePane } from '../../../src/web/media';
+import { preparePhoto, rasterImage, workerJob } from '../../../src/web/media/photos';
+import { uploadEvidence } from '../../../src/web/media/transport';
+import { buildMultipart } from '../../../src/web/media/helpers';
+import type { EvidenceAttachment } from '../../../src/web/media/types';
+const names = ['media-active.svg', 'media-html.eml', 'media-compound.msg', 'media-document.pdf', 'media-video.webm', 'media-audio.wav', 'media-design.dwg'];
+const kinds = ['image', 'email', 'email', 'pdf', 'video', 'audio', 'document'] as const;
+const types = ['image/svg+xml','message/rfc822','application/vnd.ms-outlook','application/pdf','video/webm','audio/wav','application/octet-stream'];
+const attachments: EvidenceAttachment[] = names.map((name, index) => ({ id:index+1, originalFilename:name,title:null,size:100,contentType:types[index]!,uploadedBy:'Synthetic owner',uploadedAt:'2026-10-04T00:00:00Z',logEntry:null,capabilities:{kind:kinds[index]!,view:index===6?'download':index===1||index===2?'email':'native',download:true,mediaType:types[index],reader:index===1?'eml':index===2?'msg':undefined} }));
+Object.assign(window, { mediaTest: { preparePhoto, rasterImage, workerJob, uploadEvidence, buildMultipart, attachments } });
+const photoMode = new URLSearchParams(location.search).has('photo');
+const photos = photoMode ? [{ id:1,originalFilename:'media-oriented.jpg',phase:'before' as const,caption:null,takenAt:null,uploadedBy:'Synthetic owner',uploadedAt:'2026-10-04T00:00:00Z' }] : [];
+createRoot(document.getElementById('root')!).render(<LanguageProvider><EvidencePane context={photoMode ? {mode:'owner',base:'/api/projects/1/records/1'} : {mode:'shared',base:'/api/shared',token:'synthetic-test-only'}} photos={photos} attachments={attachments} canUpload={false} owner={false} onChange={()=>{}} onAccessLost={()=>document.getElementById('root')!.replaceChildren(document.createTextNode('Access lost'))}/></LanguageProvider>);
