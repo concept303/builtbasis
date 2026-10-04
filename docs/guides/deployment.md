@@ -1,7 +1,7 @@
 # Deploy and release BuiltBasis v1
 
 > **Document type:** Operator guide
-> **Status:** Proposed with Plan 6. Activate only after its deployment checks pass.
+> **Status:** Active for deployed release `6247a9f`. Remaining release acceptance is tracked in the release checklist.
 > **Contracts:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), [access guide](share-key-management.md), [backup and recovery](backup-restore.md).
 
 ## Build and stage

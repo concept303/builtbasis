@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–5 are implemented and merged to `main`. Plan 6 Tasks 1–3 are implemented and merged to `main`: A3 printing, Administration, backup/export/restore and release tools. Verification on 2026-10-04 passed builds, TypeScript, 503 unit/API tests across 71 files and 55 browser tests across 11 specs. Release 6247a9f is active on Hetzner. Scheduled server/PC backups and the actual populated off-site restore drill passed. Mobile viewer layout is corrected and verified live. Remaining release-acceptance items and documentation closeout are tracked in the release checklist.
+**Status:** Plans 0–5 are implemented and merged to `main`. Plan 6 Tasks 1–3 are implemented and merged to `main`: A3 printing, Administration, backup/export/restore and release tools. Verification on 2026-10-04 passed builds, TypeScript, 503 unit/API tests across 71 files and 55 browser tests across 11 specs. Release 6247a9f is active on Hetzner. Scheduled server/PC backups, the populated off-site restore and the hosted recovery cutover/return rehearsal passed. Mobile viewer layout is corrected and verified live. Remaining release-acceptance items and documentation closeout are tracked in the release checklist.
 
 ## Local dependency installation
 
@@ -30,7 +30,7 @@ For development, run `npm run dev` and `npm run web:dev` in separate terminals w
 
 Open Print / Save PDF from a record. Include QR link is off by default; Drafts can be printed without sharing. Administration always shows server backup and storage status. Other owner screens show only warnings. The remaining-file warning defaults to 5 GB (`FILES_WARNING_BELOW_BYTES`); the backup-age warning defaults to 36 hours (`BACKUP_MAX_AGE_HOURS`).
 
-`npm run build` produces the web interface and compiled Node entrypoints under `dist`. See the [deployment guide](docs/guides/deployment.md), [backup guide](docs/guides/backup-restore.md) and [release checklist](docs/guides/release-checklist.md) for the still-pending live setup. The [proposed v1 specification](docs/specs/v1.md) awaits release reconciliation.
+`npm run build` produces the web interface and compiled Node entrypoints under `dist`. See the [deployment guide](docs/guides/deployment.md), [backup guide](docs/guides/backup-restore.md) and [release checklist](docs/guides/release-checklist.md) for live operation and the remaining acceptance checks. The [proposed v1 specification](docs/specs/v1.md) awaits release reconciliation.
 
 ## Access and evidence contract
 

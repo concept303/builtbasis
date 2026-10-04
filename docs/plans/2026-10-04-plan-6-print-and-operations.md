@@ -6,9 +6,9 @@
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §5.12, §11.6–11.8, §12–13; [roadmap](2026-10-02-v1-roadmap.md); DOCS-STANDARD v1.4 §2.
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
 > **Implemented by:** Tasks 1–3: `e915b44`, `83a869c`, `c21a279` on `codex/plan-6`. Tasks 4–6 remain pending live acceptance and closeout.
-> **Verified:** 2026-10-04 local implementation: 503 unit/API tests in 71 files, 55 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. Release 6247a9f is active; actual scheduled server/PC backups and the populated off-site restore have passed. Upload boundary/capacity probes and owner phone/print-preview checks passed. Remaining acceptance and closeout checks are listed in the release checklist.
+> **Verified:** 2026-10-04 local implementation: 503 unit/API tests in 71 files, 55 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. Release 6247a9f is active; actual scheduled server/PC backups, the populated off-site restore and hosted cutover/return rehearsal have passed. Upload boundary/capacity probes and owner phone/print-preview checks passed. Remaining acceptance and closeout checks are listed in the release checklist.
 > **Merged to main:** Implementation through `e53ee9e` fast-forward merged on 2026-10-04. Remaining acceptance gates are unchanged.
-> **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The embedded release checklist is reconciled with recorded acceptance evidence.
+> **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The maintained release checklist records current acceptance evidence; embedded source snapshots retain their implementation history.
 > **Execution:** Use subagent-driven-development or inline executing-plans task by task. Use Astra Medium for delegated work, as the owner requested.
 
 ## Outcome and boundary

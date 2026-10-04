@@ -1,7 +1,7 @@
 # Share-link key management and API handoff
 
 > **Document type:** Operational guide
-> **Status:** Active for the implemented Plan 4 backend and Plan 5 browser. Plan 4 is merged to `main` at `01a4477`; Plan 5 is merged at `a681e53`. Not deployed.
+> **Status:** Active for the implemented Plan 4 backend and Plan 5 browser. Plan 4 is merged to `main` at `01a4477`; Plan 5 is merged at `a681e53`. Deployed as part of release `6247a9f` on Hetzner.
 > **Authority:** The approved v1 design defines scope. This guide documents the implemented key/account procedures and API contract, with deployment and release closeout assigned to Plan 6. See the [web interface guide](web-interface.md) for browser operation.
 > **Verified:** 2026-10-03 — implementation suite passed 423 tests across 53 files; TypeScript passed. Implementation range: `a442939..55da13a`.
 
