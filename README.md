@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–5 are implemented and merged to `main`. Plan 6 Tasks 1–3 are implemented on `codex/plan-6`: A3 printing, Administration, backup/export/restore and release tools. Verification on 2026-10-04 passed builds, TypeScript, 501 unit/API tests across 70 files and 52 browser tests across 11 specs. Hosted deployment, scheduling, the actual off-site recovery drill and final release acceptance remain pending.
+**Status:** Plans 0–5 are implemented and merged to `main`. Plan 6 Tasks 1–3 are implemented on `codex/plan-6`: A3 printing, Administration, backup/export/restore and release tools. Verification on 2026-10-04 passed builds, TypeScript, 503 unit/API tests across 71 files and 52 browser tests across 11 specs. Release 1265439 is active on Hetzner. Scheduled server/PC backups and the actual populated off-site restore drill passed. Final capacity/device acceptance and documentation closeout remain pending.
 
 ## Local dependency installation
 

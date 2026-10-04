@@ -6,9 +6,9 @@
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §5.12, §11.6–11.8, §12–13; [roadmap](2026-10-02-v1-roadmap.md); DOCS-STANDARD v1.4 §2.
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
 > **Implemented by:** Tasks 1–3: `e915b44`, `83a869c`, `c21a279` on `codex/plan-6`. Tasks 4–6 remain pending live acceptance and closeout.
-> **Verified:** 2026-10-04 local implementation: 501 unit/API tests in 70 files, 52 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. No live release or scheduled recovery acceptance is claimed.
+> **Verified:** 2026-10-04 local implementation: 503 unit/API tests in 71 files, 52 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. Release 1265439 is active; actual scheduled server/PC backups and the populated off-site restore have passed. Upload boundary/capacity probes and owner phone/print-preview checks passed. Remaining acceptance and closeout checks are listed in the release checklist.
 > **Merged to main:** Implementation remains on `codex/plan-6`; not merged.
-> **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The embedded file snapshots retain their original checklist text.
+> **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The embedded release checklist is reconciled with recorded acceptance evidence.
 > **Execution:** Use subagent-driven-development or inline executing-plans task by task. Use Astra Medium for delegated work, as the owner requested.
 
 ## Outcome and boundary
@@ -2984,7 +2984,7 @@ This task requires the owner’s actual hosting settings and live acceptance evi
 
 #### File: `docs/guides/deployment.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=10a64b1d62f8d2ed7f66c1170b9f4e68184b87a36631f909ce32c48dfe579acf -->
+<!-- replay task=4 phase=implementation encoding=text sha256=7b8645648e834bf42ffb2fb7c06f9453f131089f314b2e6ef149f953019d4f67 -->
 
 ``````markdown
 # Deploy and release BuiltBasis v1
@@ -3014,7 +3014,7 @@ Record the actual account quota and current usage from konsoleH before setting `
 
 Set `BACKUP_MAX_AGE_HOURS` if the server-backup warning threshold should differ from its 36-hour default. Keep it aligned with the nightly schedule and the Windows pull's `-MaxAgeHours`. Set `FILES_WARNING_BELOW_BYTES` if the default 5,000,000,000 bytes (5 GB) remaining-file warning should change. These values are server configuration, not editable website settings. Administration always shows full status; the other owner screens show only warnings with a link to that page. Verify healthy status is hidden there, missing/unreadable status warns, and contributors/share/print cannot see monitoring. The [backup guide](backup-restore.md) explains the separate Windows failure message and logged-on-desktop requirement.
 
-Set `BUILTBASIS_DATA_DIR`, `PUBLIC_BASE_URL=https://builtbasis.ktimanet.com`, `SHARE_LINK_KEY`, `BEHIND_CLOUDFLARE=1`, both storage settings, and `NODE_ENV=production`. Leave `PORT` unset: Hetzner supplies its socket. Keep `SHARE_LINK_KEY` only in the HTTP application settings in konsoleH. The command-line tools do not need it. Put only `BUILTBASIS_DATA_DIR` and any other needed non-secret settings in `operations.env`; keep the data path aligned with konsoleH. Never duplicate the share key into that file. Never print the key in logs. Cloudflare Full (strict) remains enabled.
+Set `BUILTBASIS_DATA_DIR`, `PUBLIC_BASE_URL=https://builtbasis.ktimanet.com`, `SHARE_LINK_KEY`, `BEHIND_CLOUDFLARE=0`, both storage settings, and `NODE_ENV=production`. Leave `PORT` unset: Hetzner supplies its socket. Keep `SHARE_LINK_KEY` only in the HTTP application settings in konsoleH. The command-line tools do not need it. Put only `BUILTBASIS_DATA_DIR` and any other needed non-secret settings in `operations.env`; keep the data path aligned with konsoleH. Never duplicate the share key into that file. Never print the key in logs. Cloudflare Full (strict) remains enabled. Hosted acceptance found the origin directly reachable, so keep BEHIND_CLOUDFLARE=0 to ignore untrusted visitor-IP headers. Only set it to 1 after origin access is restricted and that restriction is verified. The global login failure limit remains enforced.
 
 Provision real project data locally using the existing `seed:gennadi` command against a fresh private data directory. Source contact CSV/workbook and the resulting database are private. Do not include them in the release archive. Transfer the closed initial database to the production data folder only while Node is deactivated and only when no production database exists. Preserve any existing database instead of replacing it. Verify its schema/integrity on the server. Once the app has live data, use the restore procedure for data replacement.
 
@@ -3068,22 +3068,22 @@ Release only when the hosted checks, real off-site drill and documentation recon
 
 #### File: `docs/guides/release-checklist.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=337695e765bb63db414697a0602623cfbd16c5466307784230044cb270f5a141 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=02625070505d1d992fdcf8c61a7a88b94092e9934443f736612cb5b748a089a0 -->
 
 ``````markdown
 # v1 release checklist
 
 > **Document type:** Release acceptance checklist
-> **Status:** Proposed and unexecuted. Every box below is intentionally empty. Local tests and planning replay do not establish hosting, deployment or recovery success.
+> **Status:** In progress. Hosted release `1265439` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
 > **Authority:** [Approved design](../designs/2026-10-02-v1-records-design.md), [proposed specification](../specs/v1.md) and [roadmap](../plans/2026-10-02-v1-roadmap.md).
 
 For every completed gate, record the date, operator, release commit, environment, command or procedure, observed result and a private evidence location. Record failures plainly. Do not copy credentials, tokens, contact data or private record content into this repository. Do not activate the specification or mark the design historical until the external gates are satisfied.
 
 ## Build and release identity
 
-- [ ] Record the exact reviewed commit and clean build inputs. Run unit/API tests, TypeScript, production builds and browser tests. Retain their actual outputs and distinguish replay from implementation evidence.
-- [ ] Check the release archive contains only compiled server/web assets and production dependency manifests. It must exclude `.env`, keys, database/files/backups, source CSV/workbooks and synthetic test credentials.
-- [ ] Install production dependencies with the verified hosting Node executable on PATH. Run the native SQLite runtime check in the staged release. Confirm no source `tsx` command is required on hosting.
+- [x] Record the exact reviewed commit and clean build inputs. Run unit/API tests, TypeScript, production builds and browser tests. Retain their actual outputs and distinguish replay from implementation evidence.
+- [x] Check the release archive contains only compiled server/web assets and production dependency manifests. It must exclude `.env`, keys, database/files/backups, source CSV/workbooks and synthetic test credentials.
+- [x] Install production dependencies with the verified hosting Node executable on PATH. Run the native SQLite runtime check in the staged release. Confirm no source `tsx` command is required on hosting.
 - [ ] Record the stable current-release path and separate private data/configuration paths. Verify deployment cannot overwrite data or external configuration. Exercise the documented restart and rollback procedure without silently rolling back a migrated database.
 
 ## Hosting, proxy and capacity
@@ -3092,11 +3092,11 @@ For every completed gate, record the date, operator, release commit, environment
 - [ ] Confirm local disk placement and SQLite locking on the production data path. Verify Linux file and directory sync support. Record the hosting Node version, socket activation and restart behavior.
 - [ ] Verify Cloudflare proxying, Full (strict), origin certificate and intended hostname. Record whether origin access is restricted to Cloudflare. Test direct-origin reachability and the `CF-Connecting-IP` trust boundary. Keep the global login failure cap even when the client-IP header is enabled.
 - [ ] Inspect application, hosting and Cloudflare logging settings. Verify Authorization headers, share/session tokens, passwords and private request bodies do not enter upstream logs. Verify private/no-store, no-referrer, noindex and protective content headers survive the proxy.
-- [ ] Send valid multipart requests totaling exactly **100,000,000 bytes**, including all boundaries, metadata and file parts, through the public Cloudflare URL. Check both declared Content-Length and streaming requests where supported. Verify accepted bytes and metadata after success.
+- [x] Send valid multipart requests totaling exactly **100,000,000 bytes**, including all boundaries, metadata and file parts, through the public Cloudflare URL. Check both declared Content-Length and streaming requests where supported. Verify accepted bytes and metadata after success.
 - [ ] Send a **100,000,001-byte** request through the public path. Verify rejection, no incomplete evidence occurrence and temporary-file cleanup. Exercise a disconnect during upload. Record any lower upstream limit as a blocking failure rather than advertising a larger limit than users can reach.
 - [ ] Observe streaming upload memory on hosting under the actual **384 MB** process limit. Include a near-limit attachment, a photo bundle and realistic concurrent activity. Record peak resident memory, process stability and response results. Confirm the server does not buffer whole large uploads.
 - [ ] Check authorised GET, HEAD, one byte range, suffix/open ranges, unsupported multiple ranges and If-Range behavior through the proxy. Verify originals, previews and media remain private and no-store. Test revoked, expired and wrong-record access.
-- [ ] Record the actual hosting account storage allowance and current usage. Select explicit `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`, leaving capacity for retained immutable files, database, backups, export pins, logs and other account use. Filesystem free bytes alone do not establish account quota.
+- [x] Record the actual hosting account storage allowance and current usage. Select explicit `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`, leaving capacity for retained immutable files, database, backups, export pins, logs and other account use. Filesystem free bytes alone do not establish account quota.
 - [ ] Exercise capacity refusal using an isolated configured limit. Verify new uploads fail safely while reads/login work. Document who monitors usage and how capacity is increased. Do not delete published immutable files as a capacity response.
 
 ## Access, seed and browser acceptance
@@ -3112,19 +3112,41 @@ For every completed gate, record the date, operator, release commit, environment
 ## Backup and recovery
 
 - [ ] Verify Administration is linked in owner navigation and always shows the completed server source date, backup-age limit, remaining allowance and configured 5 GB warning threshold. Healthy status must stay hidden on the working pages; missing/overdue/read-failure or low storage must show a compact warning linked to Administration, which disappears after recovery. Check below/at/above the configured allowance threshold, live upload reservations, filesystem reserve and accounting failures. No paths/secrets or implied hosting quota; contributors/share/print cannot see monitoring.
-- [ ] Under the actual scheduled Windows identity, trigger a controlled pull failure and observe the local `msg.exe` desktop message. Verify setup/transfer/stale/release failures keep a nonzero task exit, failed notification delivery is logged, and success sends no message. Record the logged-on-desktop requirement and that a powered-off PC or a task that never runs cannot alert through this mechanism.
+- [x] Under the actual scheduled Windows identity, trigger a controlled pull failure and observe the local `msg.exe` desktop message. Verify setup/transfer/stale/release failures keep a nonzero task exit, failed notification delivery is logged, and success sends no message. Record the logged-on-desktop requirement and that a powered-off PC or a task that never runs cannot alert through this mechanism.
 
 - [ ] Install nightly server cron with absolute Node, stable release directory and the existing external configuration file. Keep the share key out of cron text and backup directories. Observe an actual scheduled run, inspect its completed SQLite copy and confirm failed jobs produce a visible operator alert.
 - [ ] Confirm retention keeps 14 daily and eight weekly UTC buckets while leaving pre-migration backups and immutable blobs intact. Verify rotation cannot break an active pinned export. Document abandoned-pin and stale-lock inspection without clearing active work.
-- [ ] Install the owner's Windows scheduled pull to the intended private X: destination. Observe an actual scheduled run. Check database-first pin/copy, incremental immutable-file transfer, every-reference hash/size verification and COMPLETE creation only after success. Verify failure alerting, PC availability assumptions and remote export release.
-- [ ] Perform an actual restore drill from that completed offsite copy into a fresh isolated destination using compatible release code. Keep production data untouched. Record the selected backup, verification result, restored records and representative original/preview/attachment checks.
-- [ ] In the restored drill, verify all sessions are deleted, every share link revoked, every non-owner account disabled and all record grants cleared. Verify the owner is preserved. Demonstrate reset-password, enable and deliberate regrant before contributor access returns.
+- [x] Install the owner's Windows scheduled pull to the intended private X: destination. Observe an actual scheduled run. Check database-first pin/copy, incremental immutable-file transfer, every-reference hash/size verification and COMPLETE creation only after success. Verify failure alerting, PC availability assumptions and remote export release.
+- [x] Perform an actual restore drill from that completed offsite copy into a fresh isolated destination using compatible release code. Keep production data untouched. Record the selected backup, verification result, restored records and representative original/preview/attachment checks.
+- [x] In the restored drill, verify all sessions are deleted, every share link revoked, every non-owner account disabled and all record grants cleared. Verify the owner is preserved. Demonstrate reset-password, enable and deliberate regrant before contributor access returns.
 - [ ] Rehearse the real-cutover prerequisite: stop application and all backup/pull jobs, verify writers are stopped, restore to a fresh path, select data/configuration, then reopen access. Document rollback preservation and key-loss handling. A fixture-only unit test does not satisfy the actual offsite drill.
 
 ## Closeout
 
 - [ ] Reconcile actual deployed behavior with the specification, Architecture and operator guides. Record any approved deviation explicitly. Remove stale future-work claims only for work actually completed.
 - [ ] Record the release owner's acceptance and the evidence locations for all external gates. Activate `docs/specs/v1.md` and mark the approved design historical only at this point. Update the roadmap and release documentation without turning planning replay into deployment evidence.
+
+## Acceptance evidence — 2026-10-04
+
+Operator: Codex, with Konstantinos performing konsoleH changes and confirming the desktop/phone observations. Hosted runtime: `12654399ff3fcdd060620745bf4744a316b8dfcd`, Node 24.21.0, Hetzner Webhosting L. Implementation remains on `codex/plan-6`; this is not a claim that main contains it.
+
+Private execution evidence is retained under `.superpowers/sdd/2026-10-04-plan-6-print-and-operations/` in the implementation worktree. No credentials or share URLs are included here.
+
+| Check | Procedure and observed result | Private evidence |
+|---|---|---|
+| Build and staged release | 503 unit/API tests in 71 files, 52 browser tests in 11 specs, TypeScript and builds passed. Compiled allowlisted release installed 78 production packages; native SQLite passed, production audit found zero vulnerabilities. | `live-fix-unit.log`, `live-fix-browser.log`, `live-fix-types.log`, `live-fix-build.log`, `host-fix-stage.log` |
+| Hosted request limit | Through the public Cloudflare URL, hosting-originated requests of exactly 100,000,000 bytes returned 201, both declared and chunked. Both 100,000,001-byte cases returned 413. The first PC attempt returned 524 without creating an occurrence; a later PC repeat returned 201 in 34.410 seconds. The first timeout's cause remains unproven. | `host-server-boundaries.log`, `host-upload-limits.json`, `host-upload-limits-100000000.json` |
+| Memory and capacity, partial | Concurrent reads and a backup succeeded during near-limit uploads. Peak process RSS was 144,960 KiB under the 384 MB limit; no temporary files remained. An isolated hosted process returned 507 with no new attachment. Production limits were unchanged. Actual phone camera/photo-bundle acceptance remains open. | `host-final-memory.json`, `host-capacity-probe.json` |
+| Account allowance | Owner screenshot showed 100 GB allowance and about 43.6 GB used. Configured file budget is 30 GB, filesystem reserve 5 GB, warning threshold 5 GB. Other account usage still requires konsoleH monitoring. | Owner screenshot in conversation; `progress.md` |
+| Proxy and logs, partial | Direct origin was reachable with a forged visitor-IP header. Owner set BEHIND_CLOUDFLARE=0 before activating the correction. API/shell privacy headers survive Cloudflare. Application logs passed sensitive-pattern checks. Only older hosting access archives were available; current-day hosting logs and Cloudflare logging settings remain unchecked. | `origin-reachability.json`, `host-log-check.json`, `upstream-log-check.json` |
+| Devices and printing, partial | Owner confirmed live login/Administration, actual-phone record/photo/small-PDF display, and English/Greek A3 landscape previews without clipping. Physical QR scan, broader phone formats and real camera upload are not yet confirmed. Local browser tests cover multipage PDF and QR decoding, but do not replace the device gates above. | User confirmations in conversation; `progress.md` |
+| Scheduled backup and pull | Server scheduled acceptance produced source backup at 06:21:01 UTC. Windows task ran as the actual logged-on owner, result 0, verified at 06:21:37 UTC. Permanent schedules remain 02:00 server-local and 13:00 Sydney respectively. Transfer uses pinned source metadata and verified immutable files. | `progress.md`; private destination `operations/scheduled-pull.log` |
+| Notification | Controlled failure under the scheduled Windows identity returned nonzero. Owner confirmed seeing the desktop message. The actual backup succeeded. Logged-on desktop and PC availability remain requirements. | Private destination `operations/notification-test.log`; user confirmation |
+| Offsite recovery | Restored populated snapshot `2fe09d837a1ca2e75a116f1059641dd3` into a fresh isolated destination. Verified two unique blobs and preserved owner credentials. Cleared two sessions, revoked one link, disabled one contributor and cleared one grant. Real HTTP checks proved reset alone and enable alone insufficient; deliberate regrant restored access. Production was untouched. | `populated-pull.log`, `populated-restore-results.json`, `populated-restore.log` |
+
+Offsite destination: `X:\1976KN\Sys\Software\builtbasis`. The Windows runner currently references the retained implementation worktree. When integrating to main, update it to the permanent checkout, build the matching tools and verify the scheduled task before removing the worktree.
+
+The synthetic acceptance project remains available for the pending QR check. A controlled code rollback/restart rehearsal and the remaining unchecked acceptance details must be resolved before final release acceptance. Do not mark the specification Current or the design Historical from these partial results.
 ``````
 
 - [ ] Use the release checklist as the evidence index. Record real commands, outcomes, release identity, operator and evidence locations. Never substitute planning replay or synthetic fixtures for actual hosting evidence. Do not publish tokens, credentials, contact files or private record data in git.
@@ -4045,8 +4067,8 @@ Execution started from approved publication `472cf07` in the isolated `codex/pla
 | 1 — print and Administration | `e915b44`; RED on missing routes/module/capacity snapshot and Draft print control; GREEN: 19 focused tests, 475 unit/API tests, 20 print/status/record browser tests, build and typecheck | Complete locally |
 | 2 — backups/export/restore | `83a869c`; RED on missing operations module; GREEN: 18 focused tests, 489 unit/API tests and typecheck; synthetic integrity/access-reset/rotation drill | Complete locally |
 | 3 — release and Windows tools | `c21a279`; RED on missing build/pull scripts; GREEN: 12 focused tests, final 501 unit/API tests and 51 browser tests, builds and typecheck | Complete locally |
-| 4 — hosted acceptance | Release `0e8743a` staged on Hetzner; production dependencies and native runtime passed. Private operations configuration prepared. SQLite locking/integrity and Linux file/directory sync passed on an isolated probe. Trial remains active; awaiting owner konsoleH deactivation before initial database installation | In progress |
-| 5 — scheduled backups and real recovery | No cron or Windows scheduled task installed; no actual off-site drill or desktop notification delivery claimed | Pending |
+| 4 — hosted acceptance | Release `1265439` active. Owner login/Administration confirmed. SQLite/runtime, privacy headers, synthetic sharing/files and WordPress checks passed. Direct-origin access is reachable; proxy-IP trust disabled. Upload boundaries and isolated capacity refusal passed; phone photo/PDF and EN/EL print previews confirmed. Remaining acceptance details are tracked in the release checklist | In progress |
+| 5 — scheduled backups and real recovery | Daily server cron and Windows task installed and actually exercised. Verified database and immutable-file transfer, populated restore, access reset and explicit reset/enable/regrant passed. Owner observed the Windows failure message | Operational checks passed; final closeout pending |
 | 6 — documentation closeout | Proposed specification and operating guides prepared; final activation, design Historical status and release acceptance await Tasks 4–5 | Pending |
 
 The production-only package installed 78 packages, omitted tsx and browser libraries, passed native SQLite and real HTTP health/shell checks, and reported zero production dependency vulnerabilities. Existing four moderate development-only audit findings remain. PowerShell scripts and their harness parsed on Windows PowerShell 5.1; the staged release also verified the script on installed PowerShell 5.1, so the guide now permits either 5.1 or 7. Browser tests used temporary loopback ports 3500/5184 to preserve the owner's preview, then restored their original source bytes. Print tests decoded QR output and checked Greek A3/multipage PDF text; the print screenshot was inspected. Physical-device and actual printed-output acceptance remain live gates.
@@ -4055,7 +4077,7 @@ Execution logs and the progress ledger are in the ignored worktree folder `.supe
 
 The implementation review correction passed all 501 unit/API tests and 52 browser tests across 11 specs. The new browser regression uses its own record and link, rejects direct native printing after a remote record edit or link revocation, accepts the refreshed button flow, and rejects reuse of its print authorization. All nine print tests pass. The release build and TypeScript checks pass. The three changed print payloads and their checksums match the implemented files. The README lifecycle description was also corrected.
 
-Hosted preparation on 2026-10-04: the owner supplied a 100 GB account allowance with 43.6 GB displayed used and selected `X:\1976KN\Sys\Software\builtbasis` for off-site copies. The initial file budget is 30 GB, the filesystem reserve 5 GB and the warning threshold 5 GB. These are configured application limits, not an automatic hosting-account quota check. Release `0e8743a0ff3421494772cf386bd350cd6d073de7` is staged but not activated. The remote production installation has 78 packages with zero audit findings. Runtime and isolated data-filesystem checks passed on hosting Node 24.21.0. The backup destination permissions are restricted to the operator, SYSTEM and administrators. No actual backup transfer, scheduled job or off-site drill is claimed yet.
+Hosted preparation on 2026-10-04: the owner supplied a 100 GB account allowance with 43.6 GB displayed used and selected `X:\1976KN\Sys\Software\builtbasis` for off-site copies. The initial file budget is 30 GB, the filesystem reserve 5 GB and the warning threshold 5 GB. These are configured application limits, not an automatic hosting-account quota check. Release `12654399ff3fcdd060620745bf4744a316b8dfcd` is active; the earlier `0e8743a` release is retained. The remote production installation has 78 packages with zero audit findings. Runtime and isolated data-filesystem checks passed on hosting Node 24.21.0. The backup destination permissions are restricted to the operator, SYSTEM and administrators. Actual scheduled server/Windows runs, verified offsite transfers, the populated restore drill and user-observed failure notification have passed. Physical-device checks are partly confirmed; see the release checklist for exact results and remaining gates.
 
 ## Planning replay evidence
 
