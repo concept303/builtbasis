@@ -12,9 +12,14 @@ export const FileTimestamp = z.iso.datetime({ offset: true }).transform(value =>
 export const Filename = z.string().transform(value => value.split(/[\\/]/).at(-1) ?? '').pipe(z.string().min(1).max(255).refine(value => !/[\x00-\x1f\x7f]/.test(value), 'Invalid filename'));
 export const PhotoVariantParam = z.enum(['original', 'display', 'thumbnail']);
 export type PhotoVariant = z.infer<typeof PhotoVariantParam>;
-const photoFields = { phase: z.enum(['before', 'during', 'after']), caption: text.optional(), takenAt: FileTimestamp.nullable().optional() };
-export const PhotoUploadMeta = z.strictObject(photoFields);
-export const PhotoPatch = PhotoUploadMeta.partial().refine(value => Object.keys(value).length > 0, 'Empty patch');
+const photoFields = { caption: text.optional(), takenAt: FileTimestamp.nullable().optional() };
+const phase = z.enum(['before', 'during', 'after']);
+export const PhotoUploadMeta = z.union([
+  z.strictObject({ ...photoFields, purpose: z.literal('evidence').default('evidence'), phase }),
+  z.strictObject({ ...photoFields, purpose: z.literal('location'), phase: z.null().optional().default(null) }),
+]);
+// Purpose is immutable: location photos cannot become work evidence accidentally.
+export const PhotoPatch = z.strictObject({ ...photoFields, phase: phase.optional() }).refine(value => Object.keys(value).length > 0, 'Empty patch');
 export const AttachmentUploadMeta = z.strictObject({ title: text.optional(), logEntryId: z.number().int().positive().nullable().optional() });
 export const AttachmentPatch = z.strictObject({ title: text.optional() }).refine(value => Object.keys(value).length > 0, 'Empty patch');
 export type PhotoMeta = z.output<typeof PhotoUploadMeta>;
@@ -22,7 +27,7 @@ export type PhotoPatchInput = z.output<typeof PhotoPatch>;
 export type AttachmentMeta = z.output<typeof AttachmentUploadMeta>;
 export type AttachmentPatchInput = z.output<typeof AttachmentPatch>;
 export interface PhotoOut {
-  id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string;
+  id: number; originalFilename: string; purpose: 'evidence' | 'location'; phase: PhotoPhase | null; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string;
 }
 export interface AttachmentCapabilities {
   kind: 'image' | 'pdf' | 'email' | 'video' | 'audio' | 'document';

@@ -4,7 +4,7 @@
 > **Status:** Approved (2026-10-02, project owner). Revised 2026-10-02 after independent design review (sharing, required fields, verification, security, backups, files, measurements, severity, Greek labels).
 > **Revision:** 2026-10-03 — owner approved named users with per-record upload/Log grants; owner-edited Public/Private Notes; broader attachments with viewing/playback; 100 MB upload-request ceiling; configurable total file-storage budget and free-space reserve. Implementation details are in the revised Plan 4.
 > **Revision:** 2026-10-04 — owner approved optional QR codes in print/PDF, off by default, and printing Draft records without sharing; an owner-only Administration page with backup/storage details and warning-only notices elsewhere, using a configurable 5 GB remaining-file threshold; and Windows notifications for failed off-site pulls. Implementation details are in Plan 6.
-> **Revision:** 2026-10-04 — owner approved project administration and the compact managed-list/location-tree refresh. Location images are a separate requested addition, pending clarification.
+> **Revision:** 2026-10-04 — owner approved project administration and the compact managed-list/location-tree refresh. The owner also approved per-record location photos and Location Notes, independent of the location tree.
 > **Scope:** BuiltBasis v1 — records (Quality Issue, Detail Clarification, Task), their fields, value lists, rules, screens, sharing, PDF, hosting and operations.
 > **Retention:** Implementation baseline for the v1 specification and implementation plan. Becomes historical after v1 delivery and reconciliation (DOCS-STANDARD §2).
 > **Governed by:** `docs/VISION.md` (intent), `docs/adr/0001-v1-stack-and-hosting.md` (stack).
@@ -138,13 +138,17 @@ Field privacy: **P** = private (owner only). Shared record pages show every non-
 | Field | Greek | Type | Rules |
 |---|---|---|---|
 | Location | Θέση | one or more nodes of the project's location tree (§9.4) | Optional (a project-wide record may leave it empty). |
+| Location Notes | Σημειώσεις θέσης | multiline text, up to 20,000 characters | Optional precise directions for this record. Owner-editable; visible to readers and on the printed sheet. |
+| Location photos | Φωτογραφίες θέσης | multiple images | Optional photos, sketches or drawing snapshots that pinpoint this record’s work. Independent of the tree; no tree selection is required. |
 
 Rules:
 
 1. **Ticking a node means the record concerns that place as a whole** (or in general). Ticking "Villa 2" means the whole villa — not "somewhere inside it, unknown where".
 2. **Filtering on a node returns records ticked on that node or on any node inside it.** A filter on "Villa 2" includes records ticked on Villa 2's kitchen.
 3. A record ticked on several nodes appears **once** in any list and is **counted once**.
-4. The location tree stops at room/space level. **Physical items** (a door frame, its left side, a step, a roof edge) are **not** modelled; they are described in the Description and in measurement item labels.
+4. The location tree stops at room/space level. **Physical items** (a door frame, its left side, a step, a roof edge) are **not** modelled; describe them in the Description, Location Notes, location photos and measurement item labels.
+5. Location photos belong to the record, not to tree nodes. They use the same original/display/thumbnail storage and access rules as other photos, but have no Before/During/After phase. Their purpose cannot be changed after upload. Captions and capture times are optional. Show them separately in Overview and in the record editor, newest first. Upload permission also permits adding location photos; only the owner edits or removes existing photos and edits Location Notes.
+6. Location photos upload immediately, independently of saving record text. Uploading or editing a photo must preserve unsaved record fields. Pending selections must be uploaded or explicitly cleared before Save record. Location photos and notes are included in the public record and printed sheet.
 
 ### 5.6 Decision and instruction
 
@@ -196,6 +200,8 @@ A record can hold any number of **measurement sets**; each set holds any number 
 2. **Before vs after** — the same _Item + Quantity_ (and unit) across measurement sets, in set order, with the change between consecutive sets.
 
 ### 5.8 Photos
+
+This section describes work-evidence photos. Location photos are the separate record control in §5.5 and do not use a phase.
 
 | Field | Greek | Type | Rules |
 |---|---|---|---|
@@ -556,7 +562,7 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
    - Totals: count; sum of estimated cost for the filtered set, counting only records currently marked _Outside contract scope_ (owner only).
 3. **New record** — quick capture: subtype, title, optional photo(s) and location; saved as **Draft**; completed later.
 4. **Record page** — header (ID, title, subtype, status with allowed actions, ball in court, due date, severity, priority, completion bar, safety badge) and sections/tabs:
-   - **Overview** — description, location paths, responsible, trades, tags, reference, must be done before / requires first; Public Notes; Private Notes and commercial fields (owner only). Both Notes fields are editable only by the owner.
+   - **Overview** — description, location paths, Location Notes and Location photos, responsible, trades, tags, reference, must be done before / requires first; Public Notes; Private Notes and commercial fields (owner only). All Notes fields are editable only by the owner.
    - **Classification** — subtype-specific fields (§6).
    - **Decision** — options considered, chosen option, decided by/on, instruction text (QI, DC).
    - **Measurements** — sets and rows; comparison views.
@@ -691,7 +697,7 @@ The owner can print or save a PDF of any record, including a Draft, without crea
 One A3-landscape page per record (continuing to further pages if needed), in the chosen language, **without private content**. It shows exactly these fields:
 
 - Header: ID, title, subtype, status, severity, priority, due date, ball in court, responsible.
-- Location paths; trades; tags; reference.
+- Location paths, Location Notes and all location photos with captions; trades; tags; reference.
 - Description (QI, Task); question (DC).
 - Classification (subtype fields).
 - Decision: chosen option, decided by/on; current instruction text.
@@ -711,6 +717,7 @@ The Public Notes and Private Notes fields, the Log and the Activity log are not 
   - **Security:** owner data changes and uploads without a valid session are rejected, while a valid login succeeds without an existing session; login, data changes and uploads with a wrong or missing `Origin` are rejected; GET requests change no records, evidence or access (only the share-page view count and last-viewed time); invalid direct API writes (rule violations) are rejected by the server; a password reset ends all sessions; session identifiers and share tokens are never stored in plain text, and raw share tokens never appear in activity entries or logs.
   - **Log and attachments:** attachments added through a log entry appear in the record's attachments list with the entry's date and text; directly added attachments appear without one.
   - **Sharing:** private fields (including Private Notes and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; **same blob, two occurrences:** with one public and one private occurrence of the same file on the shared record, the public one downloads and the private one is denied, and no private filename or log metadata is returned; **deleting a private log entry** deletes its attachment occurrences and never makes them public; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
+  - **Location photos and notes:** multiple location images with no tree selection; separate photo purpose and no phase; notes persist with exact text; owner-only note editing; upload grant and live session/grant recheck; cross-record file isolation; shared and print projections; existing-photo migration and nonreused IDs. Browser coverage includes preserving unsaved text during uploads and caption edits, pending/failed upload selection guards, enlarged views, phone layout, removal and access revocation.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
 - **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content; ordinary and Draft records print without QR or share links by default; QR output requires explicit selection and a freshly checked valid link; printing uses the refreshed snapshot and waits for its resources.
 - **Monitoring and Administration:** owner-only status API/page; healthy status hidden on working pages and visible in Administration; missing/overdue/unavailable warnings; low file allowance below, at and above the configured 5 GB default; warning disappears after recovery; no monitoring information on contributor/share/print pages.

@@ -1,7 +1,7 @@
 # Web interface — local operation and browser checks
 
 > **Document type:** Operator guide
-> **Status:** Current for the implemented browser. The project/managed-list refresh is verified locally on `codex/project-management`. Production remains `6247a9f` (2026-10-04) until a separate deployment.
+> **Status:** Current for the implemented browser. The project/managed-list refresh and record location photos/notes are verified locally on `codex/project-management`. Production remains `6247a9f` (2026-10-04) until a separate deployment.
 > **Governing contracts:** [v1 design](../designs/2026-10-02-v1-records-design.md) and [access/evidence guide](share-key-management.md)
 
 ## Run the compiled interface locally
@@ -50,6 +50,14 @@ An uncertain record or Log creation, or a Log attachment upload, keeps its input
 Editing only a Log entry's text or privacy keeps its exact event timestamp. When changing its time deliberately, check the displayed UTC offset. During a repeated daylight-saving hour, the offset distinguishes the two possible instants.
 
 Share recipients open the full `/share#token` URL. The fragment is used locally for bearer requests. Removing it makes the link unusable. Shared pages start in Greek and can switch to English. Typed record text is never translated. Public views never receive Private Notes, commercial fields or private Log evidence.
+
+## Location photos and notes
+
+Open a saved record, including a Draft. In Overview, Location photos accepts multiple photos, sketches or drawing snapshots. It also appears in Edit record, beside Location Notes. It works without selecting anything in the location tree. These images belong only to this record and remain separate from the Before/During/After evidence gallery.
+
+Choose files and Upload location photos. Photos save immediately; Save record saves Location Notes and other edited text. Uploading or editing a caption preserves your unsaved record fields. Pending file selections must be uploaded or cleared before saving the record. Open a thumbnail to enlarge it or download the original. The owner can change captions and remove images. Contributors with Upload permission can add images, but cannot change Location Notes or existing photos.
+
+Readers see the location notes and photos, and the printed sheet includes them. Location photos use the existing photo formats, conversion, 100 MB request limit, storage allowance and original-file retention rules. A failed or uncertain upload retains the pending selection; refresh successfully before retrying an uncertain result.
 
 ## Projects and managed lists
 

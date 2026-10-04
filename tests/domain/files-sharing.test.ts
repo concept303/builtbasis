@@ -4,7 +4,7 @@ import { AttachmentPatch, AttachmentUploadMeta, Filename, PhotoPatch, PhotoUploa
 describe('file and share metadata', () => {
   it('preserves text, normalises blank text and offset timestamps, and validates phases', () => {
     for (const phase of ['before', 'during', 'after']) expect(PhotoUploadMeta.parse({ phase }).phase).toBe(phase);
-    expect(PhotoUploadMeta.parse({ phase: 'before', caption: '  όψη  ', takenAt: '2026-10-03T12:00:00+03:00' })).toEqual({ phase: 'before', caption: '  όψη  ', takenAt: '2026-10-03T09:00:00.000Z' });
+    expect(PhotoUploadMeta.parse({ phase: 'before', caption: '  όψη  ', takenAt: '2026-10-03T12:00:00+03:00' })).toEqual({ purpose: 'evidence', phase: 'before', caption: '  όψη  ', takenAt: '2026-10-03T09:00:00.000Z' });
     expect(PhotoPatch.parse({ caption: '  ', takenAt: null })).toEqual({ caption: null, takenAt: null });
     expect(AttachmentUploadMeta.parse({ title: '\t' })).toEqual({ title: null });
     expect(AttachmentPatch.parse({ title: ' Test ' })).toEqual({ title: ' Test ' });

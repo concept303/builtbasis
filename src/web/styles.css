@@ -73,6 +73,17 @@
   .management-table .row-controls > button { min-height: 42px; }
 }
 .entry-secondary { display: block; color: #596d7c; font-size: .85rem; }
+.location-photos { margin: 18px 0; padding: 18px; border: 1px solid #ced8e0; border-radius: 6px; background: white; }
+.location-photos > h2 { margin-top: 0; }
+.location-photos > p, .location-photos .evidence-upload > p { font-size: .88rem; color: #596d7c; }
+.location-photos .photo-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.location-photos .photo-thumbnail { width: 100%; height: 150px; padding: 6px; }
+.location-photos .photo-thumbnail img { width: 100%; height: 100%; object-fit: contain; }
+.location-photos .evidence-card { min-width: 0; overflow-wrap: anywhere; }
+.location-photos .actions button { font-size: .85rem; }
+.location-photos .evidence-upload fieldset { border: 0; padding: 0; margin-bottom: 0; }
+.location-photos .evidence-upload fieldset > button { margin: 4px 8px 4px 0; }
+.upload-queue { padding-inline-start: 22px; overflow-wrap: anywhere; font-size: .85rem; }
 .retired-label { display: inline-block; font-size: .75rem; background: #e9edf1; border-radius: 3px; padding: 2px 6px; }
 .entry-definition { font-size: .8rem; }
 .entry-definition p { margin: 6px 0; white-space: normal; }

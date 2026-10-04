@@ -1,7 +1,7 @@
-import type { AttachmentCapabilities } from './files';
+import type { AttachmentCapabilities, PhotoOut } from './files';
 import { z } from 'zod';
 import { FileTimestamp } from './files';
-import type { PhotoPhase, Subtype, Status, Severity, Priority, ProblemType, Stage, Disposition, Route, MeasurementPhase, Unit, VerificationMethod, VerificationOutcome } from './vocab';
+import type { Subtype, Status, Severity, Priority, ProblemType, Stage, Disposition, Route, MeasurementPhase, Unit, VerificationMethod, VerificationOutcome } from './vocab';
 
 export const ShareCreate = z.strictObject({ label: z.string().max(200).refine(value => value.trim() !== '', 'Required'), expiresAt: FileTimestamp.nullable().optional() });
 export type ShareCreateInput = z.output<typeof ShareCreate>;
@@ -17,6 +17,7 @@ export interface SharedRecordFields {
   title: string | null;
   description: string | null;
   publicNotes: string | null;
+  locationNotes: string | null;
   reference: string | null;
   ballInCourtId: number | null;
   responsibleId: number | null;
@@ -70,7 +71,7 @@ export interface SharedRecord {
     rows: { item: string; quantity: string; value: number; unit: Unit; note: string | null }[];
   }[];
   verifications: { id: number; checkedById: number; date: string; method: VerificationMethod; outcome: VerificationOutcome; note: string | null; createdAt: string }[];
-  photos: { id: number; originalFilename: string; phase: PhotoPhase; caption: string | null; takenAt: string | null; uploadedBy: string; uploadedAt: string }[];
+  photos: PhotoOut[];
   attachments: {
     capabilities: AttachmentCapabilities;
     id: number; originalFilename: string; title: string | null; size: number; contentType: string; uploadedBy: string; uploadedAt: string;

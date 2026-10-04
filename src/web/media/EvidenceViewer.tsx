@@ -93,5 +93,5 @@ export function PhotoThumbnail({ context, photo, onOpen, onAccessLost }: { conte
     }).catch(error => { if (!controller.signal.aborted && isAccessLost(error)) onAccessLost(); });
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); setSource(''); };
   }, [context.base, context.token, photo.id]);
-  return <button className="photo-thumbnail" onClick={onOpen} aria-label={`${t('Open photo', 'Άνοιγμα φωτογραφίας')} ${photo.originalFilename}`}>{source ? <img src={source} loading="lazy" alt={photo.caption ?? photo.originalFilename} /> : photo.originalFilename}</button>;
+  return <button type="button" className="photo-thumbnail" onClick={onOpen} aria-label={`${t('Open photo', 'Άνοιγμα φωτογραφίας')} ${photo.originalFilename}`}>{source ? <img src={source} loading="lazy" alt={photo.caption ?? photo.originalFilename} /> : photo.originalFilename}</button>;
 }

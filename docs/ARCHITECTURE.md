@@ -37,6 +37,8 @@ Consistent SQLite snapshots are pinned before off-site transfer. Manifests prese
 
 Project management uses owner-only API routes and monotonic numeric sequences for project and record IDs. Project deletion is a single database transaction; record grants and sharing end with the project while immutable blobs remain available to backups. Managed lists use compact tables; location administration uses a hierarchy and one selected-node editor.
 
+Record location photos reuse photo occurrences and the protected upload/view pipeline. A purpose discriminator separates location images (no phase) from work evidence. Location Notes is a record field. Both are independent of location tree IDs and are explicitly included in shared and print projections. Migration 0006 preserves existing photo metadata and the autoincrement high-water mark when adding the purpose/phase constraint.
+
 ## Boundaries
 
 - Plans 0–5 are merged to main. Plan 5 browser delivery was merged at `a681e53`; final integration review passed.

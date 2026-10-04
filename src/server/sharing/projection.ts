@@ -74,6 +74,7 @@ export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' 
     title: r.title,
     description: r.description,
     publicNotes: r.publicNotes,
+    locationNotes: r.locationNotes,
     reference: r.reference,
     ballInCourtId: r.ballInCourtId,
     responsibleId: r.responsibleId,
@@ -110,6 +111,7 @@ export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' 
     id: item.id, checkedById: item.checkedById, date: item.date, method: item.method, outcome: item.outcome, note: item.note, createdAt: item.createdAt,
   }));
   const photos = listPhotos(db, recordId).map(item => ({
+    purpose: item.purpose,
     id: item.id, originalFilename: item.originalFilename, phase: item.phase, caption: item.caption, takenAt: item.takenAt, uploadedBy: item.uploadedBy, uploadedAt: item.uploadedAt,
   }));
   const attachments = listAttachments(db, recordId).filter(item => !item.logEntry?.private).map(item => ({

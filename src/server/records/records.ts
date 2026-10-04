@@ -50,6 +50,7 @@ export interface RecordDetail {
   reference: string | null;
   notes: string | null;
   publicNotes: string | null;
+  locationNotes: string | null;
   ballInCourtId: number | null;
   responsibleId: number | null;
   tradeIds: number[];
@@ -125,6 +126,7 @@ export function getRecordDetail(db: Db, projectId: number, recordId: number): Re
     reference: row.reference,
     notes: row.notes,
     publicNotes: row.publicNotes,
+    locationNotes: row.locationNotes,
     ballInCourtId: row.ballInCourtId,
     responsibleId: row.responsibleId,
     tradeIds: readLinkIds(db, recordId, 'tradeIds'),
@@ -189,6 +191,7 @@ function applyPatch(db: Db, current: RecordRow, userId: number, patch: RecordPat
     reference: patch.reference,
     notes: patch.notes,
     public_notes: patch.publicNotes,
+    location_notes: patch.locationNotes,
     ball_in_court_id: patch.ballInCourtId,
     responsible_id: patch.responsibleId,
     severity: patch.severity,

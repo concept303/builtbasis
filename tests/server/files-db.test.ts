@@ -11,6 +11,32 @@ function seed(db: Db) {
   for (const n of [1, 2]) db.prepare("INSERT INTO records (project_id,subtype,sequence,human_id,status,created_at,created_by,updated_at,updated_by) VALUES (1,'task',?,?,'draft','t',1,'t',1)").run(n, `T-${n}`);
 }
 
+it('upgrades existing photos without changing bytes, phases, metadata or reusing deleted photo IDs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bb-location-migration-'));
+  const db = openDatabase(join(dir, 'test.db'));
+  try {
+    migrate(db, { backupsDir: join(dir, 'backups'), migrations: MIGRATIONS.filter(m => m.id < '0006') }); seed(db);
+    const hash = 'b'.repeat(64);
+    db.prepare('INSERT INTO blobs VALUES (?,8,?)').run(hash, 'image/jpeg');
+    const insert = db.prepare("INSERT INTO photos(record_id,original_hash,display_hash,thumbnail_hash,original_filename,phase,caption,uploaded_by,uploaded_at) VALUES (1,?,?,?,'existing.jpg','during','Existing caption',1,'t')");
+    insert.run(hash, hash, hash);
+    const deleted = Number(insert.run(hash, hash, hash).lastInsertRowid);
+    db.prepare('DELETE FROM photos WHERE id=?').run(deleted);
+    const before = db.prepare('SELECT * FROM photos').get();
+    migrate(db, { backupsDir: join(dir, 'backups') });
+    expect(db.prepare('SELECT * FROM photos').get()).toEqual({ ...before as object, purpose: 'evidence' });
+    expect(db.prepare('SELECT location_notes FROM records WHERE id=1').pluck().get()).toBeNull();
+    const location = db.prepare("INSERT INTO photos(record_id,original_hash,display_hash,thumbnail_hash,original_filename,purpose,uploaded_by,uploaded_at) VALUES (1,?,?,?,'sketch.jpg','location',1,'t')");
+    const id = Number(location.run(hash, hash, hash).lastInsertRowid);
+    expect(id).toBeGreaterThan(deleted);
+    expect(() => db.prepare("UPDATE photos SET phase='before' WHERE id=?").run(id)).toThrow();
+    expect(() => db.prepare('UPDATE photos SET phase=NULL WHERE id=1').run()).toThrow();
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+    expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
+    expect(readdirSync(join(dir, 'backups')).length).toBeGreaterThan(0);
+  } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
 it('enforces occurrence ownership, cascade, retained blobs, nonreused ids and unique tokens', () => {
   const db = openDatabase(':memory:');
   try {

@@ -35,6 +35,7 @@ export function buildPrintRecord(db: Db, projectId: number, recordId: number) {
       humanId: r.humanId, title: r.title, subtype: r.subtype, status: r.status, severity: r.severity, priority: r.priority,
       dueDate: r.dueDate, ballInCourtId: r.ballInCourtId, responsibleId: r.responsibleId, reference: r.reference,
       description: r.subtype === 'detail_clarification' ? null : r.description, question: r.subtype === 'detail_clarification' ? r.question : null,
+      locationNotes: r.locationNotes,
       problemTypes: r.problemTypes, stage: r.stage, disposition: r.disposition, correction: r.correction, route: r.route, issuedById: r.issuedById,
       chosenOption: listOptions(db, recordId).filter(o => o.id === r.chosenOptionId).map(o => ({ label: o.label, description: o.description }))[0] ?? null,
       decidedById: r.decidedById, decidedOn: r.decidedOn, instructionText: r.instructionText, updatedAt: r.updatedAt,
@@ -42,6 +43,7 @@ export function buildPrintRecord(db: Db, projectId: number, recordId: number) {
     people: listPeople(db, projectId).filter(p => personIds.has(p.id)).map(p => ({ id: p.id, name: p.name })),
     locations, trades: names(listTrades(db, projectId), r.tradeIds), tags: names(listTags(db, projectId), r.tagIds),
     measurements, comparisons, verifications,
+    locationPhotos: photos.filter(p => p.purpose === 'location').map(p => ({ id: p.id, caption: p.caption })),
     photos: (['before', 'after'] as const).flatMap(phase => photos.filter(p => p.phase === phase).slice(0, 4).map(p => ({ id: p.id, phase: p.phase, caption: p.caption }))),
     generatedAt: new Date().toISOString(),
   };

@@ -6,7 +6,7 @@ import { requireRecord, touchRecord } from '../records/store';
 import type { StagedFile } from './storage';
 import type { UploadEnvelope } from './uploads';
 
-const PHOTO_SELECT = `SELECT p.id, p.original_filename AS originalFilename, p.phase, p.caption, p.taken_at AS takenAt,
+const PHOTO_SELECT = `SELECT p.id, p.original_filename AS originalFilename, p.purpose, p.phase, p.caption, p.taken_at AS takenAt,
   u.display_name AS uploadedBy, p.uploaded_at AS uploadedAt FROM photos p JOIN users u ON u.id = p.uploaded_by`;
 
 export function listPhotos(db: Db, recordId: number): PhotoOut[] {
@@ -58,8 +58,8 @@ export function saveUpload(db: Db, projectId: number, recordId: number, userId: 
       const { original, display, thumbnail } = envelope.files;
       if (!original || !display || !thumbnail) throw new HttpError(400, 'invalid_upload');
       for (const file of [original, display, thumbnail]) insertBlob(db, file);
-      id = Number(db.prepare(`INSERT INTO photos(record_id, original_hash, display_hash, thumbnail_hash, original_filename, phase, caption, taken_at, uploaded_by, uploaded_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(recordId, original.hash, display.hash, thumbnail.hash, original.filename, meta.phase, meta.caption ?? null, meta.takenAt ?? null, userId, at).lastInsertRowid);
+      id = Number(db.prepare(`INSERT INTO photos(record_id, original_hash, display_hash, thumbnail_hash, original_filename, purpose, phase, caption, taken_at, uploaded_by, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(recordId, original.hash, display.hash, thumbnail.hash, original.filename, meta.purpose, meta.phase, meta.caption ?? null, meta.takenAt ?? null, userId, at).lastInsertRowid);
     } else {
       const meta = envelope.metadata as AttachmentMeta;
       if (meta.logEntryId != null && !db.prepare('SELECT id FROM log_entries WHERE id = ? AND record_id = ?').get(meta.logEntryId, recordId)) {
@@ -80,6 +80,9 @@ export function editOccurrence(db: Db, projectId: number, recordId: number, id: 
   return db.transaction(() => {
     requireRecord(db, projectId, recordId);
     requireOccurrence(db, kind, recordId, id);
+    if (kind === 'photos' && Object.hasOwn(patch, 'phase') && db.prepare('SELECT purpose FROM photos WHERE id = ?').pluck().get(id) === 'location') {
+      throw new HttpError(400, 'invalid_request');
+    }
     const fields = kind === 'photos' ? { phase: 'phase', caption: 'caption', takenAt: 'taken_at' } : { title: 'title' };
     for (const [key, column] of Object.entries(fields)) {
       if (Object.hasOwn(patch, key)) db.prepare(`UPDATE ${kind} SET ${column} = ? WHERE id = ?`).run((patch as Record<string, unknown>)[key], id);

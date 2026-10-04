@@ -73,7 +73,7 @@ it('projects all visible sections and only their referenced labels, omitting pri
   expect(keys(body.measurements[0])).toEqual(['date','id','measuredById','note','phase','rows']);
   expect(keys(body.measurements[0].rows[0])).toEqual(['item','note','quantity','unit','value']);
   expect(keys(body.verifications[0])).toEqual(['checkedById','createdAt','date','id','method','note','outcome']);
-  expect(keys(body.photos[0])).toEqual(['caption','id','originalFilename','phase','takenAt','uploadedAt','uploadedBy']);
+  expect(keys(body.photos[0])).toEqual(['caption','id','originalFilename','phase','purpose','takenAt','uploadedAt','uploadedBy']);
   expect(keys(body.attachments[0])).toEqual(['capabilities','contentType','id','logEntry','originalFilename','size','title','uploadedAt','uploadedBy']);
   expect(body.log).toEqual([{ id: publicLog.json().id, eventAt: publicLog.json().eventAt, text: 'Public Log', loggedBy: 'Owner', attachmentIds: [publicFile.id] }]);
   expect(body.activity.find((a: { field: string }) => a.field === 'instructionText')).toMatchObject({ from: 'Old instruction', to: 'New instruction', detail: null });
