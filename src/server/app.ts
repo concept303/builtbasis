@@ -1,3 +1,4 @@
+import { registerPrintRoutes } from './printing/routes';
 import { resolve } from 'node:path';
 import { registerWeb } from './web';
 import cookie from '@fastify/cookie';
@@ -25,6 +26,7 @@ import { safeErrorDiagnostic, safeLogger } from './http/logging';
 import { registerAccessRoutes } from './access/routes';
 import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
+import { registerOperationsStatus } from './monitoring/status';
 
 export interface AppDeps {
   config: AppConfig;
@@ -74,6 +76,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.setNotFoundHandler(async (_request, reply) => reply.status(404).send({ error: 'not_found' }));
 
   registerHealthRoutes(app);
+  registerOperationsStatus(app, config, capacity);
   registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
   registerProjectRoutes(app, db);
   registerPeopleRoutes(app, db);
@@ -82,6 +85,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerTagRoutes(app, db);
   registerLocationRoutes(app, db);
   registerRecordRoutes(app, db);
+  registerPrintRoutes(app, db);
   registerFileRoutes(app, db, config, capacity);
   registerSharingRoutes(app, db, config);
   registerAccessRoutes(app, db, config, capacity);

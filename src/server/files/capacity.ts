@@ -5,6 +5,11 @@ import { HttpError } from '../errors';
 import { blobPath, type StagedFile } from './storage';
 
 export interface StoragePolicy { budgetBytes: number; freeReserveBytes: number }
+export interface StorageStatus {
+  state: 'ok' | 'warning' | 'unavailable'; healthy: boolean;
+  retainedBytes: string; reservedBytes: string; budgetBytes: string; managedHeadroomBytes: string;
+  freeReserveBytes: string; filesystemAvailableBytes: string | null; filesystemHeadroomBytes: string | null;
+}
 export interface UploadReservation {
   maxBodyBytes: number;
   retained: (file: StagedFile) => void;
@@ -42,6 +47,19 @@ export async function openStorageCapacity(filesDir: string, policy: StoragePolic
   catch { throw new Error('storage_inventory_failed'); }
 
   return {
+    async snapshot(): Promise<StorageStatus> {
+      let available: bigint | null = null;
+      try { const space = await statfs(filesDir, { bigint: true }); available = space.bavail * space.bsize; } catch { /* Unknown capacity must be visible. */ }
+      // Read accounting after the async probe so in-flight changes are represented consistently.
+      const managedHeadroom = budget - retainedBytes - pendingBytes;
+      const filesystemHeadroom = available === null ? null : available - pendingBytes - reserve;
+      return {
+        state: available === null ? 'unavailable' : !healthy || managedHeadroom < BigInt(UPLOAD_REQUEST_LIMIT) || filesystemHeadroom! < BigInt(UPLOAD_REQUEST_LIMIT) ? 'warning' : 'ok',
+        healthy, retainedBytes: String(retainedBytes), reservedBytes: String(pendingBytes), budgetBytes: String(budget),
+        managedHeadroomBytes: String(managedHeadroom), freeReserveBytes: String(reserve),
+        filesystemAvailableBytes: available === null ? null : String(available), filesystemHeadroomBytes: filesystemHeadroom === null ? null : String(filesystemHeadroom),
+      };
+    },
     async reserve(contentLength: string | undefined): Promise<UploadReservation> {
       if (contentLength !== undefined && !/^\d+$/.test(contentLength)) throw new HttpError(400, 'invalid_upload');
       const amount = contentLength === undefined ? BigInt(UPLOAD_REQUEST_LIMIT) : BigInt(contentLength);

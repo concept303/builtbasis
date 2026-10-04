@@ -11,6 +11,20 @@ beforeEach(async()=>{dir=await fs.mkdtemp(join(tmpdir(),'bb-capacity-'));});
 afterEach(async()=>{vi.restoreAllMocks();await fs.rm(dir,{recursive:true,force:true});});
 const policy={budgetBytes:100,freeReserveBytes:1};
 const pdf=Buffer.concat([Buffer.from('%PDF-1.7\n'),Buffer.alloc(31)]);
+it('reports the live retained/orphan/reserved accounting and separate filesystem headroom', async () => {
+ await fs.writeFile(join(dir,'orphan'),Buffer.alloc(30));
+ const capacity=await openStorageCapacity(dir,{budgetBytes:200_000_000,freeReserveBytes:100});
+ vi.spyOn(fs,'statfs').mockResolvedValue({bavail:300_000_000n,bsize:1n} as never);
+ const slot=await capacity.reserve('100000000');
+ expect(await capacity.snapshot()).toMatchObject({state:'warning',retainedBytes:'30',reservedBytes:'100000000',managedHeadroomBytes:'99999970',filesystemAvailableBytes:'300000000',filesystemHeadroomBytes:'199999900'});
+ slot.release(); expect((await capacity.snapshot()).state).toBe('ok');
+ vi.spyOn(fs,'statfs').mockResolvedValueOnce({bavail:99n,bsize:1n} as never);
+ expect(await capacity.snapshot()).toMatchObject({state:'warning',filesystemHeadroomBytes:'-1'});
+ const failing=await capacity.reserve('1'); failing.cleanupFailed(); failing.release();
+ expect(await capacity.snapshot()).toMatchObject({state:'warning',healthy:false});
+ vi.spyOn(fs,'statfs').mockRejectedValueOnce(new Error('private'));
+ expect((await capacity.snapshot()).state).toBe('unavailable');
+});
 it('counts actual retained orphans and stale temporary bytes on every startup',async()=>{
  await fs.mkdir(join(dir,'.tmp')); await fs.writeFile(join(dir,'.tmp','stale'),Buffer.alloc(10));
  await fs.writeFile(join(dir,'orphan'),Buffer.alloc(30));

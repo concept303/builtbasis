@@ -58,7 +58,7 @@ test('QI classification and chosen options require an accountable decision; DC k
   await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Preserve the original proposal.');
   await saved(page, 'Save option');
   await page.getByRole('button', { name: 'Edit record', exact: true }).click();
-  await page.getByRole('group', { name: 'Problem types', exact: true }).getByRole('checkbox').first().check();
+  await page.getByRole('group', { name: 'Type of problem', exact: true }).getByRole('checkbox').first().check();
   await page.getByRole('combobox', { name: 'Disposition', exact: true }).selectOption('repair');
   await page.getByRole('combobox', { name: 'Chosen option', exact: true }).selectOption({ label: 'Repair carefully' });
   await page.getByRole('textbox', { name: 'Instruction text', exact: true }).fill('  Issued wording\nDo not translate.  ');

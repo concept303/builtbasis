@@ -9,6 +9,8 @@ export interface AppConfig {
   /** Explicit HTTP upload capacity settings; offline commands may omit them. */
   filesStorageBudgetBytes: number | null;
   filesFreeReserveBytes: number | null;
+  filesWarningBelowBytes: number;
+  backupMaxAgeHours: number;
   /** Scheme + host (+ port) that browsers send as Origin, e.g. https://builtbasis.ktimanet.com */
   publicOrigin: string;
   secureCookies: boolean;
@@ -34,6 +36,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     }
     return Number(value);
   };
+  const backupAge = env.BACKUP_MAX_AGE_HOURS ?? '36';
+  if (!/^\d+(?:\.\d+)?$/.test(backupAge) || !Number.isFinite(Number(backupAge)) || Number(backupAge) <= 0) throw new Error('BACKUP_MAX_AGE_HOURS must be positive');
   return {
     dataDir,
     dbPath: join(dataDir, 'builtbasis.db'),
@@ -42,6 +46,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     shareKey: encodedKey === undefined ? null : Buffer.from(encodedKey, 'hex'),
     filesStorageBudgetBytes: positiveBytes('FILES_STORAGE_BUDGET_BYTES'),
     filesFreeReserveBytes: positiveBytes('FILES_FREE_RESERVE_BYTES'),
+    filesWarningBelowBytes: positiveBytes('FILES_WARNING_BELOW_BYTES') ?? 5000000000,
+    backupMaxAgeHours: Number(backupAge),
     publicOrigin,
     secureCookies: publicOrigin.startsWith('https://'),
     behindCloudflare: env.BEHIND_CLOUDFLARE === '1',
