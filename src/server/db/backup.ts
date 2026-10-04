@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
-import { mkdirSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
+import { syncDirectory, syncFile } from '../operations/durability';
 import { join } from 'node:path';
 import type { Db } from './connection';
 
@@ -12,14 +13,20 @@ export function backupDatabase(db: Db, backupsDir: string, label: string, now: D
   const stamp = now.toISOString().replace(/[:.]/g, '-');
   const finalPath = join(backupsDir, `builtbasis-${label}-${stamp}.db`);
   const tmpPath = `${finalPath}.tmp`;
-  db.prepare('VACUUM INTO ?').run(tmpPath);
-  const check = new Database(tmpPath, { readonly: true });
-  const result = check.pragma('integrity_check', { simple: true });
-  check.close();
-  if (result !== 'ok') {
+  if (existsSync(finalPath) || existsSync(tmpPath)) throw new Error('backup_name_exists');
+  try {
+    db.prepare('VACUUM INTO ?').run(tmpPath);
+    const check = new Database(tmpPath, { readonly: true });
+    try {
+      const result = check.pragma('integrity_check', { simple: true });
+      if (result !== 'ok') throw new Error('backup_integrity_failed');
+    } finally { check.close(); }
+    syncFile(tmpPath);
+    renameSync(tmpPath, finalPath);
+    syncDirectory(backupsDir);
+    return finalPath;
+  } catch (error) {
     rmSync(tmpPath, { force: true });
-    throw new Error(`Backup integrity check failed: ${String(result)}`);
+    throw error;
   }
-  renameSync(tmpPath, finalPath);
-  return finalPath;
 }
