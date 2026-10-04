@@ -46,6 +46,7 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
 | [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
 | [Plan 5 — Web interface](docs/plans/2026-10-04-plan-5-web-interface.md) | Historical execution plan, actual delivery evidence and separate planning replay |
+| [Plan 6 — Print, PDF and operations](docs/plans/2026-10-04-plan-6-print-and-operations.md) | Draft full-code plan with replay evidence; not implemented or deployed |
 | [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Key/account operations, access rules and Plan 6 handoff |
 | [Web interface guide](docs/guides/web-interface.md) | Local build, development, browser checks and screen operation |
 | [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
