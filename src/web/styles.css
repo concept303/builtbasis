@@ -47,14 +47,8 @@
 .management-table .entry-name { border: 0; background: transparent; text-align: left; padding: 3px 0; color: #245e79; font-weight: 600; width: 100%; }
 .management-table .entry-name small { display: block; font-weight: 400; }
 .management-table .row-controls { width: 1%; white-space: nowrap; }
+.management-table .row-controls > button + button { margin-inline-start: 6px; }
 .management-table .row-controls > button { font-size: .82rem; padding: 5px 9px; min-height: 36px; }
-.row-menu { display: inline-block; position: relative; font-size: .82rem; }
-.row-menu > summary { list-style: none; padding: 8px; min-height: 36px; border-radius: 4px; color: #315e77; }
-.row-menu > summary::-webkit-details-marker { display: none; }
-.row-menu > summary::after { content: ' ▾'; }
-.row-menu[open] > summary { background: #e6eff5; }
-.row-menu > div { position: absolute; right: 0; top: 100%; z-index: 5; min-width: 155px; border: 1px solid #c7d4df; background: #fff; border-radius: 5px; box-shadow: 0 5px 18px #203b5026; padding: 5px; }
-.row-menu button { display: block; width: 100%; border: 0; text-align: left; white-space: nowrap; }
 .management-collection .table-wrap { overflow: visible; }
 .management-dialog { width: 540px; max-width: calc(100vw - 24px); }
 .management-back,.management-phone-code,.managed-phone-select { display: none; }
@@ -77,7 +71,6 @@
   .management-table td { padding: 7px 4px; }
   .management-table th { padding: 8px 4px; }
   .management-table .row-controls > button { min-height: 42px; }
-  .row-menu > summary { min-height: 42px; }
 }
 .entry-secondary { display: block; color: #596d7c; font-size: .85rem; }
 .retired-label { display: inline-block; font-size: .75rem; background: #e9edf1; border-radius: 3px; padding: 2px 6px; }
@@ -102,4 +95,10 @@
 @media (max-width: 650px) {
   .location-tree li > ul { margin-inline-start: 12px; padding-inline-start: 5px; }
   .location-tree .branch-toggle,.location-tree .branch-spacer { width: 32px; flex-basis: 32px; }
+}
+
+@media (max-width: 650px) {
+  .management-table .row-controls { white-space: normal; }
+  .management-table .row-controls > button { display: block; width: 100%; }
+  .management-table .row-controls > button + button { margin-inline-start: 0; margin-top: 5px; }
 }

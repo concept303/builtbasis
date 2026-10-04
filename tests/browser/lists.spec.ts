@@ -8,10 +8,8 @@ async function rowAction(page: Page, name: string, action: string) {
     await row.getByRole('button', { name, exact: true }).click();
     if (action === 'Edit') return;
     const panel = page.getByRole('region', { name: 'Entry details' });
-    if (['Retire', 'Reactivate', 'Delete'].includes(action)) await panel.getByText('Actions', { exact: true }).click();
     await panel.getByRole('button', { name: action, exact: true }).click();
   } else {
-    if (action !== 'Edit' && !await row.locator('.row-menu').evaluate(element => element.hasAttribute('open'))) await row.getByText('Actions', { exact: true }).click();
     await row.getByRole('button', { name: action, exact: true }).click();
   }
 }

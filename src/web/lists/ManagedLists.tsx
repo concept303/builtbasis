@@ -170,12 +170,12 @@ function ListsProject({ projectId }: { projectId: number }): React.JSX.Element {
     return path.join(' / ') || t('Project root', 'Ρίζα έργου');
   }
   function secondaryActions(node: Item) {
-    return <details className="row-menu"><summary>{t('Actions', 'Ενέργειες')}</summary><div>
+    return <>
       {'active' in node && <button type="button" disabled={busy} onClick={() => {
         if (discard() && window.confirm(node.active ? t(`Retire “${name(node)}”? Existing records keep this entry.`, `Απενεργοποίηση «${name(node)}»; Οι υπάρχουσες εγγραφές διατηρούν το στοιχείο.`) : t(`Reactivate “${name(node)}”?`, `Επανενεργοποίηση «${name(node)}»;`))) void act(`${base}/${section}/${node.id}`, 'PATCH', { active: !node.active });
       }}>{node.active ? t('Retire', 'Απενεργοποίηση') : t('Reactivate', 'Επανενεργοποίηση')}</button>}
       {(section === 'tags' || section === 'zone-types' || section === 'locations') && <button type="button" disabled={busy} onClick={() => void askDelete(node)}>{t('Delete', 'Διαγραφή')}</button>}
-    </div></details>;
+    </>;
   }
   const term = foldText(query);
   const filtered: Item[] = (data?.[section] ?? []).filter(node => {

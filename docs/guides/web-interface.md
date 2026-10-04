@@ -53,9 +53,9 @@ Share recipients open the full `/share#token` URL. The fragment is used locally 
 
 ## Projects and managed lists
 
-In Projects, choose New project or Edit. Give each project a name and a unique code. Open Actions → Delete project to review its record/photo/attachment counts. Deletion requires typing the project's current name. It removes the project's records and lists, including shared access. It does not remove user accounts, other projects, retained files or backups.
+In Projects, choose New project or Edit. Give each project a name and a unique code. Choose Delete project to review its record/photo/attachment counts. Deletion requires typing the project's current name. It removes the project's records and lists, including shared access. It does not remove user accounts, other projects, retained files or backups.
 
-Managed Lists has a search field and compact rows. Choose a name or Edit to open its fields beside the list. On a phone, use the List selector to switch lists and Back to list to leave an editor without losing the search. Unsaved changes require confirmation before leaving.
+Managed Lists has a search field and compact rows. Edit, Retire/Reactivate and Delete are directly visible where applicable. Retirement and deletion still require confirmation. Choose a name or Edit to open its fields beside the list. On a phone, use the List selector to switch lists and Back to list to leave an editor without losing the search. Unsaved changes require confirmation before leaving.
 
 Locations has expandable branches. Search reveals matching locations and their parents. Select a location to see its full path and controls for editing, adding a child, copying, retiring or deleting the branch. Expand all and Collapse all control the hierarchy when no search is active.
 

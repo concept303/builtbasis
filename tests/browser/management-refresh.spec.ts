@@ -13,7 +13,6 @@ test('owner creates, renames and deletes a project after reviewing its contents'
   await page.getByLabel('Project name', { exact: true }).fill('Renamed interface project');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   const renamed = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Renamed interface project', exact: true }) });
-  await renamed.getByText('Actions', { exact: true }).click();
   await renamed.getByRole('button', { name: 'Delete project', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete project', exact: true });
   await expect(dialog).toContainText('0 records');
