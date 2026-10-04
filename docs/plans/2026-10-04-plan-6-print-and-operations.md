@@ -6,7 +6,7 @@
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §5.12, §11.6–11.8, §12–13; [roadmap](2026-10-02-v1-roadmap.md); DOCS-STANDARD v1.4 §2.
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
 > **Implemented by:** Tasks 1–3: `e915b44`, `83a869c`, `c21a279` on `codex/plan-6`. Tasks 4–6 remain pending live acceptance and closeout.
-> **Verified:** 2026-10-04 local implementation: 503 unit/API tests in 71 files, 52 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. Release 1265439 is active; actual scheduled server/PC backups and the populated off-site restore have passed. Upload boundary/capacity probes and owner phone/print-preview checks passed. Remaining acceptance and closeout checks are listed in the release checklist.
+> **Verified:** 2026-10-04 local implementation: 503 unit/API tests in 71 files, 55 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. Release 6247a9f is active; actual scheduled server/PC backups and the populated off-site restore have passed. Upload boundary/capacity probes and owner phone/print-preview checks passed. Remaining acceptance and closeout checks are listed in the release checklist.
 > **Merged to main:** Implementation remains on `codex/plan-6`; not merged.
 > **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The embedded release checklist is reconciled with recorded acceptance evidence.
 > **Execution:** Use subagent-driven-development or inline executing-plans task by task. Use Astra Medium for delegated work, as the owner requested.
@@ -3068,13 +3068,13 @@ Release only when the hosted checks, real off-site drill and documentation recon
 
 #### File: `docs/guides/release-checklist.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=74bc75620042d6d08c2048f47e59c54267d5c63b3325457aa5be9875ea256f20 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=88ce6a923ce905bc2edb7c330cb33b9e69669ad65c1a3f01183c2d7cb8b68d7b -->
 
 ``````markdown
 # v1 release checklist
 
 > **Document type:** Release acceptance checklist
-> **Status:** In progress. Hosted release `1265439` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
+> **Status:** In progress. Hosted release `6247a9f` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
 > **Authority:** [Approved design](../designs/2026-10-02-v1-records-design.md), [proposed specification](../specs/v1.md) and [roadmap](../plans/2026-10-02-v1-roadmap.md).
 
 For every completed gate, record the date, operator, release commit, environment, command or procedure, observed result and a private evidence location. Record failures plainly. Do not copy credentials, tokens, contact data or private record content into this repository. Do not activate the specification or mark the design historical until the external gates are satisfied.
@@ -3084,7 +3084,7 @@ For every completed gate, record the date, operator, release commit, environment
 - [x] Record the exact reviewed commit and clean build inputs. Run unit/API tests, TypeScript, production builds and browser tests. Retain their actual outputs and distinguish replay from implementation evidence.
 - [x] Check the release archive contains only compiled server/web assets and production dependency manifests. It must exclude `.env`, keys, database/files/backups, source CSV/workbooks and synthetic test credentials.
 - [x] Install production dependencies with the verified hosting Node executable on PATH. Run the native SQLite runtime check in the staged release. Confirm no source `tsx` command is required on hosting.
-- [ ] Record the stable current-release path and separate private data/configuration paths. Verify deployment cannot overwrite data or external configuration. Exercise the documented restart and rollback procedure without silently rolling back a migrated database.
+- [x] Record the stable current-release path and separate private data/configuration paths. Verify deployment cannot overwrite data or external configuration. Exercise the documented restart and rollback procedure without silently rolling back a migrated database.
 
 ## Hosting, proxy and capacity
 
@@ -3163,6 +3163,16 @@ All results below are from 2026-10-04 against hosted release `1265439`, except e
 | Retention and pinning | Local implementation tests verify 14 daily/8 weekly UTC buckets, migration-copy preservation, active pin survival and failed cleanup. Real transfers released export pins. This is not a claim that eight weeks of scheduled history already exist. Stale-lock/pin inspection procedures are in the backup guide. | `task-2-unit.log`, `live-fix-unit.log`, completed pull logs |
 
 Known display limitation: measurement comparisons can print long floating-point fractions. The calculation remains unrounded as approved; a later display-formatting change can shorten those values.
+
+### Mobile viewer correction — 2026-10-04
+
+Owner requested finishing the cramped viewer UI and deferring the phone JPG investigation after a successful desktop upload. That phone rejection remains unresolved; no claim of successful phone camera/gallery acceptance is made.
+
+Release `6247a9f857eddb34cdbed159bdcada0b7afd1d81` fixes dialog sizing, media placement, fixed header/actions and scrolling/wrapping email content. Three new layout regressions failed before the fix and passed afterwards. TypeScript/build, 503 unit/API tests and 55 browser tests passed. Two unchanged backend tests timed out during overlapping default-worker verification; the complete four-worker rerun passed without test or backend changes.
+
+Staging passed native SQLite/runtime checks and installed 78 production packages with no production audit findings. All eight compiled server entrypoints and both dependency manifests were byte-identical to live `1265439`. For this UI-only deployment, the operator atomically switched the code symlink and stopped the exact verified old app PID. Activation, rollback to `1265439`, and reactivation of `6247a9f` each produced HTTP 200 from a new process in the expected release directory. The data directory and configuration were unchanged. This is a bounded exception to the guide's general stopped-service switch, not permission to use it for changed server code, schemas or dependencies.
+
+The deployed UI then passed authenticated Chrome checks at 360×740 for dialog bounds, media placement, email/SVG/media previews and original downloads. Its mobile screenshot was inspected. WordPress still returned HTTP 200. Evidence: `viewer-unit.log`, `viewer-stage.log`, `viewer-activation.json`, `viewer-live-acceptance.json`, `live-mobile-viewer.png`. This completes the requested UI correction; other unchecked release gates remain recorded above. Uploaded test photos are preserved.
 ``````
 
 - [ ] Use the release checklist as the evidence index. Record real commands, outcomes, release identity, operator and evidence locations. Never substitute planning replay or synthetic fixtures for actual hosting evidence. Do not publish tokens, credentials, contact files or private record data in git.
@@ -4094,6 +4104,8 @@ Execution logs and the progress ledger are in the ignored worktree folder `.supe
 The implementation review correction passed all 501 unit/API tests and 52 browser tests across 11 specs. The new browser regression uses its own record and link, rejects direct native printing after a remote record edit or link revocation, accepts the refreshed button flow, and rejects reuse of its print authorization. All nine print tests pass. The release build and TypeScript checks pass. The three changed print payloads and their checksums match the implemented files. The README lifecycle description was also corrected.
 
 Hosted preparation on 2026-10-04: the owner supplied a 100 GB account allowance with 43.6 GB displayed used and selected `X:\1976KN\Sys\Software\builtbasis` for off-site copies. The initial file budget is 30 GB, the filesystem reserve 5 GB and the warning threshold 5 GB. These are configured application limits, not an automatic hosting-account quota check. Release `12654399ff3fcdd060620745bf4744a316b8dfcd` is active; the earlier `0e8743a` release is retained. The remote production installation has 78 packages with zero audit findings. Runtime and isolated data-filesystem checks passed on hosting Node 24.21.0. The backup destination permissions are restricted to the operator, SYSTEM and administrators. Actual scheduled server/Windows runs, verified offsite transfers, the populated restore drill and user-observed failure notification have passed. Physical-device checks are partly confirmed; see the release checklist for exact results and remaining gates.
+
+Acceptance follow-up `6247a9f` corrects the mobile evidence viewer. Its committed changes to EvidenceViewer/styles and browser regressions supplement the original Task 1 snapshots; they do not change the approved file/access policy. Full verification passed 503 unit/API and 55 browser tests. Hosted restart/rollback and phone-width browser checks passed. At the owner’s instruction, the phone JPG investigation is deferred after successful desktop upload. See the release checklist for exact evidence and remaining external gates.
 
 ## Planning replay evidence
 

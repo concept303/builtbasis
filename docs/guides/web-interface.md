@@ -1,7 +1,7 @@
 # Web interface — local operation and browser checks
 
 > **Document type:** Operator guide
-> **Status:** Current for the implemented browser, including Plan 6 printing and Administration on `codex/plan-6`; not deployed.
+> **Status:** Current for the implemented browser, including Plan 6 printing and Administration on `codex/plan-6`; deployed as `6247a9f` on 2026-10-04.
 > **Governing contracts:** [v1 design](../designs/2026-10-02-v1-records-design.md) and [access/evidence guide](share-key-management.md)
 
 ## Run the compiled interface locally
@@ -60,3 +60,5 @@ Administration is available only to the owner and always shows server-backup/sto
 ## Release boundary
 
 This guide does not authorize production deployment. Plan 6 has implemented A3/PDF printing and backup/restore tools locally. Hosting/proxy/capacity and memory checks, actual scheduling and recovery, deployment and activation of the proposed maintained v1 specification remain pending. Retain the existing access/evidence guide for key, account, storage and restore rules.
+
+Evidence previews use a consistent dialog width. Close and Download original remain above the independently scrolling preview. Media fills the available width, and email metadata wraps on narrow screens.

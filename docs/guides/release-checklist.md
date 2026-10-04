@@ -1,7 +1,7 @@
 # v1 release checklist
 
 > **Document type:** Release acceptance checklist
-> **Status:** In progress. Hosted release `1265439` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
+> **Status:** In progress. Hosted release `6247a9f` is active. Checked boxes have implementation or operational evidence recorded below. Unchecked boxes may be partly tested; they are not accepted as complete.
 > **Authority:** [Approved design](../designs/2026-10-02-v1-records-design.md), [proposed specification](../specs/v1.md) and [roadmap](../plans/2026-10-02-v1-roadmap.md).
 
 For every completed gate, record the date, operator, release commit, environment, command or procedure, observed result and a private evidence location. Record failures plainly. Do not copy credentials, tokens, contact data or private record content into this repository. Do not activate the specification or mark the design historical until the external gates are satisfied.
@@ -11,7 +11,7 @@ For every completed gate, record the date, operator, release commit, environment
 - [x] Record the exact reviewed commit and clean build inputs. Run unit/API tests, TypeScript, production builds and browser tests. Retain their actual outputs and distinguish replay from implementation evidence.
 - [x] Check the release archive contains only compiled server/web assets and production dependency manifests. It must exclude `.env`, keys, database/files/backups, source CSV/workbooks and synthetic test credentials.
 - [x] Install production dependencies with the verified hosting Node executable on PATH. Run the native SQLite runtime check in the staged release. Confirm no source `tsx` command is required on hosting.
-- [ ] Record the stable current-release path and separate private data/configuration paths. Verify deployment cannot overwrite data or external configuration. Exercise the documented restart and rollback procedure without silently rolling back a migrated database.
+- [x] Record the stable current-release path and separate private data/configuration paths. Verify deployment cannot overwrite data or external configuration. Exercise the documented restart and rollback procedure without silently rolling back a migrated database.
 
 ## Hosting, proxy and capacity
 
@@ -90,3 +90,13 @@ All results below are from 2026-10-04 against hosted release `1265439`, except e
 | Retention and pinning | Local implementation tests verify 14 daily/8 weekly UTC buckets, migration-copy preservation, active pin survival and failed cleanup. Real transfers released export pins. This is not a claim that eight weeks of scheduled history already exist. Stale-lock/pin inspection procedures are in the backup guide. | `task-2-unit.log`, `live-fix-unit.log`, completed pull logs |
 
 Known display limitation: measurement comparisons can print long floating-point fractions. The calculation remains unrounded as approved; a later display-formatting change can shorten those values.
+
+### Mobile viewer correction — 2026-10-04
+
+Owner requested finishing the cramped viewer UI and deferring the phone JPG investigation after a successful desktop upload. That phone rejection remains unresolved; no claim of successful phone camera/gallery acceptance is made.
+
+Release `6247a9f857eddb34cdbed159bdcada0b7afd1d81` fixes dialog sizing, media placement, fixed header/actions and scrolling/wrapping email content. Three new layout regressions failed before the fix and passed afterwards. TypeScript/build, 503 unit/API tests and 55 browser tests passed. Two unchanged backend tests timed out during overlapping default-worker verification; the complete four-worker rerun passed without test or backend changes.
+
+Staging passed native SQLite/runtime checks and installed 78 production packages with no production audit findings. All eight compiled server entrypoints and both dependency manifests were byte-identical to live `1265439`. For this UI-only deployment, the operator atomically switched the code symlink and stopped the exact verified old app PID. Activation, rollback to `1265439`, and reactivation of `6247a9f` each produced HTTP 200 from a new process in the expected release directory. The data directory and configuration were unchanged. This is a bounded exception to the guide's general stopped-service switch, not permission to use it for changed server code, schemas or dependencies.
+
+The deployed UI then passed authenticated Chrome checks at 360×740 for dialog bounds, media placement, email/SVG/media previews and original downloads. Its mobile screenshot was inspected. WordPress still returned HTTP 200. Evidence: `viewer-unit.log`, `viewer-stage.log`, `viewer-activation.json`, `viewer-live-acceptance.json`, `live-mobile-viewer.png`. This completes the requested UI correction; other unchecked release gates remain recorded above. Uploaded test photos are preserved.

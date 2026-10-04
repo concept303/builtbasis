@@ -14,7 +14,7 @@ Fastify / TypeScript (Node.js) ── serves the built web app
         └── Stored files, by content hash (data folder)
 ```
 
-Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. Release `1265439` is active. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
+Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. Release `6247a9f` is active. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
 
 ## Parts
 
