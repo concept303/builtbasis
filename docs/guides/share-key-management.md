@@ -100,9 +100,9 @@ Only a successful public record GET updates view count and last-viewed time. HEA
 
 ## Plan 6 PDF and documentation contract
 
-PDF generation reuses an owner-selected existing share URL and never creates a link on GET. Its QR code may contain that selected URL. Private content remains excluded from PDF as required by the design.
+PDF generation defaults to no QR and permits Draft printing without sharing. If Include QR link is enabled, it reuses an owner-selected active share URL and never creates a link on GET. Its QR code contains that selected URL. Private content remains excluded from PDF as required by the design.
 
-The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented, verified and merged to main. Plan 5 browser delivery is implemented, verified and merged at `a681e53`, with final integration review passed. Production deployment remains future work. No maintained specification exists to update at this stage; the approved design remains the requirements baseline until Plan 6 consolidates it.
+The approved v1 design remains active. Plan 6 still owns the maintained v1 specification, Architecture reconciliation, recovery drill and v1 documentation closeout. Plan 4's backend is implemented, verified and merged to main. Plan 5 browser delivery is implemented, verified and merged at `a681e53`, with final integration review passed. Production deployment remains future work. A proposed maintained specification is prepared in `docs/specs/v1.md`; the approved design remains the requirements baseline until the live release gates and documentation closeout pass.
 
 ## Verification evidence
 

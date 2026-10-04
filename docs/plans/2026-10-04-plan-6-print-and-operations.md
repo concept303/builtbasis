@@ -1,14 +1,14 @@
 # Plan 6 — Print, PDF and operations
 
 > **Document type:** Implementation plan
-> **Status:** Draft
+> **Status:** In progress
 > **Retention:** Active execution instructions until completed or abandoned; retain as historical evidence afterwards.
 > **Implements:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), §5.12, §11.6–11.8, §12–13; [roadmap](2026-10-02-v1-roadmap.md); DOCS-STANDARD v1.4 §2.
 > **Parent plan:** [v1 roadmap](2026-10-02-v1-roadmap.md)
-> **Implemented by:** Not implemented. Complete proposed payloads and planning replay are below.
-> **Verified:** Not verified as an implementation or live release. Planning evidence is separate below.
-> **Merged to main:** Plan publication only; Plan 6 runtime not merged.
-> **Checklist note:** Unchecked items are future execution work. Writing or replaying this plan does not complete them.
+> **Implemented by:** Tasks 1–3: `e915b44`, `83a869c`, `c21a279` on `codex/plan-6`. Tasks 4–6 remain pending live acceptance and closeout.
+> **Verified:** 2026-10-04 local implementation: 501 unit/API tests in 70 files, 51 browser tests in 11 specs, builds, TypeScript and production-only runtime probe passed. No live release or scheduled recovery acceptance is claimed.
+> **Merged to main:** Implementation remains on `codex/plan-6`; not merged.
+> **Checklist note:** Preflight and Tasks 1–3 are executed. Remaining unchecked items are active live-release work. The embedded file snapshots retain their original checklist text.
 > **Execution:** Use subagent-driven-development or inline executing-plans task by task. Use Astra Medium for delegated work, as the owner requested.
 
 ## Outcome and boundary
@@ -47,9 +47,9 @@ Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API t
 
 ## Preflight
 
-- [ ] Start an isolated implementation branch/worktree from main containing this plan. Check status, Node and npm versions. Preserve unrelated work. Node must be at least 22.13; the hosting trial uses Node 24.
-- [ ] Read the governing design, Plan 0 [hosting evidence](../../spikes/webhosting-l/README.md), [access guide](../guides/share-key-management.md) and [web guide](../guides/web-interface.md).
-- [ ] Run this runtime baseline guard. Documentation-only changes after authoring are allowed. Reconcile a runtime difference before overwriting it.
+- [x] Start an isolated implementation branch/worktree from main containing this plan. Check status, Node and npm versions. Preserve unrelated work. Node must be at least 22.13; the hosting trial uses Node 24.
+- [x] Read the governing design, Plan 0 [hosting evidence](../../spikes/webhosting-l/README.md), [access guide](../guides/share-key-management.md) and [web guide](../guides/web-interface.md).
+- [x] Run this runtime baseline guard. Documentation-only changes after authoring are allowed. Reconcile a runtime difference before overwriting it.
 
 ```powershell
 git diff --exit-code 59f04d0 -- package.json package-lock.json tsconfig.json src scripts tests vite.config.ts vite.browser-test.config.ts playwright.config.ts vitest.config.ts
@@ -84,7 +84,7 @@ Ports 3490 and 5174 must be free. Use synthetic local fixtures, never a producti
 
 Owner-only print projection and resource-ready A3 landscape output. The single print screen defaults to no QR and permits Drafts; an optional Include QR link checkbox enables explicit existing-link selection. No-QR printing needs no sharing request. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design. Add owner-only Administration with always-available backup/storage details. Other working pages show only a compact warning and an Administration link; healthy status and loading indicators remain hidden. The configurable remaining-file threshold defaults to 5 GB. The read-only API and live capacity snapshot are independent of the Task 2 scheduler. Missing, overdue, unavailable and unsafe-capacity states also warn. Extra storage details stay collapsed by default; printing and readers never show this owner information.
 
-- [ ] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Move bundled browser-only packages to development dependencies without changing their versions. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
+- [x] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Move bundled browser-only packages to development dependencies without changing their versions. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
 
 #### File: `package.json`
 
@@ -159,7 +159,7 @@ Owner-only print projection and resource-ready A3 landscape output. The single p
 }
 ``````
 
-- [ ] Write/extract the tests first.
+- [x] Write/extract the tests first.
 
 #### File: `tests/server/print-api.test.ts`
 
@@ -1026,9 +1026,9 @@ test('Administration and status are absent from contributor, share and print vie
 
 ``````
 
-- [ ] Run the focused test before implementation: `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts`. The API suite fails on the missing endpoint before implementation. Existing guard-only assertions may already pass. The new browser case fails on the absent print heading after building the baseline. Do not mistake a missing browser installation for the intended RED.
+- [x] Run the focused test before implementation: `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts`. The API suite fails on the missing endpoint before implementation. Existing guard-only assertions may already pass. The new browser case fails on the absent print heading after building the baseline. Do not mistake a missing browser installation for the intended RED.
 
-- [ ] Write/extract the complete implementation files.
+- [x] Write/extract the complete implementation files.
 
 #### File: `src/server/printing/routes.ts`
 
@@ -1825,11 +1825,11 @@ export function OperationsStatus({ detailed = false }: { detailed?: boolean }) {
 @media print { .operations-status { display: none !important; } }
 ``````
 
-- [ ] GREEN: run `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts` and require success.
+- [x] GREEN: run `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts` and require success.
 
-- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect 19 focused print/monitoring/capacity tests and eight print browser tests. Also run tests/browser/operations-status.spec.ts; expect four tests for healthy-state suppression, Administration, warning/recovery behavior, refresh errors, Greek labels and reader/print exclusion. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
+- [x] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect 19 focused print/monitoring/capacity tests and eight print browser tests. Also run tests/browser/operations-status.spec.ts; expect four tests for healthy-state suppression, Administration, warning/recovery behavior, refresh errors, Greek labels and reader/print exclusion. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
 
-- [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files and generated package lock. Preserve synthetic PDF fixture whitespace from Plan 5.
+- [x] Self-review the task diff, run `git diff --check`, and commit only this task’s files and generated package lock. Preserve synthetic PDF fixture whitespace from Plan 5.
 
 ## Task 2: Nightly backups, pinned exports and offline restore
 
@@ -1837,7 +1837,7 @@ export function OperationsStatus({ detailed = false }: { detailed?: boolean }) {
 
 Use the existing data-directory configuration. Durable nightly VACUUM INTO backups retain the latest 14 UTC days and eight Monday-start UTC weeks (union, at most 22 names). Pre-migration backups are separate. A completed database inode is pinned before transfer; only its database and manifest are staged, never another copy of all server blobs. Preserve source backup identity and timestamp separately from export and verification time; scheduled verification rejects sources older than the configurable 36-hour default, while deliberate restore may use an older completed recovery point. Restore publishes a fresh verified candidate after resetting all restored access.
 
-- [ ] Write/extract the tests first.
+- [x] Write/extract the tests first.
 
 #### File: `tests/server/operations.test.ts`
 
@@ -2099,9 +2099,9 @@ it('closes a failed integrity-check connection and never publishes the bad backu
 });
 ``````
 
-- [ ] Run the focused test before implementation: `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts`. The new operations suite fails to import the missing operations modules. Existing database tests remain green. Then extract the implementation and verify all eighteen focused operations/database tests.
+- [x] Run the focused test before implementation: `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts`. The new operations suite fails to import the missing operations modules. Existing database tests remain green. Then extract the implementation and verify all eighteen focused operations/database tests.
 
-- [ ] Write/extract the complete implementation files.
+- [x] Write/extract the complete implementation files.
 
 #### File: `src/server/operations/durability.ts`
 
@@ -2551,11 +2551,11 @@ Successful restore emits a system diagnostic with reason `database_restore` and 
 `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts` performs a synthetic offsite-copy restore drill. It checks access reset, owner preservation, original database isolation, corrupt/missing blobs, schema mismatch, failed candidate cleanup and rotation while pinned. This local drill is not production recovery evidence. Before release, perform and record one operator drill from an actual offsite copy into a fresh isolated directory. Record backup identity, verification output, restore result and representative file checks. Keep production stopped only when doing a real cutover. Windows tests do not establish Linux directory-sync durability; verify that separately on hosting.
 ``````
 
-- [ ] GREEN: run `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts` and require success.
+- [x] GREEN: run `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts` and require success.
 
-- [ ] Run npm run typecheck. Inspect the synthetic drill assertions: source remains unchanged; restored owner survives; sessions/grants are empty; links revoked; contributors disabled. Corrupt or missing bytes, schema mismatch and incomplete copies cannot become a completed restore. Do not run any command against live data during this task.
+- [x] Run npm run typecheck. Inspect the synthetic drill assertions: source remains unchanged; restored owner survives; sessions/grants are empty; links revoked; contributors disabled. Corrupt or missing bytes, schema mismatch and incomplete copies cannot become a completed restore. Do not run any command against live data during this task.
 
-- [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files. Preserve synthetic PDF fixture whitespace from Plan 5.
+- [x] Self-review the task diff, run `git diff --check`, and commit only this task’s files. Preserve synthetic PDF fixture whitespace from Plan 5.
 
 ## Task 3: Compiled release and Windows transfer tools
 
@@ -2563,7 +2563,7 @@ Successful restore emits a system diagnostic with reason `database_restore` and 
 
 Build Node ESM entrypoints locally with esbuild while keeping runtime packages external. Stage only compiled assets and package manifests; npm ci --omit=dev runs with the hosting Node 24 directory on PATH. Staging never switches the running release. Windows pull pins the database, downloads database/manifest, copies only missing immutable blobs into a shared local pool, uses one SFTP batch for database/manifest and one for all missing blobs, verifies all references and source freshness, and only then creates COMPLETE. Failed pulls notify only the configured local logged-on operator through Windows msg.exe and retain a nonzero exit. This includes setup, lock, transfer, verification and pin-release failures. Windows tests exercise transfer and notification dispatch with mocked commands; they do not establish real SSH or desktop delivery.
 
-- [ ] Write/extract the tests first.
+- [x] Write/extract the tests first.
 
 #### File: `tests/server/production-build.test.ts`
 
@@ -2730,9 +2730,9 @@ catch { $failed = $true }
 [ordered]@{ notificationTargets = $global:NotificationTargets.ToArray(); deliveryWarnings = $deliveryWarnings.Count; notifications = $global:Notifications; batches = $global:TransferBatches.ToArray(); released = $global:Released; age = $global:VerifiedAge; failed = $failed; order = $global:CopyOrder.ToArray(); locked = Test-Path (Join-Path $Destination '.pull-lock') } | ConvertTo-Json -Compress
 ``````
 
-- [ ] Run the focused test before implementation: `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts`. The production test fails because scripts/build-server.mjs does not exist. It must pass after extraction, exercising a real compiled process and HTTP health request without invoking tsx.
+- [x] Run the focused test before implementation: `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts`. The production test fails because scripts/build-server.mjs does not exist. It must pass after extraction, exercising a real compiled process and HTTP health request without invoking tsx.
 
-- [ ] Write/extract the complete implementation files.
+- [x] Write/extract the complete implementation files.
 
 #### File: `scripts/build-server.mjs`
 
@@ -2907,11 +2907,11 @@ Write-Output "Verified off-site backup: $bundle"
 }
 ``````
 
-- [ ] GREEN: run `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts` and require success.
+- [x] GREEN: run `npx vitest run tests/server/production-build.test.ts tests/server/pull-script.test.ts` and require success.
 
-- [ ] Expect 12 focused tests: one compiled-process check and 11 Windows transfer/failure checks. Run npm run build and npm run typecheck. Parse both PowerShell scripts with System.Management.Automation.Language.Parser and require zero errors. Follow the production-only probe below. Actual SSH upload, scheduling and live activation remain Task 4/5; local tests do not claim those passed.
+- [x] Expect 12 focused tests: one compiled-process check and 11 Windows transfer/failure checks. Run npm run build and npm run typecheck. Parse both PowerShell scripts with System.Management.Automation.Language.Parser and require zero errors. Follow the production-only probe below. Actual SSH upload, scheduling and live activation remain Task 4/5; local tests do not claim those passed.
 
-- [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files. Preserve synthetic PDF fixture whitespace from Plan 5.
+- [x] Self-review the task diff, run `git diff --check`, and commit only this task’s files. Preserve synthetic PDF fixture whitespace from Plan 5.
 
 ## Task 4: Stage the hosted release and pass hosting acceptance
 
@@ -3864,6 +3864,23 @@ foreach ($file in @('scripts/stage-release.ps1','scripts/pull-backup.ps1')) {
 ```
 
 Their real remote and scheduled execution is checked in Tasks 4–5. Use PowerShell 7 and an OpenSSH alias already verified against the server host key. Never disable host-key verification. Run `npm audit --omit=dev` and record results rather than applying unrelated dependency upgrades.
+
+## Implementation progress — 2026-10-04
+
+Execution started from approved publication `472cf07` in the isolated `codex/plan-6` branch. The 464-test Plan 5 baseline passed before extraction. All runtime source snapshots were installed exactly as reviewed; no optional Draft banner or other product scope was added.
+
+| Task | Implementation evidence | State |
+|---|---|---|
+| 1 — print and Administration | `e915b44`; RED on missing routes/module/capacity snapshot and Draft print control; GREEN: 19 focused tests, 475 unit/API tests, 20 print/status/record browser tests, build and typecheck | Complete locally |
+| 2 — backups/export/restore | `83a869c`; RED on missing operations module; GREEN: 18 focused tests, 489 unit/API tests and typecheck; synthetic integrity/access-reset/rotation drill | Complete locally |
+| 3 — release and Windows tools | `c21a279`; RED on missing build/pull scripts; GREEN: 12 focused tests, final 501 unit/API tests and 51 browser tests, builds and typecheck | Complete locally |
+| 4 — hosted acceptance | Existing SSH alias verified read-only; remote BuiltBasis directory still contains trial data only. Hosting quota requested from owner; no production mutation or deployment performed | Pending |
+| 5 — scheduled backups and real recovery | No cron or Windows scheduled task installed; no actual off-site drill or desktop notification delivery claimed | Pending |
+| 6 — documentation closeout | Proposed specification and operating guides prepared; final activation, design Historical status and release acceptance await Tasks 4–5 | Pending |
+
+The production-only package installed 78 packages, omitted tsx and browser libraries, passed native SQLite and real HTTP health/shell checks, and reported zero production dependency vulnerabilities. Existing four moderate development-only audit findings remain. PowerShell scripts and their harness parsed on Windows PowerShell 5.1; the operating guide's PowerShell 7 environment remains a deployment prerequisite. Browser tests used temporary loopback ports 3500/5184 to preserve the owner's preview, then restored their original source bytes. Print tests decoded QR output and checked Greek A3/multipage PDF text; the print screenshot was inspected. Physical-device and actual printed-output acceptance remain live gates.
+
+Execution logs and the progress ledger are in the ignored worktree folder `.superpowers/sdd/2026-10-04-plan-6-print-and-operations/`. These are implementation results, separate from the earlier planning replay below. The external release checklist remains uncompleted.
 
 ## Planning replay evidence
 

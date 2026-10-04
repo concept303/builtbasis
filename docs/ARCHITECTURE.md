@@ -1,6 +1,6 @@
 # Architecture
 
-> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5 (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
+> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5 and Plan 6 Tasks 1–3 on `codex/plan-6` (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
 
 ## System
 
@@ -23,7 +23,7 @@ Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain,
 | `src/domain` | Pure TypeScript shared by server and browser: schemas, value lists (EN/EL), status rules, measurement comparisons. No I/O. |
 | `src/server` | API, named-user authentication, grants, share links, data access, file storage and compiled browser serving. |
 | `src/web` | React entrypoint, English/Greek screens, photo preparation and protected viewers; Vite builds `dist/web`. |
-| `scripts/` | Owner/contributor administration, seed import and share revocation. Backup and deployment remain Plan 6 work. |
+| `scripts/` | Owner/contributor administration, seed import, share revocation, backup/export/restore, compiled releases and Windows transfer tools. Live scheduling/deployment remain pending. |
 
 ## Browser delivery
 
@@ -31,7 +31,9 @@ Fastify serves the built React entrypoint and hashed assets from `dist/web`. The
 
 HEIC conversion and EML/MSG parsing use bundled local workers. PDF.js renders authorized PDF bytes to canvas with a local worker. Photo originals remain immutable. Shared media is fetched with bearer authorization; shared SVG is rasterized before display. Owner/contributor native media routes retain cookie authorization and range support. Unavailable previews retain original downloads. No third-party runtime resources are needed.
 
-See the [web interface guide](guides/web-interface.md) for commands and browser limits. A3 printing, release PDF output, backup/restore and deployment remain Plan 6 work.
+See the [web interface guide](guides/web-interface.md) for commands and browser limits. A3 printing uses a strict owner-only projection and desktop browser Save as PDF. QR is optional, off by default, and unavailable for Drafts. Administration shows full server-backup/storage status; other owner pages show warning-only notices.
+
+Consistent SQLite snapshots are pinned before off-site transfer. Manifests preserve source backup time separately from transfer time; verification checks every referenced blob and source freshness. Offline restore creates a fresh directory and clears old access before publication. Compiled server/CLI entrypoints live in `dist/server`; deployment copies only built files and package manifests. Live hosting, scheduled backups and recovery acceptance remain pending.
 
 ## Boundaries
 

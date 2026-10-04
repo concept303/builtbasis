@@ -2,7 +2,7 @@
 
 Lightweight construction-control application for quality issues, detail clarifications and tasks, in English and Greek. It combines measurements, decisions, evidence files, named contributors and read-only share links.
 
-**Status:** Plans 0–5 are implemented and merged to `main`. Plan 5 was merged at `a681e53`. Verification on 2026-10-04 passed the browser build, TypeScript check, 464 unit/API tests across 64 files and 39 Chrome browser tests across 9 spec files. Final integration review passed. Production deployment remains Plan 6 work.
+**Status:** Plans 0–5 are implemented and merged to `main`. Plan 6 Tasks 1–3 are implemented on `codex/plan-6`: A3 printing, Administration, backup/export/restore and release tools. Verification on 2026-10-04 passed builds, TypeScript, 501 unit/API tests across 70 files and 51 browser tests across 11 specs. Hosted deployment, scheduling, the actual off-site recovery drill and final release acceptance remain pending.
 
 ## Local dependency installation
 
@@ -25,6 +25,12 @@ npm start
 ```
 
 For development, run `npm run dev` and `npm run web:dev` in separate terminals with the matching browser origin described in the guide. Verification uses `npm run typecheck`, `npm test` and `npm run test:browser` after building. The guide covers browser installation and isolated test servers.
+
+## Printing and Administration
+
+Open Print / Save PDF from a record. Include QR link is off by default; Drafts can be printed without sharing. Administration always shows server backup and storage status. Other owner screens show only warnings. The remaining-file warning defaults to 5 GB (`FILES_WARNING_BELOW_BYTES`); the backup-age warning defaults to 36 hours (`BACKUP_MAX_AGE_HOURS`).
+
+`npm run build` produces the web interface and compiled Node entrypoints under `dist`. See the [deployment guide](docs/guides/deployment.md), [backup guide](docs/guides/backup-restore.md) and [release checklist](docs/guides/release-checklist.md) for the still-pending live setup. The [proposed v1 specification](docs/specs/v1.md) awaits release reconciliation.
 
 ## Access and evidence contract
 

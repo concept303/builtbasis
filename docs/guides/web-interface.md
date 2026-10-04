@@ -1,7 +1,7 @@
 # Web interface — local operation and browser checks
 
 > **Document type:** Operator guide
-> **Status:** Active for the implemented Plan 5 browser, merged to main at `a681e53`; not deployed.
+> **Status:** Current for the implemented browser, including Plan 6 printing and Administration on `codex/plan-6`; not deployed.
 > **Governing contracts:** [v1 design](../designs/2026-10-02-v1-records-design.md) and [access/evidence guide](share-key-management.md)
 
 ## Run the compiled interface locally
@@ -51,6 +51,12 @@ Editing only a Log entry's text or privacy keeps its exact event timestamp. When
 
 Share recipients open the full `/share#token` URL. The fragment is used locally for bearer requests. Removing it makes the link unusable. Shared pages start in Greek and can switch to English. Typed record text is never translated. Public views never receive Private Notes, commercial fields or private Log evidence.
 
+## Print and Administration
+
+Use Print / Save PDF from the record screen. Choose A3 landscape and disable browser headers/footers. Include QR link is off by default; enable it only when you want a selected active share link on the sheet. Drafts print without QR.
+
+Administration is available only to the owner and always shows server-backup/storage status. Working pages display only warnings, with a link to Administration. The default low-file-allowance warning is 5 GB; the default overdue-backup age is 36 hours. The website does not certify the separate PC copy.
+
 ## Release boundary
 
-This guide does not authorize production deployment. Plan 6 owns A3/PDF printing, hosting/proxy/capacity and memory checks, backup/restore procedures and drill, deployment and the maintained v1 specification. Retain the existing access/evidence guide for key, account, storage and restore rules.
+This guide does not authorize production deployment. Plan 6 has implemented A3/PDF printing and backup/restore tools locally. Hosting/proxy/capacity and memory checks, actual scheduling and recovery, deployment and activation of the proposed maintained v1 specification remain pending. Retain the existing access/evidence guide for key, account, storage and restore rules.
