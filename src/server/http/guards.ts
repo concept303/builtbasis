@@ -39,7 +39,8 @@ export function registerGuards(app: FastifyInstance, config: AppConfig, db: Db):
   app.decorateRequest('user', null);
 
   app.addHook('onRequest', async (request, reply) => {
-    if (request.routeOptions.config.privateResponse) shareHeaders(reply);
+    // Apply before authentication and parsing so failures are private too.
+    if (request.routeOptions.config.privateResponse || (request.routeOptions.url ?? request.url).startsWith('/api/')) shareHeaders(reply);
     if (SAFE_METHODS.has(request.method)) return;
     if (request.headers.origin !== config.publicOrigin) throw new HttpError(403, 'origin_rejected');
     const contentType = (request.headers['content-type']?.split(';', 1)[0] ?? '').trim().toLowerCase();
