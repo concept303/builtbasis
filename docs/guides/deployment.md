@@ -4,6 +4,114 @@
 > **Status:** Active for deployed release `a3ff3e1`. Remaining release acceptance is tracked in the release checklist.
 > **Contracts:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), [access guide](share-key-management.md), [backup and recovery](backup-restore.md).
 
+## Server directory layout
+
+The hosting account's home directory is `/usr/home/ktimana`. The layout below was checked against the server on 2026-10-04 after the owner removed the obsolete hosting trial. Names in angle brackets vary. Temporary entries appear during work and may remain after an interruption.
+
+```text
+/usr/home/ktimana/
+├── builtbasis/                         Application code
+│   ├── current -> releases/<commit>/   Link to the running release
+│   └── releases/<commit>/              One directory per deployed code version
+│       ├── dist/server/                Compiled server and command-line tools
+│       │   └── main.mjs                Application entrypoint
+│       ├── dist/web/                   Built browser interface and assets
+│       ├── node_modules/               Installed server dependencies
+│       ├── package.json               Package and runtime requirements
+│       └── package-lock.json           Exact dependency versions
+├── builtbasis-config/
+│   └── operations.env                 Non-secret command-line settings
+├── builtbasis-data/                    Live data, retained across deployments
+│   ├── builtbasis.db                   SQLite application database
+│   ├── builtbasis.db-journal           Temporary SQLite rollback journal
+│   ├── files/
+│   │   ├── <two-hex-digits>/<hash>     Immutable uploaded bytes and image variants
+│   │   └── .tmp/                      Temporary uploads
+│   └── backups/
+│       ├── builtbasis-nightly-<UTC timestamp>.db
+│       ├── builtbasis-pre-migration-<UTC timestamp>.db
+│       ├── <backup filename>.tmp       Incomplete backup, not a recovery point
+│       ├── .operations-lock/          Temporary backup/export coordination lock
+│       └── .exports/<export-id>/       Pinned database copy during an off-site pull
+│           ├── builtbasis.db
+│           └── manifest.json
+├── builtbasis-logs/
+│   ├── app.log                        Application diagnostic log
+│   ├── backup.log                     Scheduled server-backup output
+│   └── scheduled-acceptance.done       Retained scheduling-test marker
+└── builtbasis-recovery-20261004/        Retained recovery rehearsal material
+    ├── restored/                      Separate restored database and files
+    ├── snapshots/                     Recovery input snapshots
+    ├── files/                         Recovery input file pool
+    ├── offsite.tar                    Transferred recovery input archive
+    ├── cron.*                         Saved cron configurations
+    ├── operations.*                   Saved non-secret tool configurations
+    ├── *.json                         Rehearsal preparation and result evidence
+    └── synthetic-cleanup-trial.db      Database used to rehearse test-project cleanup
+```
+
+### What each application area is for
+
+| Area | Purpose and handling |
+|---|---|
+| `builtbasis/releases/` and `current` | A release is a built copy of the application, not a Git checkout. `current` is a symbolic link, not another copy. Deployment stages a new release and switches this link while the service is stopped. Retain the current and previous release through verification. Do not edit deployed files in place. |
+| `dist/server/` | `main.mjs` runs the website/API. `owner.mjs` and `user.mjs` manage accounts. `backup.mjs`, `backup-export.mjs` and `restore.mjs` manage recovery copies. `revoke-share-links.mjs` revokes links. `runtime-check.mjs` checks the installed runtime. |
+| `builtbasis-config/operations.env` | Tells command-line tools where live data is stored and supplies any other required non-secret settings. Preserve it across releases. The HTTP application's settings, including `SHARE_LINK_KEY`, are in konsoleH. The share key is not copied into this file or backup bundles. |
+| `builtbasis-data/builtbasis.db` | Stores projects, records, managed lists, users, access rules, file metadata and history. Uploaded file bytes live in `files/`. Preserve both together. SQLite manages any adjacent rollback journal; do not remove it while the database is in use. |
+| `builtbasis-data/files/` | Stores originals, display images and thumbnails under content hashes. The database keeps their user-facing filenames and record associations. Published files are retained even after their photo/attachment occurrences are deleted. Do not rename or manually prune them. `.tmp/` is upload staging, not published evidence. |
+| `builtbasis-data/backups/` | Holds checked database snapshots. It does not duplicate all uploaded bytes; retained `files/` bytes supply those during recovery. Nightly rotation retains the latest snapshot in each of 14 daily and eight weekly buckets. Pre-migration snapshots are outside that rotation. |
+| `.exports/` and `.operations-lock/` | Protect backup selection and transfer. An export contains a pinned database and its file manifest; the PC separately copies missing files. Use the backup guide's release/recovery procedure for abandoned exports and locks. Do not clear active work. |
+| `builtbasis-logs/` | Holds diagnostic output, separate from website content and backup bundles. `scheduled-acceptance.done` is a retained test marker, not a backup or a signal of current backup health. Logs should be managed through the hosting log-rotation procedure. |
+| `builtbasis-recovery-20261004/` | Holds the isolated restored copy and evidence from the recovery rehearsal. It is not the active data directory or the normal backup destination. It contains private data and remains retained. Its eventual removal is separate from hosting-trial cleanup. |
+
+Application code can be replaced during deployment. Live data, configuration, logs and retained recovery material remain outside the release directories. Database schema upgrades change the live database only through the migration procedure, which first creates a pre-migration backup. Copying the code directory alone is not an application-data backup.
+
+### Other folders and files in the hosting account
+
+These share the same home directory but serve the wider hosting account. BuiltBasis deployment does not manage them.
+
+| Entry | Purpose |
+|---|---|
+| `public_html -> /usr/www/users/ktimana` | Symbolic link to the conventional website files, including WordPress sites. BuiltBasis is served by its separate Node.js application. |
+| `public_ftp/incoming/` | FTP incoming area. BuiltBasis deployment and off-site copying use SSH/SFTP instead. |
+| `vmail/` | Hosted email mailbox storage. |
+| `www_logs/` | Hosting web-server logs for the account's websites, separate from BuiltBasis's own logs. |
+| `.ssh/` | SSH access configuration and authentication-related files. |
+| `.cache/` | Tool caches. The observed `node-gyp/` cache supports native Node.js module builds. |
+| `.npm/` | npm package cache, installation logs and update-check metadata. |
+| `.local/share/` | User-specific application data used by installed tools. |
+| `.tmp/` | Account-level temporary files, including hosting job locks. Distinct from `builtbasis-data/files/.tmp/`. |
+| `.nodeversion`, `.phpversion` | Hosting version-selection files. Observed values were `24` and `8.2`. The BuiltBasis Node.js application is configured separately in konsoleH. |
+| `.bashrc`, `.profile`, `.bash_logout` | Shell startup and logout configuration. |
+| `.bash_history` | Shell command history. It may contain sensitive commands and is not application documentation. |
+| `.selected_editor` | Saved command-line editor preference. |
+
+A leading dot marks a hidden entry; it does not mean the entry is a directory. In `ls -la`, `.` means the current directory and `..` its parent. An arrow after a filename identifies a symbolic link and its target.
+
+### PC backup directory
+
+The owner-selected off-site destination is `X:\1976KN\Sys\Software\builtbasis`:
+
+```text
+builtbasis/
+├── snapshots/<export-id>/
+│   ├── builtbasis.db                  Copied server database snapshot
+│   ├── manifest.json                  Source-backup identity and expected hashes
+│   └── COMPLETE                       Successful verification report
+├── files/<two-hex-digits>/<hash>       Shared immutable file pool for snapshots
+├── operations/
+│   ├── run-pull.ps1                   Windows scheduled-task entrypoint
+│   └── scheduled-pull.log             Transfer and verification results
+├── .pull-lock/                        Temporary lock preventing concurrent pulls
+└── restore-drills/                    Separate local recovery-test destinations
+```
+
+`operations/` also contains retained notification-test scripts/logs and recovery-transfer artifacts. These are test evidence, not recovery points. The scheduled pull uses the matching compiled tools in `X:\1976KN\Dev\Code\builtbasis`. `COMPLETE` records successful verification; source-backup age, not transfer time, determines freshness. Preserve the file pool required by retained snapshots. See [backup and restore](backup-restore.md) for transfer, verification, retention and recovery procedures.
+
+### Removed hosting-trial material
+
+On 2026-10-04 the owner removed `builtbasis-spike/`, `builtbasis-data/spike.db`, `builtbasis-data/backup-check.log` and the two `backups/spike-*.db` trial snapshots. SSH inspection confirmed all five paths were absent and no `spike-*` backups remained. `pdf-check.pdf` and the trial database's WAL/SHM files were already absent before cleanup. The live database, file pool, backups and recovery-rehearsal folder were retained. The live health endpoint returned HTTP 200 with `{"ok":true}`. The historical [hosting trial plan](../plans/2026-10-02-plan-0-webhosting-trial.md) explains why those test files existed.
+
 ## Build and stage
 
 Run locally from a clean implementation commit. Run `npm ci --ignore-scripts`, `npm rebuild esbuild`, `npm run build`, `npm run typecheck`, `npm test` and `npm run test:browser` (installed Chrome requires `PLAYWRIGHT_CHANNEL=chrome`). Node 22.13 is the minimum; the trial used Node 24 on hosting. `dist/server` contains compiled application and administrative entrypoints. It does not need tsx on hosting. The package lock is retained, not regenerated on the server.

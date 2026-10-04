@@ -55,6 +55,7 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [Plan 6 — Print, PDF and operations](docs/plans/2026-10-04-plan-6-print-and-operations.md) | Active implementation/release plan; Tasks 1–3 complete locally, Tasks 4–6 pending |
 | [docs/guides/share-key-management.md](docs/guides/share-key-management.md) | Key/account operations, access rules and Plan 6 handoff |
 | [Web interface guide](docs/guides/web-interface.md) | Local build, development, browser checks and screen operation |
+| [Server directory layout](docs/guides/deployment.md#server-directory-layout) | Server folders/files, deployment handling, retained recovery material and the PC backup layout |
 | [Email viewer probe](docs/research/fixtures/2026-10-03-email-viewer-probe) | Synthetic browser-parser evidence for the Plan 5 EML/MSG reader |
 | [docs/research/2026-10-02-issue-and-clarification-tracking-research.md](docs/research/2026-10-02-issue-and-clarification-tracking-research.md) | Market and terminology research |
 

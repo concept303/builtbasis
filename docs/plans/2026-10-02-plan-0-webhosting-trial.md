@@ -2,11 +2,11 @@
 
 > **Document type:** Implementation plan
 > **Status:** Completed
-> **Retention:** Historical — do not execute. Remaining action: Task 8 Step 5 (server clean-up) during Plan 6 go-live preparation.
+> **Retention:** Historical — do not execute. The remaining server cleanup in Task 8 Step 5 was completed and verified on 2026-10-04; see the [directory reference](../guides/deployment.md#removed-hosting-trial-material).
 > **Implements:** `docs/designs/2026-10-02-v1-records-design.md` §11.9 (test deployment), informing §11.6 and §11.8.
 > **Implemented by:** Branch `feat/plan-0-webhosting-trial`: `f3ccc78` (spike), `801b2f5` (listen like Hetzner), `7afbd3c`..`5bc1376` (trial log), plus the results commit
 > **Verified:** 2026-10-03 on Webhosting L — GO: checks 1, 2, 3, 4, 7 pass; 6 fails (browser-print fallback); memory limit 384 MB (maximum). Evidence: `spikes/webhosting-l/README.md`.
-> **Checklist note:** ticked boxes are done (ticked 2026-10-03 at completion). The one open box, Task 8 Step 5 (server clean-up), remains work for Plan 6 go-live preparation. Deviations are listed below and logged in the spike README.
+> **Checklist note:** Boxes preserve the state recorded at trial completion on 2026-10-03. The open Task 8 Step 5 box is historical; its server cleanup was subsequently completed and verified on 2026-10-04. No cleanup work remains from this plan. Deviations are listed below and logged in the spike README.
 > **Deviations:** HTTPS via Cloudflare proxy + existing Cloudflare Origin Certificate instead of Let's Encrypt (Task 2); SSH key added through konsoleH (Public SSH Keys) and IPv4 forced; better-sqlite3 install script approved via npm `allowScripts`; cron created at hosting-account level with Freetext `* * * * *` and a 705 wrapper script.
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 2–7 need the owner's Hetzner konsoleH access and SSH; an agent prepares commands and records results, the owner performs console actions.
