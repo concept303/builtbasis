@@ -57,7 +57,7 @@ For every completed gate, record the date, operator, release commit, environment
 
 Operator: Codex, with Konstantinos performing konsoleH changes and confirming the desktop/phone observations. Hosted runtime: `12654399ff3fcdd060620745bf4744a316b8dfcd`, Node 24.21.0, Hetzner Webhosting L. Implementation remains on `codex/plan-6`; this is not a claim that main contains it.
 
-Private execution evidence is retained under `.superpowers/sdd/2026-10-04-plan-6-print-and-operations/` in the implementation worktree. No credentials or share URLs are included here.
+Private execution evidence was recorded under `.superpowers/sdd/2026-10-04-plan-6-print-and-operations/` in the implementation worktree. After workspace cleanup on 2026-10-05, it is retained in the private `workspace-files.tar.gz` archive under `.worktrees/execute-plan-6/.superpowers/sdd/2026-10-04-plan-6-print-and-operations/`. See the [archive location and contents](deployment.md#local-development-workspaces-and-archived-evidence). No credentials or share URLs are included here.
 
 | Check | Procedure and observed result | Private evidence |
 |---|---|---|
@@ -145,7 +145,7 @@ The temporary project, record, photo occurrences, share link and verification se
 
 After cleanup, a new schema-0006 backup completed at 11:11:57.615 UTC. The Windows task was enabled and run successfully with result 0. Snapshot `0eb50ab024485777ce7ecea62187bee1` was hash/schema/freshness-verified at 11:12:26.785 UTC and its server export pin was released. The task returned to Ready with its regular schedule enabled; the server nightly schedule was unchanged. The previous release and pre-upgrade backups were retained. A schema rollback must follow the recovery guide rather than pointing old code at the upgraded database.
 
-Private evidence is under `.superpowers/project-management-refresh/`: `deploy-local-checks.json`, `deploy-before.json`, `deploy-activation.json`, `deploy-preservation.json`, `deploy-live-check.json` and `live-*.png`. Local verification logs are in the operator's temporary directory as `builtbasis-release-*.log`; PC transfer evidence is in the private destination's `operations/scheduled-pull.log`.
+Private evidence was recorded under `.superpowers/project-management-refresh/`: `deploy-local-checks.json`, `deploy-before.json`, `deploy-activation.json`, `deploy-preservation.json`, `deploy-live-check.json` and `live-*.png`. That directory is now a member of the private `workspace-files.tar.gz` archive described in the [directory guide](deployment.md#local-development-workspaces-and-archived-evidence). Local verification logs are in the operator's temporary directory as `builtbasis-release-*.log`; PC transfer evidence is in the private destination's `operations/scheduled-pull.log`.
 
 ### Hosting-trial cleanup and directory documentation — 2026-10-04
 

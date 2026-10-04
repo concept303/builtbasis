@@ -27,6 +27,9 @@ Thumbs.db
 # Isolated implementation worktrees
 .worktrees/
 
+# Private agent scratch files and execution evidence
+.superpowers/
+
 # Browser test output
 test-results/
 playwright-report/

@@ -103,10 +103,33 @@ builtbasis/
 │   ├── run-pull.ps1                   Windows scheduled-task entrypoint
 │   └── scheduled-pull.log             Transfer and verification results
 ├── .pull-lock/                        Temporary lock preventing concurrent pulls
+├── development-archives/              Preserved development drafts and evidence
 └── restore-drills/                    Separate local recovery-test destinations
 ```
 
 `operations/` also contains retained notification-test scripts/logs and recovery-transfer artifacts. These are test evidence, not recovery points. The scheduled pull uses the matching compiled tools in `X:\1976KN\Dev\Code\builtbasis`. `COMPLETE` records successful verification; source-backup age, not transfer time, determines freshness. Preserve the file pool required by retained snapshots. See [backup and restore](backup-restore.md) for transfer, verification, retention and recovery procedures.
+
+### Local development workspaces and archived evidence
+
+`.worktrees/` and `.superpowers/` in the development checkout were temporary development areas. `.worktrees/` held isolated planning, implementation and replay checkouts with duplicate dependencies. `.superpowers/` held private execution scripts, screenshots and deployment evidence. Neither directory is needed by the deployed application or the Windows backup runner, which uses the main checkout and its compiled tools.
+
+On 2026-10-05 both directories were removed after archiving and verifying 4,467 retained files. Thirteen additional Git worktrees were deregistered, and the two merged implementation branches were removed. Only the main checkout remains registered. Dependency copies were disposable; uncommitted drafts, detached commit history, private execution evidence and saved preview data were preserved. No local preview was running during cleanup.
+
+The private archive is `X:\1976KN\Sys\Software\builtbasis\development-archives\2026-10-05-workspace-cleanup`. It contains:
+
+| File | Contents |
+|---|---|
+| `workspace-files.tar.gz` | Former `.worktrees/` and `.superpowers/` contents, excluding reinstallable `node_modules/` directories. Original member paths are retained. |
+| `repository-history.bundle` | Git history and references, including the detached worktree commits. |
+| `worktrees.json` | Original checkout paths, commits, status and tracked-file differences. |
+| `preview-data.tar.gz` | Saved local preview database, its backups and files. This is separate from production backup snapshots. |
+| `preview-path-original.json` | The preview's original local data path. |
+| `manifest.json` | Original paths, sizes and SHA-256 hashes for every retained file. |
+| `VERIFIED.json` | Successful extraction/hash comparison and archive hashes. |
+
+The archives occupy about 60 MB; the removed workspace files occupied about 3.7 GB. Treat these archives as private because they contain databases and operational evidence. Extract into a separate recovery directory when needed. Do not overwrite the current checkout or run historical scripts without review. Old `.git` pointer files inside the archive refer to removed worktree registrations; use the Git bundle when recovering history. These archives do not replace the scheduled production backups.
+
+For future development, temporary worktrees and private scratch folders remain ignored by Git. After integration, remove inactive worktrees and reinstallable dependencies. Preserve unique drafts, user-entered data and required operational evidence outside the checkout before cleanup, and update documentation that refers to their old locations.
 
 ### Removed hosting-trial material
 
