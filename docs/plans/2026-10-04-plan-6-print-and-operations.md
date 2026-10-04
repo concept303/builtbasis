@@ -17,7 +17,7 @@ Finish the approved v1 scope: owner A3 print/PDF output, tested production packa
 
 Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API tests, 39 browser tests). It uses a separate scratch checkout. All proposed application/scripts/tests are included completely, once per file. Runtime payloads are not installed on main by publishing this document. The extraction helper checks SHA-256 before writing selected files. The lockfile is generated from the existing one, never embedded as a replacement snapshot.
 
-**Owner decisions, 2026-10-04:** print without QR is allowed, including Drafts; **Include QR link** is off by default. Add a compact backup/storage status box below navigation on normal owner website pages and Windows notifications for failed off-site pulls. These additions are included in the proposed snapshots and release acceptance below.
+**Owner decisions, 2026-10-04:** print without QR is allowed, including Drafts; **Include QR link** is off by default. Add owner-only Administration with full backup/storage status, warning-only notices below navigation elsewhere, and Windows notifications for failed off-site pulls. The owner selected a configurable 5 GB remaining-file warning threshold. These additions are included in the proposed snapshots and release acceptance below.
 
 ## Global constraints and settled decisions
 
@@ -28,7 +28,7 @@ Authoring starts from `59f04d0`, with Plan 5 merged and verified (464 unit/API t
 - Keep the 100,000,000-byte whole-request ceiling, immutable blobs and configured total budget/reserve. Actual hosting quota and reserve values must be recorded at execution; free filesystem bytes are not the account quota. No per-user quotas or deletion of published evidence.
 - Nightly backup retains the latest snapshot for each of 14 UTC days and eight Monday-start UTC weeks, taking their union. Protect database pinning against rotation. A backup/export or pull lock fails closed on collision; remove a stale lock only after confirming its job stopped. Unreleased export pins are operational cleanup, not timed eviction of possibly active transfers.
 - Off-site order is pinned completed database and manifest first, then missing immutable files, then full hash/size/database and source-freshness verification, then COMPLETE. Use two SFTP batches, not a connection per file. Preserve the source backup filename and creation timestamp separately from export and verification times. Scheduled verification rejects a source older than the configurable 36-hour default. Deliberate restore can use an older completed recovery point. Shared local file pool is never pruned in v1. A restored directory is fresh; the live directory is never overwritten by the restore command.
-- Owner pages show a compact server-backup and storage status box below navigation, excluded from contributor/shared/print views. Missing or overdue backups (configurable 36-hour default), low storage and failed status checks warn visibly. Windows pull failures notify the logged-on owner and retain a failed exit status. The website does not claim the PC copy is current; a stopped PC or a task that never starts cannot notify.
+- Administration always shows full server-backup/storage status. Other owner pages show only a compact warning with an Administration link, excluded from contributor/shared/print views. Missing or overdue backups (configurable 36-hour default), remaining file allowance below the configurable 5 GB default, unsafe storage and failed status checks warn visibly. Healthy status and loading indicators stay off working pages. `FILES_WARNING_BELOW_BYTES` is a server configuration setting; it does not change upload admission. Windows pull failures notify the logged-on owner and retain a failed exit status. The website does not claim the PC copy is current; a stopped PC or a task that never starts cannot notify.
 - Restore checks exact schema compatibility and all bytes before publication, then deletes sessions/grants, revokes links and disables nonowners atomically. Preserve the owner. Emit only the system reset reason and counts. Reset contributor passwords before enabling and deliberately granting access again. Keep the dedicated share key outside code, data and backups.
 - Separate local replay from live evidence. Tasks 4–5 require hosting access, private configuration, Windows scheduler access and actual off-site drill results. Do not mark release complete until those gates pass. No production change is authorized merely by publishing or reviewing this plan.
 
@@ -78,11 +78,11 @@ npm run test:browser
 Ports 3490 and 5174 must be free. Use synthetic local fixtures, never a production database or production server for automated tests. Do not run browser suites concurrently.
 
 
-## Task 1: Owner A3 print view and backup/storage status
+## Task 1: Owner A3 print view, Administration and backup/storage warnings
 
 **Depends on:** verified Plan 5 baseline.
 
-Owner-only print projection and resource-ready A3 landscape output. The single print screen defaults to no QR and permits Drafts; an optional Include QR link checkbox enables explicit existing-link selection. No-QR printing needs no sharing request. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design. Add the owner-only backup/storage status box below navigation on existing pages; its read-only API and live capacity snapshot are independent of the Task 2 scheduler. Missing, overdue, unavailable and low-capacity states must be visible. Details stay collapsed by default; printing and readers never show this owner information.
+Owner-only print projection and resource-ready A3 landscape output. The single print screen defaults to no QR and permits Drafts; an optional Include QR link checkbox enables explicit existing-link selection. No-QR printing needs no sharing request. The print view excludes both Notes fields, Log, Activity and private/commercial content. Latest measurement tables and comparison history follow the existing domain functions. Always adopt the refreshed printable snapshot, including independently maintained labels and generatedAt; wait for its resources before native print. A direct browser print before resources are ready produces no incomplete record sheet. Align the existing editor and overview Greek labels with the design. Add owner-only Administration with always-available backup/storage details. Other working pages show only a compact warning and an Administration link; healthy status and loading indicators remain hidden. The configurable remaining-file threshold defaults to 5 GB. The read-only API and live capacity snapshot are independent of the Task 2 scheduler. Missing, overdue, unavailable and unsafe-capacity states also warn. Extra storage details stay collapsed by default; printing and readers never show this owner information.
 
 - [ ] Extract setup and install dependencies preserving the existing lockfile. Run `npm install --ignore-scripts`, then `npm rebuild esbuild`. Move bundled browser-only packages to development dependencies without changing their versions. Inspect the lockfile diff and commit it; no embedded lockfile replaces it.
 
@@ -765,7 +765,7 @@ test('inline tag creation and collision recovery retain unsaved record text', as
 
 #### File: `tests/server/monitoring.test.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=289f560a7133d8341c7dbb5b571f5b22826355b4e05a6f7ef6300954e69dffaa -->
+<!-- replay task=1 phase=test encoding=text sha256=356ead499afae5ba2cc97a951f357c75b5f30c76a4cf0d42f5cf036b4d272a2f -->
 
 ``````typescript
 import { afterEach, expect, it, vi } from 'vitest';
@@ -810,6 +810,24 @@ it('uses nightly source timestamps, rejects future dates, and shows read failure
 it('accepts only a positive finite backup warning age', () => {
   expect(loadConfig({ BUILTBASIS_DATA_DIR: '.', BACKUP_MAX_AGE_HOURS: '12.5' }).backupMaxAgeHours).toBe(12.5);
   for (const value of ['0', '-1', 'Infinity', 'no']) expect(() => loadConfig({ BUILTBASIS_DATA_DIR: '.', BACKUP_MAX_AGE_HOURS: value })).toThrow();
+});
+it('warns below the configured file allowance threshold', async () => {
+  ctx = await makeContext(); const cookie = await loginAsOwner(ctx);
+  const read = async () => (await get(ctx, cookie, '/api/operations/status')).json().storage;
+  expect(await read()).toMatchObject({ state: 'warning', managedHeadroomBytes: '1000000000', warningBelowBytes: '5000000000' });
+  ctx.config.filesWarningBelowBytes = 1000000000;
+  expect((await read()).state).toBe('ok'); // At the threshold is not below it.
+  ctx.config.filesWarningBelowBytes = 1000000001;
+  expect((await read()).state).toBe('warning');
+  ctx.config.filesWarningBelowBytes = 999999999;
+  expect((await read()).state).toBe('ok');
+});
+it('defaults the file allowance warning to 5 GB and rejects invalid thresholds', () => {
+  expect(loadConfig({ BUILTBASIS_DATA_DIR: '.' }).filesWarningBelowBytes).toBe(5000000000);
+  expect(loadConfig({ BUILTBASIS_DATA_DIR: '.', FILES_WARNING_BELOW_BYTES: '2000000000' }).filesWarningBelowBytes).toBe(2000000000);
+  for (const value of ['', '0', '-1', '1.5', 'Infinity', 'no', '9007199254740992']) {
+    expect(() => loadConfig({ BUILTBASIS_DATA_DIR: '.', FILES_WARNING_BELOW_BYTES: value })).toThrow();
+  }
 });
 ``````
 
@@ -919,37 +937,93 @@ it('fails closed if staging cleanup becomes uncertain while another admission pr
 
 #### File: `tests/browser/operations-status.spec.ts`
 
-<!-- replay task=1 phase=test encoding=text sha256=b5d60b27aa3c9e70f5966c930e3faef122f97b0f53a521c1ab17b1e24ba8dcc0 -->
+<!-- replay task=1 phase=test encoding=text sha256=039cb00f179f43c996905a4287f5ce55699287acfeabc9029acdee6a5d3f574b -->
 
 ``````typescript
 import { test, expect, login, seed } from './fixture';
+import type { OperationsStatus } from '../../src/server/monitoring/status';
 
-test('owner sees a compact warning below navigation, including fetch failure after focus', async ({ page }) => {
+test('healthy status is hidden on working pages and always available in Administration', async ({ page }) => {
+  await login(page);
+  const status = await (await page.request.get('/api/operations/status')).json() as OperationsStatus;
+  status.backup = { state: 'ok', sourceCreatedAt: new Date().toISOString(), ageHours: 0, maxAgeHours: 36 };
+  status.storage = { ...status.storage, state: 'ok', managedHeadroomBytes: '6000000000', warningBelowBytes: '5000000000' };
+  let requests = 0;
+  await page.route('**/api/operations/status', route => { requests++; return route.fulfill({ json: status }); });
+  const paths = ['/projects', `/projects/${seed().projectId}/records`, `/projects/${seed().projectId}/lists`, `/projects/${seed().projectId}/records/${seed().recordId}`];
+  for (const path of paths) {
+    const before = requests;
+    await page.goto(path);
+    await expect.poll(() => requests).toBeGreaterThan(before);
+    await expect(page.getByTestId('operations-status')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible();
+  }
+  await page.getByRole('link', { name: 'Administration', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Administration', exact: true })).toBeVisible();
+  const box = page.getByRole('region', { name: 'Server backup and storage' });
+  await expect(box).toContainText('Server backup is recent');
+  await expect(box).toContainText('6 GB');
+  await expect(box).toContainText('Warning below: 5 GB');
+  await box.getByText('Storage details', { exact: true }).click();
+  await expect(box.getByText(/does not establish hosting account quota/)).toBeVisible();
+  await page.getByLabel('Language', { exact: true }).selectOption('el');
+  await expect(page.getByRole('heading', { name: 'Διαχείριση', exact: true })).toBeVisible();
+  await expect(box).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Αντίγραφα ασφαλείας και χώρος' })).toContainText('Προειδοποίηση κάτω από: 5 GB');
+});
+
+test('warnings are compact, link to Administration and disappear after recovery', async ({ page }) => {
   await login(page);
   await page.goto(`/projects/${seed().projectId}/records`);
   const box = page.getByRole('region', { name: 'Server backup and storage' });
-  await expect(box).toBeVisible();
   await expect(box).toContainText('No completed server backup');
-  await expect(box).toContainText('File allowance remaining');
-  await expect(box).toContainText('does not establish hosting account quota');
-  await page.route('**/api/operations/status', route => route.fulfill({ status: 503, body: '{}' }));
+  await expect(box).toContainText('File allowance is below the warning threshold');
+  await expect(box.getByText('Storage details', { exact: true })).toHaveCount(0);
+  await box.getByRole('link', { name: 'Open Administration' }).click();
+  await expect(page.getByRole('heading', { name: 'Administration', exact: true })).toBeVisible();
+  await expect(box.getByText('Storage details', { exact: true })).toBeVisible();
+
+  const status = await (await page.request.get('/api/operations/status')).json() as OperationsStatus;
+  status.storage.state = 'ok';
+  status.backup.state = 'overdue';
+  await page.route('**/api/operations/status', route => route.fulfill({ json: status }));
+  await page.goto('/projects');
+  await expect(box).toContainText('Server backup overdue');
+  status.backup.state = 'unavailable';
   await page.evaluate(() => dispatchEvent(new Event('focus')));
+  await expect(box).toContainText('Backup status unavailable');
+  status.backup.state = 'ok';
+  await page.evaluate(() => dispatchEvent(new Event('focus')));
+  await expect(box).toHaveCount(0);
+});
+
+test('failed status checks warn instead of leaving a healthy or empty display', async ({ page }) => {
+  await login(page);
+  await page.route('**/api/operations/status', route => route.fulfill({ status: 503, body: '{}' }));
+  await page.goto('/projects');
+  const box = page.getByRole('region', { name: 'Server backup and storage' });
   await expect(box).toContainText('Status unavailable');
   await expect(box).not.toContainText('File allowance remaining');
   await page.getByLabel('Language', { exact: true }).selectOption('el');
   await expect(page.getByRole('region', { name: 'Αντίγραφα ασφαλείας και χώρος' })).toContainText('Η κατάσταση δεν είναι διαθέσιμη');
 });
 
-test('status is absent from contributor, share and print pages', async ({ page }) => {
+test('Administration and status are absent from contributor, share and print views', async ({ page }) => {
   await login(page, 'reader');
+  await page.goto('/administration');
+  await expect(page.getByRole('heading', { name: 'Assigned records' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Administration', exact: true })).toHaveCount(0);
   await expect(page.getByTestId('operations-status')).toHaveCount(0);
+  expect((await page.request.get('/api/operations/status')).status()).toBe(403);
   await page.goto(seed().shareUrl);
   await expect(page.getByTestId('operations-status')).toHaveCount(0);
   await page.context().clearCookies();
   await login(page);
   await page.goto(`/projects/${seed().projectId}/records/${seed().recordId}/print`);
   await expect(page.getByTestId('operations-status')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Administration', exact: true })).toHaveCount(0);
 });
+
 ``````
 
 - [ ] Run the focused test before implementation: `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts`. The API suite fails on the missing endpoint before implementation. Existing guard-only assertions may already pass. The new browser case fails on the absent print heading after building the baseline. Do not mistake a missing browser installation for the intended RED.
@@ -1121,7 +1195,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
 #### File: `src/server/web.ts`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=9527b3478fe16a33f9f3eba41c116e14bb0499ffcb5bd62df8d4a36488d1dfe5 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=143765d441c3d4e6aa57b9cc2c6bbb83724edcffbaba2af0f568c69357390c22 -->
 
 ``````typescript
 import { readFile, stat } from 'node:fs/promises';
@@ -1133,7 +1207,7 @@ export async function registerWeb(app: FastifyInstance, directory: string): Prom
   try { html = await readFile(join(directory, 'index.html'), 'utf8'); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
   if ((await stat(join(directory, 'assets'))).isDirectory()) await app.register(serveStatic, { root: join(directory, 'assets'), prefix: '/assets/', index: false, redirect: false, dotfiles: 'deny', maxAge: '1y', immutable: true });
-  for (const route of ['/', '/login', '/projects', '/projects/:projectId/records', '/projects/:projectId/records/:id', '/projects/:projectId/records/:id/print', '/projects/:projectId/lists', '/assigned', '/assigned/:id', '/share']) {
+  for (const route of ['/', '/login', '/administration', '/projects', '/projects/:projectId/records', '/projects/:projectId/records/:id', '/projects/:projectId/records/:id/print', '/projects/:projectId/lists', '/assigned', '/assigned/:id', '/share']) {
     app.get(route, async (_request, reply) => reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer').header('X-Content-Type-Options', 'nosniff').header('X-Robots-Tag', 'noindex, nofollow')
       .header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
       .type('text/html; charset=utf-8').send(html));
@@ -1295,7 +1369,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
 
 #### File: `src/web/App.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=e0d2a747b74970da033416e2908dbbc2fa2578e69b5b894761ec0f8360d0bb29 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=1342641e32dce9158d57041a9712951b46c7034992e3b2b1810870b4987c98f4 -->
 
 ``````typescript
 import { useEffect, useState } from 'react';
@@ -1327,13 +1401,14 @@ export function App() {
   useEffect(() => { if (!shared) void load(); }, [shared]);
   const match = /^\/projects\/(\d+)\/(records|lists)(?:\/(\d+))?$/.exec(location.pathname); const projectId = match ? Number(match[1]) : undefined; const recordId = match?.[3] ? Number(match[3]) : undefined;
   const printMatch = /^\/projects\/(\d+)\/records\/(\d+)\/print$/.exec(location.pathname);
+  const administration = location.pathname === '/administration';
   const assignedId = /^\/assigned\/(\d+)$/.exec(location.pathname)?.[1];
   const project = projects.find(item => item.id === projectId);
   const from = new URLSearchParams(location.search).get('from') ?? ''; const safeFrom = from.startsWith('?') ? from : '';
   return <><header className="site-header"><a className="brand" href={shared ? undefined : user?.isOwner ? '/projects' : '/assigned'}>BuiltBasis</a>{project && <span>{project.name}</span>}<div className="header-actions"><label>{t('Language', 'Γλώσσα')} <select aria-label={t('Language', 'Γλώσσα')} value={lang} onChange={event => setLang(event.target.value as 'en' | 'el')}><option value="en">English</option><option value="el">Ελληνικά</option></select></label>{user && <><span>{user.displayName}</span><button onClick={async () => { try { await api('/api/auth/logout', { method: 'POST', body: {} }); location.assign('/login'); } catch (failure) { setError(failure); } }}>{t('Sign out', 'Αποσύνδεση')}</button></>}</div></header>
-  {user?.isOwner && projectId && <nav className="site-nav"><a href={`/projects/${projectId}/records`}>{t('Records', 'Καταγραφές')}</a><a href={`/projects/${projectId}/lists`}>{t('Managed lists', 'Διαχείριση λιστών')}</a><a href="/projects">{t('Projects', 'Έργα')}</a></nav>}
-  {user?.isOwner && !shared && !printMatch && <OperationsStatus/>}
-  <main><ErrorNotice error={error}/>{shared ? (/^[A-Za-z0-9_-]{43}$/.test(token) ? <RecordPage context={{ mode: 'shared', base: '/api/shared', token }} onBack={() => {}}/> : <h1>{t('Record not available', 'Η καταγραφή δεν είναι διαθέσιμη')}</h1>) : !ready ? <p role="status">{t('Loading…', 'Φόρτωση…')}</p> : !user ? <Login onLogin={() => { location.assign(location.pathname === '/login' || location.pathname === '/' ? '/projects' : location.pathname + location.search); }}/> : !user.isOwner ? (assignedId ? <RecordPage context={{ mode: 'contributor', base: `/api/assigned-records/${assignedId}`, recordId: Number(assignedId) }} onBack={() => location.assign('/assigned')}/> : <Assigned/>) : printMatch ? <PrintPage projectId={Number(printMatch[1])} recordId={Number(printMatch[2])}/> : projectId && project ? (match?.[2] === 'lists' ? <ManagedLists projectId={projectId}/> : recordId ? <RecordPage context={{ mode: 'owner', base: `/api/projects/${projectId}/records/${recordId}`, projectId, recordId }} onBack={() => location.assign(`/projects/${projectId}/records${safeFrom}`)}/> : <RecordList projectId={projectId}/>) : <><h1>{t('Projects', 'Έργα')}</h1>{projects.length ? <div className="record-list">{projects.map(item => <a className="panel" key={item.id} href={`/projects/${item.id}/records`}>{item.name}</a>)}</div> : <p>{t('No project has been set up yet. Ask the owner to load the project data.', 'Δεν έχει καταχωριστεί έργο. Ζητήστε από τον ιδιοκτήτη να φορτώσει τα δεδομένα.')}</p>}</>}</main></>;
+  {user?.isOwner && !shared && !printMatch && <nav className="site-nav">{projectId && <><a href={`/projects/${projectId}/records`}>{t('Records', 'Καταγραφές')}</a><a href={`/projects/${projectId}/lists`}>{t('Managed lists', 'Διαχείριση λιστών')}</a></>}<a href="/projects">{t('Projects', 'Έργα')}</a><a href="/administration" aria-current={administration ? 'page' : undefined}>{t('Administration', 'Διαχείριση')}</a></nav>}
+  {user?.isOwner && !shared && !printMatch && !administration && <OperationsStatus/>}
+  <main><ErrorNotice error={error}/>{shared ? (/^[A-Za-z0-9_-]{43}$/.test(token) ? <RecordPage context={{ mode: 'shared', base: '/api/shared', token }} onBack={() => {}}/> : <h1>{t('Record not available', 'Η καταγραφή δεν είναι διαθέσιμη')}</h1>) : !ready ? <p role="status">{t('Loading…', 'Φόρτωση…')}</p> : !user ? <Login onLogin={() => { location.assign(location.pathname === '/login' || location.pathname === '/' ? '/projects' : location.pathname + location.search); }}/> : !user.isOwner ? (assignedId ? <RecordPage context={{ mode: 'contributor', base: `/api/assigned-records/${assignedId}`, recordId: Number(assignedId) }} onBack={() => location.assign('/assigned')}/> : <Assigned/>) : administration ? <><h1>{t('Administration', 'Διαχείριση')}</h1><OperationsStatus detailed/></> : printMatch ? <PrintPage projectId={Number(printMatch[1])} recordId={Number(printMatch[2])}/> : projectId && project ? (match?.[2] === 'lists' ? <ManagedLists projectId={projectId}/> : recordId ? <RecordPage context={{ mode: 'owner', base: `/api/projects/${projectId}/records/${recordId}`, projectId, recordId }} onBack={() => location.assign(`/projects/${projectId}/records${safeFrom}`)}/> : <RecordList projectId={projectId}/>) : <><h1>{t('Projects', 'Έργα')}</h1>{projects.length ? <div className="record-list">{projects.map(item => <a className="panel" key={item.id} href={`/projects/${item.id}/records`}>{item.name}</a>)}</div> : <p>{t('No project has been set up yet. Ask the owner to load the project data.', 'Δεν έχει καταχωριστεί έργο. Ζητήστε από τον ιδιοκτήτη να φορτώσει τα δεδομένα.')}</p>}</>}</main></>;
 }
 ``````
 
@@ -1462,7 +1537,7 @@ export function RecordEditor({ data, busy, onSave, onCancel, onDirty }: { data: 
 
 #### File: `src/server/config.ts`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=cb9dca42a28c5afda1b211069901d05304a491b7f1bc09c700bb04d86501c189 -->
+<!-- replay task=1 phase=implementation encoding=text sha256=65d9fdca66f61ffeff774b9de159e9e6d47089598f024f28b39d58e9978e0dcd -->
 
 ``````typescript
 import { join } from 'node:path';
@@ -1476,6 +1551,7 @@ export interface AppConfig {
   /** Explicit HTTP upload capacity settings; offline commands may omit them. */
   filesStorageBudgetBytes: number | null;
   filesFreeReserveBytes: number | null;
+  filesWarningBelowBytes: number;
   backupMaxAgeHours: number;
   /** Scheme + host (+ port) that browsers send as Origin, e.g. https://builtbasis.ktimanet.com */
   publicOrigin: string;
@@ -1512,6 +1588,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     shareKey: encodedKey === undefined ? null : Buffer.from(encodedKey, 'hex'),
     filesStorageBudgetBytes: positiveBytes('FILES_STORAGE_BUDGET_BYTES'),
     filesFreeReserveBytes: positiveBytes('FILES_FREE_RESERVE_BYTES'),
+    filesWarningBelowBytes: positiveBytes('FILES_WARNING_BELOW_BYTES') ?? 5000000000,
     backupMaxAgeHours: Number(backupAge),
     publicOrigin,
     secureCookies: publicOrigin.startsWith('https://'),
@@ -1629,7 +1706,7 @@ export type StorageCapacity = Awaited<ReturnType<typeof openStorageCapacity>>;
 
 #### File: `src/server/monitoring/status.ts`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=e5b58a6706db35d7d36378eff861577e143ea0d232f1f3645d6def22e33adc6a -->
+<!-- replay task=1 phase=implementation encoding=text sha256=4b1ab05e97dc77b675eadba34308de402bc0334454db3f66b8bfb38973441a9c -->
 
 ``````typescript
 import { readdir } from 'node:fs/promises';
@@ -1641,7 +1718,7 @@ export interface BackupStatus {
   state: 'ok' | 'missing' | 'overdue' | 'unavailable';
   sourceCreatedAt: string | null; ageHours: number | null; maxAgeHours: number;
 }
-export interface OperationsStatus { checkedAt: string; backup: BackupStatus; storage: StorageStatus }
+export interface OperationsStatus { checkedAt: string; backup: BackupStatus; storage: StorageStatus & { warningBelowBytes: string } }
 
 /** Reads existing completed naming only; no dependency on scheduled backup/export tools. */
 async function backupStatus(dir: string, maxAgeHours: number, now: Date): Promise<BackupStatus> {
@@ -1663,14 +1740,16 @@ export function registerOperationsStatus(app: FastifyInstance, config: AppConfig
   app.get('/api/operations/status', { config: { privateResponse: true } }, async (): Promise<OperationsStatus> => {
     const now = new Date();
     const [backup, storage] = await Promise.all([backupStatus(config.backupsDir, config.backupMaxAgeHours, now), capacity.snapshot()]);
-    return { checkedAt: now.toISOString(), backup, storage };
+    const warningBelowBytes = String(config.filesWarningBelowBytes);
+    const state = storage.state === 'ok' && BigInt(storage.managedHeadroomBytes) < BigInt(warningBelowBytes) ? 'warning' : storage.state;
+    return { checkedAt: now.toISOString(), backup, storage: { ...storage, state, warningBelowBytes } };
   });
 }
 ``````
 
 #### File: `src/web/OperationsStatus.tsx`
 
-<!-- replay task=1 phase=implementation encoding=text sha256=1ff216f44397abcc853a0fc986be5d9de325f7a2cac81819239caea7f8416e9a -->
+<!-- replay task=1 phase=implementation encoding=text sha256=756ad1e0a4e0b664e659a7eec4bad2af943db4f358ee395a64ce1d0998f2128a -->
 
 ``````typescript
 import { useEffect, useState } from 'react';
@@ -1678,7 +1757,7 @@ import type { OperationsStatus as Status } from '../server/monitoring/status';
 import { api } from './core/api';
 import { useI18n } from './core/i18n';
 
-export function OperationsStatus() {
+export function OperationsStatus({ detailed = false }: { detailed?: boolean }) {
   const { t, lang } = useI18n();
   const [status, setStatus] = useState<Status | null>(null);
   const [failed, setFailed] = useState(false);
@@ -1697,23 +1776,34 @@ export function OperationsStatus() {
     addEventListener('focus', refresh);
     return () => { current?.abort(); clearInterval(timer); removeEventListener('focus', refresh); };
   }, []);
-  const bytes = (value: string | null) => value === null ? t('unavailable', 'μη διαθέσιμο') : `${(Number(value) / 1000000).toLocaleString(lang, { maximumFractionDigits: 1 })} MB`;
+  const bytes = (value: string | null) => {
+    if (value === null) return t('unavailable', 'μη διαθέσιμο');
+    const gb = Math.abs(Number(value)) >= 1000000000;
+    return `${(Number(value) / (gb ? 1000000000 : 1000000)).toLocaleString(lang, { maximumFractionDigits: 1 })} ${gb ? 'GB' : 'MB'}`;
+  };
   const backupText = !status ? '' : status.backup.state === 'missing' ? t('No completed server backup.', 'Δεν υπάρχει ολοκληρωμένο αντίγραφο στον διακομιστή.')
     : status.backup.state === 'unavailable' ? t('Backup status unavailable.', 'Η κατάσταση αντιγράφων δεν είναι διαθέσιμη.')
     : status.backup.state === 'overdue' ? t('Server backup overdue.', 'Το αντίγραφο στον διακομιστή έχει καθυστερήσει.') : t('Server backup is recent.', 'Το αντίγραφο στον διακομιστή είναι πρόσφατο.');
   const warning = failed || (status && (status.backup.state !== 'ok' || status.storage.state !== 'ok'));
+  if (!detailed && !warning) return null;
+  const storageText = !status ? '' : status.storage.state === 'unavailable' ? t('Storage status unavailable.', 'Η κατάσταση αποθήκευσης δεν είναι διαθέσιμη.')
+    : !status.storage.healthy ? t('Storage needs checking; uploads are blocked.', 'Απαιτείται έλεγχος χώρου· οι μεταφορτώσεις έχουν αποκλειστεί.')
+    : BigInt(status.storage.managedHeadroomBytes) < BigInt(status.storage.warningBelowBytes) ? t('File allowance is below the warning threshold.', 'Ο διαθέσιμος χώρος για αρχεία είναι κάτω από το όριο προειδοποίησης.')
+    : status.storage.state === 'warning' ? t('Storage is running low; large uploads may fail.', 'Ο χώρος εξαντλείται· μεγάλες μεταφορτώσεις μπορεί να αποτύχουν.') : '';
   return <section className={`operations-status panel${warning ? ' operations-warning' : ''}`} data-testid="operations-status" aria-label={t('Server backup and storage', 'Αντίγραφα ασφαλείας και χώρος')} aria-live="polite">
     <strong>{t('Server backup and storage', 'Αντίγραφα ασφαλείας και χώρος')}</strong>
     {failed ? <p>{t('Status unavailable. Check backups and storage before relying on them.', 'Η κατάσταση δεν είναι διαθέσιμη. Ελέγξτε τα αντίγραφα και την αποθήκευση.')}</p>
       : !status ? <p>{t('Checking status…', 'Έλεγχος κατάστασης…')}</p> : <>
-        <p>{backupText} {status.backup.sourceCreatedAt && <>{new Date(status.backup.sourceCreatedAt).toLocaleString(lang)} ({status.backup.ageHours?.toFixed(1)} {t('hours old', 'ώρες πριν')}; {t('limit', 'όριο')} {status.backup.maxAgeHours} h).</>}</p>
-        <p>{t('File allowance remaining', 'Χώρος που απομένει για αρχεία')}: {bytes(status.storage.managedHeadroomBytes)}. {status.storage.state === 'unavailable' ? t('Storage status unavailable.', 'Η κατάσταση αποθήκευσης δεν είναι διαθέσιμη.') : status.storage.state === 'warning' ? (!status.storage.healthy ? t('Storage needs checking; uploads are blocked.', 'Απαιτείται έλεγχος χώρου· οι μεταφορτώσεις έχουν αποκλειστεί.') : t('Storage is running low; large uploads may fail.', 'Ο χώρος εξαντλείται· μεγάλες μεταφορτώσεις μπορεί να αποτύχουν.')) : ''}</p>
+        {(detailed || status.backup.state !== 'ok') && <p>{backupText} {detailed && status.backup.sourceCreatedAt && <>{new Date(status.backup.sourceCreatedAt).toLocaleString(lang)} ({status.backup.ageHours?.toFixed(1)} {t('hours old', 'ώρες πριν')}; {t('limit', 'όριο')} {status.backup.maxAgeHours} h).</>}</p>}
+        {(detailed || status.storage.state !== 'ok') && <p>{storageText} {t('File allowance remaining', 'Χώρος που απομένει για αρχεία')}: {bytes(status.storage.managedHeadroomBytes)}.</p>}
+        {detailed && <><p>{t('Warning below', 'Προειδοποίηση κάτω από')}: {bytes(status.storage.warningBelowBytes)}.</p>
         <details><summary>{t('Storage details', 'Λεπτομέρειες χώρου')}</summary>
           <p>{t('Managed-file budget', 'Όριο διαχειριζόμενων αρχείων')}: {bytes(status.storage.budgetBytes)}. {t('Retained, including orphan files', 'Διατηρούμενα, μαζί με μη συσχετισμένα αρχεία')}: {bytes(status.storage.retainedBytes)}; {t('reserved for uploads', 'δεσμευμένα για μεταφορτώσεις')}: {bytes(status.storage.reservedBytes)}.</p>
           <p>{t('Filesystem available', 'Διαθέσιμος χώρος συστήματος αρχείων')}: {bytes(status.storage.filesystemAvailableBytes)}; {t('free-space reserve', 'απόθεμα ελεύθερου χώρου')}: {bytes(status.storage.freeReserveBytes)}; {t('headroom after reserve and pending uploads', 'περιθώριο μετά το απόθεμα και τις εκκρεμείς μεταφορτώσεις')}: {bytes(status.storage.filesystemHeadroomBytes)}. {t('This does not establish hosting account quota.', 'Αυτό δεν επιβεβαιώνει το όριο του λογαριασμού φιλοξενίας.')}</p>
           <p>{t('The PC off-site copy is separate and is not checked here.', 'Το αντίγραφο εκτός διακομιστή στον υπολογιστή είναι ξεχωριστό και δεν ελέγχεται εδώ.')}</p>
-        </details>
+        </details></>}
       </>}
+    {!detailed && <a href="/administration">{t('Open Administration', 'Άνοιγμα διαχείρισης')}</a>}
   </section>;
 }
 ``````
@@ -1737,7 +1827,7 @@ export function OperationsStatus() {
 
 - [ ] GREEN: run `npx vitest run tests/server/print-api.test.ts tests/web/print-links.test.ts tests/server/monitoring.test.ts tests/server/storage-capacity.test.ts` and require success.
 
-- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect 17 focused print/monitoring/capacity tests and eight print browser tests. Also run tests/browser/operations-status.spec.ts; expect two tests for owner visibility, refresh errors and reader/print exclusion. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
+- [ ] Run npm run web:build, npm run typecheck, then PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/print.spec.ts (PowerShell syntax below). Expect 19 focused print/monitoring/capacity tests and eight print browser tests. Also run tests/browser/operations-status.spec.ts; expect four tests for healthy-state suppression, Administration, warning/recovery behavior, refresh errors, Greek labels and reader/print exclusion. Also run the eight existing record browser tests after aligning the Greek labels. Inspect the A3 PDFs and screenshot in test-results; decode the QR, verify Greek text and multipage completeness. Browser chrome/headers must be disabled in the actual Save as PDF dialog.
 
 - [ ] Self-review the task diff, run `git diff --check`, and commit only this task’s files and generated package lock. Preserve synthetic PDF fixture whitespace from Plan 5.
 
@@ -2381,7 +2471,7 @@ try {
 
 #### File: `docs/guides/backup-restore.md`
 
-<!-- replay task=2 phase=implementation encoding=text sha256=45a04ef419cbf8ea5e1fbf33bcad7eafb8a079acf0d22df61721ccf4aac2205e -->
+<!-- replay task=2 phase=implementation encoding=text sha256=d83db37ecad5ae871be376ee356b1d079473d563a549af3e859d5dcbd66f9487 -->
 
 ``````markdown
 # Backup and restore
@@ -2432,11 +2522,15 @@ Configure the task to run in the owner's logged-on desktop session and verify an
 
 Test the task using its actual scheduled identity and logon mode. Confirm X: exists and is writable in that context; an interactive mapped drive may not exist in a background task. Set `-Destination` to the verified private location. Configure no overlapping runs. Record the task's exit code and capture diagnostic output in a private log. Alert on nonzero results, missing completion reports and sourceCreatedAt older than the configured maximum. Check verifiedAt separately for task execution monitoring; never use COMPLETE file modification time for source freshness. An old COMPLETE file does not prove the latest pull succeeded. Investigate incomplete snapshot folders and failed export release. If `.pull-lock` remains after a crash, prove no pull is active before removing only that lock.
 
-## Owner status box
+## Administration and warnings
 
-Normal owner pages show a compact server-backup and storage box below navigation. It is absent for contributors, public shares and print. The owner-only read API discloses no filesystem paths or secrets. It reads the newest completed nightly filename's source time; missing, overdue, future-dated or unreadable status is shown as a warning. `BACKUP_MAX_AGE_HOURS` is a positive configurable threshold, default 36 hours. This reports the server copy only. It does not confirm that the separate Windows offsite task has run.
+Open **Administration / Διαχείριση** in the website navigation while signed in as owner. The page always shows the server-backup and storage status, with extra storage figures under Storage details. Normal working pages show only a compact warning and an Administration link when something needs attention. Healthy status and loading indicators stay off those screens. Contributors, public shares and print do not show either monitoring view. The owner-only read API discloses no filesystem paths or secrets.
 
-The file allowance uses the same live accounting as upload admission, including retained/orphan files and pending reservations. Storage details separately show filesystem free space and the configured reserve. Neither measure establishes the hosting account quota. A warning appears when one maximum-size request cannot fit, the reserve is threatened or accounting is unhealthy. Failed probes remain visibly unavailable. The box loads when opened, refreshes on focus and every minute, and reports request failures rather than retaining a healthy-looking result. It is not an alert service while the application is closed.
+Backup status uses the newest completed nightly filename's source time. Missing, overdue, future-dated or unreadable status warns. Set the positive `BACKUP_MAX_AGE_HOURS` server setting to change the 36-hour default. This reports the server copy only; it does not confirm that the separate Windows offsite task has run.
+
+The file allowance uses the same live accounting as upload admission, including retained/orphan files and pending reservations. Set `FILES_WARNING_BELOW_BYTES` in the HTTP application's server configuration to change the default **5,000,000,000 bytes (5 GB)** warning threshold. At exactly the threshold there is no allowance warning; below it there is. This is an early warning, not an upload limit. Existing admission checks continue to enforce the managed-file budget and free-space reserve. Capacity warnings also remain when a maximum-size request cannot fit or accounting is unhealthy. Storage details separately show filesystem space and the configured reserve; neither establishes the hosting account quota.
+
+Status loads when the page opens, refreshes on focus and every minute, and reports failed or timed-out checks instead of retaining a healthy-looking result. A recovered status removes the working-page warning. The website cannot issue warnings while it is closed. The separate Windows failure message remains responsible for failed offsite pulls.
 
 ## Offline restore
 
@@ -2829,7 +2923,7 @@ This task requires the owner’s actual hosting settings and live acceptance evi
 
 #### File: `docs/guides/deployment.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=683eac8064cc126985a507f84dc4b7176a5c7aae31a8497a06bc96d2378b17f2 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=49b2535d9bc76ba6e42dfb61efe1f5dd8d7b9a884135f401387a4c254171b4ee -->
 
 ``````markdown
 # Deploy and release BuiltBasis v1
@@ -2857,7 +2951,7 @@ Use separate directories: `/usr/home/ktimana/builtbasis/releases/<commit>` for c
 
 Record the actual account quota and current usage from konsoleH before setting `FILES_STORAGE_BUDGET_BYTES` and `FILES_FREE_RESERVE_BYTES`. Budget for immutable files, the database, 14 daily/8 weekly backups, export pins, two releases and other sites. The filesystem free-space value is not the account quota. No default budget is assumed. Record the chosen values and rationale privately in the release checklist.
 
-Set `BACKUP_MAX_AGE_HOURS` if the owner-page server-backup warning threshold should differ from its 36-hour default. Keep it aligned with the planned nightly schedule and the Windows pull's `-MaxAgeHours`. The compact owner status box reports the server copy and live file allowance; its details distinguish that allowance from filesystem space and hosting quota. Missing/unreadable status remains a warning. Verify the box is absent from contributor, share and print pages. The separate Windows failure message and its logged-on-desktop requirement are documented in the [backup guide](backup-restore.md).
+Set `BACKUP_MAX_AGE_HOURS` if the server-backup warning threshold should differ from its 36-hour default. Keep it aligned with the nightly schedule and the Windows pull's `-MaxAgeHours`. Set `FILES_WARNING_BELOW_BYTES` if the default 5,000,000,000 bytes (5 GB) remaining-file warning should change. These values are server configuration, not editable website settings. Administration always shows full status; the other owner screens show only warnings with a link to that page. Verify healthy status is hidden there, missing/unreadable status warns, and contributors/share/print cannot see monitoring. The [backup guide](backup-restore.md) explains the separate Windows failure message and logged-on-desktop requirement.
 
 Set `BUILTBASIS_DATA_DIR`, `PUBLIC_BASE_URL=https://builtbasis.ktimanet.com`, `SHARE_LINK_KEY`, `BEHIND_CLOUDFLARE=1`, both storage settings, and `NODE_ENV=production`. Leave `PORT` unset: Hetzner supplies its socket. Keep `SHARE_LINK_KEY` only in the HTTP application settings in konsoleH. The command-line tools do not need it. Put only `BUILTBASIS_DATA_DIR` and any other needed non-secret settings in `operations.env`; keep the data path aligned with konsoleH. Never duplicate the share key into that file. Never print the key in logs. Cloudflare Full (strict) remains enabled.
 
@@ -2913,7 +3007,7 @@ Release only when the hosted checks, real off-site drill and documentation recon
 
 #### File: `docs/guides/release-checklist.md`
 
-<!-- replay task=4 phase=implementation encoding=text sha256=c168f423bb9a01ef845e1e2887151e44e8cd705ccdb05e29e5873c1abcac9806 -->
+<!-- replay task=4 phase=implementation encoding=text sha256=337695e765bb63db414697a0602623cfbd16c5466307784230044cb270f5a141 -->
 
 ``````markdown
 # v1 release checklist
@@ -2956,7 +3050,7 @@ For every completed gate, record the date, operator, release commit, environment
 
 ## Backup and recovery
 
-- [ ] Verify the owner-only status box below navigation shows the completed server source date and configured age threshold. Exercise missing/overdue/read-failure warnings and low managed-budget/filesystem-reserve states. Confirm it uses live upload reservations, does not expose paths/secrets, distinguishes hosting quota and remains absent for contributors/share/print.
+- [ ] Verify Administration is linked in owner navigation and always shows the completed server source date, backup-age limit, remaining allowance and configured 5 GB warning threshold. Healthy status must stay hidden on the working pages; missing/overdue/read-failure or low storage must show a compact warning linked to Administration, which disappears after recovery. Check below/at/above the configured allowance threshold, live upload reservations, filesystem reserve and accounting failures. No paths/secrets or implied hosting quota; contributors/share/print cannot see monitoring.
 - [ ] Under the actual scheduled Windows identity, trigger a controlled pull failure and observe the local `msg.exe` desktop message. Verify setup/transfer/stale/release failures keep a nonzero task exit, failed notification delivery is logged, and success sends no message. Record the logged-on-desktop requirement and that a powered-off PC or a task that never runs cannot alert through this mechanism.
 
 - [ ] Install nightly server cron with absolute Node, stable release directory and the existing external configuration file. Keep the share key out of cron text and backup directories. Observe an actual scheduled run, inspect its completed SQLite copy and confirm failed jobs produce a visible operator alert.
@@ -2996,7 +3090,7 @@ The complete proposed maintained specification below consolidates approved requi
 
 #### File: `docs/specs/v1.md`
 
-<!-- replay task=6 phase=implementation encoding=text sha256=b720b6c1cd2974d599de27f248624efac99ffbca49ca7ce89f8855e6cdcb7b9a -->
+<!-- replay task=6 phase=implementation encoding=text sha256=cb3e8e488b8162dc583fbf512b26c8565c7640319283855ca9d72c4c4e885400 -->
 
 ``````markdown
 # BuiltBasis v1 specification
@@ -3560,6 +3654,8 @@ Mobile-first responsive layout; every screen works on a phone. Language switch a
 8. **A3 print view** (§12).
 9. **Named-user access** — owner account setup and per-record grant controls; each user sees only granted, non-Draft records and the actions permitted there. A contributor screen uses the same private-content exclusions as a share page.
 
+10. **Administration / Διαχείριση** — owner-only website page, linked alongside Projects and the project Records/Managed Lists navigation. Full backup and storage status is available here even when healthy. Other working screens show warnings only (§11.7).
+
 ## 11. Architecture and operations
 
 ### 11.1 Stack
@@ -3645,7 +3741,7 @@ All database access is confined to `src/server` data-access modules, so a later 
 - **Restore requirements**: stop the application and backup jobs first; restore a database together with its files; use application code compatible with that database's schema; **before access resumes, delete all sessions and revoke all share links** (a restored database can bring back links revoked after the backup was taken); disable all non-owner accounts and delete all record grants before access resumes; then issue new links where needed. Before restoring contributor access, the owner must reset their passwords, enable selected accounts and deliberately regrant records. Enabling alone must not revive credentials or permissions from an old backup.
 - **One restore drill** from an off-site copy is performed before v1 is declared delivered.
 - **Freshness:** exports and completion reports preserve the selected database backup's identity and creation timestamp, separately from transfer and verification times. Scheduled off-site verification rejects a source older than its configured tolerance (36 hours by default). Recopying an old backup never makes it current. Previously verified older recovery points remain available for deliberate restore.
-- **Owner warnings:** a compact status box below navigation on normal owner website pages shows the latest completed server backup's age and storage headroom. It warns when the backup is missing or overdue (configurable 36-hour default), storage is low, or status cannot be checked. It is absent from contributor/shared pages and print output. Managed file-budget headroom and filesystem free space are distinct; neither claims to measure the hosting account quota.
+- **Owner warnings and Administration:** normal owner website pages show a compact warning below navigation only when a completed server backup is missing or overdue (configurable 36-hour default), the remaining file allowance is below the configured threshold (5 GB / 5,000,000,000 bytes by default), storage capacity is unsafe, or status cannot be checked. The warning links to the owner-only **Administration / Διαχείριση** page, where the latest completed server backup age and full storage status are always available. Healthy status and loading indicators do not occupy the working pages. Neither the warning nor Administration is available to contributors or share-link visitors; both are excluded from print. Managed file-budget headroom and filesystem free space are distinct; neither claims to measure the hosting account quota.
 - **PC pull failures:** the Windows pull reports failure with a nonzero exit and a desktop notification, including overdue-source and failed-transfer cases. Configure it for the owner's logged-on desktop and verify notification delivery during release acceptance. The website status describes server backups; it does not certify the PC copy. A stopped PC or a scheduled task that never starts cannot issue a failure notification.
 
 ### 11.8 PDF
@@ -3681,6 +3777,7 @@ The Public Notes and Private Notes fields, the Log and the Activity log are not 
   - **Sharing:** private fields (including Private Notes and private log entries) absent from share responses; attachments of private log entries cannot be fetched with a share token; **same blob, two occurrences:** with one public and one private occurrence of the same file on the shared record, the public one downloads and the private one is denied, and no private filename or log metadata is returned; **deleting a private log entry** deletes its attachment occurrences and never makes them public; Draft records not available; revoked and expired tokens rejected for pages **and files**; a token for one record cannot fetch another record's files; must-be-done-before entries on shared pages omit Draft records and expose only ID and title.
   - **Atomicity:** a failed status change leaves status, verification and activity unchanged.
 - **Browser (Playwright):** login; quick capture on a phone-sized viewport; status changes with reasons/verification; measurements and comparison views; share link view (no private content); language switch; A3 print view contains no private content; ordinary and Draft records print without QR or share links by default; QR output requires explicit selection and a freshly checked valid link; printing uses the refreshed snapshot and waits for its resources.
+- **Monitoring and Administration:** owner-only status API/page; healthy status hidden on working pages and visible in Administration; missing/overdue/unavailable warnings; low file allowance below, at and above the configured 5 GB default; warning disappears after recovery; no monitoring information on contributor/share/print pages.
 - **Recovery drill:** one restore from an off-site copy (database + files) before delivery (§11.7), including session deletion and share-link revocation.
 
 Additional required coverage: existing Notes stays private through migration; Public Notes is shared but owner-editable only; each contributor permission works independently; no grant, removed grant, disabled account and Draft status deny access; contributors cannot reach owner APIs, lists, private fields/files or other records; genuine contributor attribution; 100 MB request accounting with/without Content-Length; accepted-format capability matrix; authorised view/download/range paths; real HTTP oversized-upload and disconnect cleanup; safe diagnostic logs; storage admission across concurrent uploads, failed transactions and restarts; browser EML/MSG rendering and video/audio playback.
@@ -3770,25 +3867,27 @@ Their real remote and scheduled execution is checked in Tasks 4–5. Use PowerSh
 
 ## Planning replay evidence
 
-On 2026-10-04 the initial publication was replayed from `59f04d0`, passing 480 unit/API tests and 42 browser tests. The first review corrections were replayed from `7997780`, passing 486 unit/API tests and 44 browser tests, and published as `9d937ac`. After the owner approved optional QR printing and both backup warnings, all **41 full-file payloads** were extracted task by task into a fresh detached checkout of `9d937ac`, separately from authoring. The approved design amendment was copied into that checkout too. The runtime baseline of these commits is identical. All payloads were verified by hash. The checkout contains proposed code only; main still runs Plan 5. The table below reports this final replay.
+On 2026-10-04 the initial publication was replayed from `59f04d0`, passing 480 unit/API tests and 42 browser tests. The first review corrections were replayed from `7997780`, passing 486 unit/API tests and 44 browser tests, and published as `9d937ac`. Optional QR printing and both backup warnings were then replayed task by task from `9d937ac`, passing 499 unit/API tests and 49 browser tests, and published as `a75c5f9`.
+
+The owner subsequently requested warning-only notices on working pages, a separate Administration page and a configurable 5 GB remaining-file warning. All **41 full-file payloads** were extracted into another fresh detached checkout of `a75c5f9`, separately from authoring. The governing design amendment was copied there too. The runtime baseline of these commits is identical. All payloads were verified by hash. The checkout contains proposed code only; main still runs Plan 5. The table below reports the latest replay, identifying unchanged checks retained from the preceding replay.
 
 | Check | Actual result |
 |---|---|
-| Task 1 RED/GREEN | Initial missing print route/module; stale-name and optional-QR browser regressions failed before fixes. Missing status/API/capacity regressions failed before implementation. Fresh replay independently passed all 17 print/monitoring/capacity tests and TypeScript before Task 2 extraction; eight print and two status browser tests passed during authoring |
+| Task 1 RED/GREEN | Initial missing print route/module; stale-name and optional-QR browser regressions failed before fixes. The preceding task-by-task replay passed 17 focused tests and TypeScript before Task 2 extraction. This revision's two threshold tests and three affected browser cases failed before the changes. Five monitoring tests and four status/Administration browser tests then passed; the full replay covers all 19 print/monitoring/capacity tests and eight print browser tests |
 | Task 2 RED/GREEN | Initial missing operations module. Review regressions failed on missing source metadata/freshness checks, then all eighteen focused operations/database tests passed |
 | Task 3 RED/GREEN | Initial missing build script; notification regression observed no failure message before implementation. Fresh replay passed the real compiled-process HTTP test and all 11 Windows transfer/failure/exit tests |
 | Full Node/browser production builds and TypeScript | Passed |
-| Complete unit/API suite | **499 tests passed across 70 files** |
-| Complete Chrome browser suite | **49 tests passed across 11 spec files** |
-| Print output | Independent QR decode, Greek A3 dimensions, 180-paragraph multipage text completeness and photo readiness passed; screenshots of print output and owner status placement inspected |
-| Production-only installation | 78 packages installed with dev dependencies omitted, down from 126; tsx and bundled browser packages absent; native runtime check, real health request and built shell passed |
+| Complete unit/API suite | **501 tests passed across 70 files** |
+| Complete Chrome browser suite | **51 tests passed across 11 spec files** |
+| Print output and monitoring UI | Independent QR decode, Greek A3 dimensions, 180-paragraph multipage text completeness and photo readiness passed. The warning-only Records view and Administration screen were visually inspected in the updated local preview |
+| Production-only installation (preceding replay; package unchanged) | 78 packages installed with dev dependencies omitted, down from 126; tsx and bundled browser packages absent; native runtime check, real health request and built shell passed. The latest replay reran the compiled-process HTTP test |
 | Existing dependency resolutions | All 316 existing package-path version/resolved/integrity values preserved |
-| Production dependency audit | Zero vulnerabilities reported; four existing moderate findings remain in the complete development dependency tree |
+| Production dependency audit (preceding replay; package unchanged) | Zero vulnerabilities reported; four existing moderate findings remain in the complete development dependency tree |
 | Windows tooling | Release/pull scripts and test harness parsed without errors on PowerShell 5.1. Two SFTP batches covered 128 missing blobs; repeat used metadata only. Mocked notifications covered setup, lock, SSH/SFTP, integrity, stale-source, pin-release and delivery failures; an actual child process exited 1. `msg.exe` is installed on the replay PC, but delivery was mocked. Real remote execution, scheduled identity and visible desktop delivery remain Tasks 4–5 |
 
-Environment: Windows, Node 24.12.0, npm 11.6.2, Playwright 1.63.0 and installed Chrome 154.0.8037.58. Browser tests start private local fixture servers. No command connected to the hosting account or altered production. The synthetic restore is a local fixture drill, not the required actual off-site drill.
+Environment: Windows, Node 24.12.0, npm 11.6.2, Playwright 1.63.0 and installed Chrome 154.0.8037.58. Browser tests start private local fixture servers. The latest replay temporarily substituted loopback ports 3500/5184 for 3490/5174 so the owner's preview stayed available; all source bytes were restored afterwards and payload hashes checked. No command connected to the hosting account or altered production. The synthetic restore is a local fixture drill, not the required actual off-site drill.
 
-The review corrections preserve source backup identity and creation time, reject stale scheduled copies, always adopt fresh printable data before printing, batch missing-file transfers, keep the share key solely in the HTTP application settings, and align Greek field labels with the design. The approved additions permit printing Drafts without QR, add a compact owner-only status box, and notify the local Windows operator on a failed pull. Long-lived recovery points remain restorable. The package change preserves every existing dependency version and integrity value. Code blocks use their correct language tags and contain no leading BOM.
+The review corrections preserve source backup identity and creation time, reject stale scheduled copies, always adopt fresh printable data before printing, batch missing-file transfers, keep the share key solely in the HTTP application settings, and align Greek field labels with the design. The approved additions permit printing Drafts without QR, provide owner-only Administration with full status and warning-only notices elsewhere, and notify the local Windows operator on a failed pull. The remaining-file warning defaults to the owner's chosen 5 GB. Long-lived recovery points remain restorable. The package change preserves every existing dependency version and integrity value. Code blocks use their correct language tags and contain no leading BOM.
 
 Authoring caught and corrected one full-suite timeout: a rotation test originally made 74 VACUUM copies. It now uses validated historical snapshots and one real rotation, preserving the race/retention assertion without the unnecessary I/O. Restore diagnostics were reconciled with §5.12 to include only system reason and reset counts. A reviewer questioned the existing ignore-scripts installation workaround; the clean production-only native/runtime probe confirmed the pinned package includes usable prebuilds on this machine. Linux installation remains a separate hosted check.
 
