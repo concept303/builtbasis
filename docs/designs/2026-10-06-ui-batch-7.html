@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BuiltBasis · Iteration 7 · Work packages and refinements</title>
+<style>
+:root{--accent:#08776c;--soft:#e8f4ef;--ink:#25352f;--muted:#63746b;--line:#dbe4de;--paper:#f6f8f5}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer;background:white;border:1px solid #b8c9bf;border-radius:7px;padding:9px 15px;color:var(--ink)}button:hover{background:var(--soft)}button:disabled{cursor:default;opacity:.65}button.primary{background:var(--accent);border-color:var(--accent);color:white}:focus-visible{outline:3px solid #ba741f;outline-offset:3px}a{color:var(--accent)}.review{background:#fff4dd;padding:9px 24px;font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}.review button{padding:1px 8px;font-size:13px}header{background:white;padding:18px 28px;display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--line)}.brand{font-size:23px;font-weight:750;letter-spacing:-.7px}.brand b{color:var(--accent)}.account{margin-left:auto;display:flex;gap:15px;align-items:center;font-size:14px}.site-nav{display:flex;gap:26px;padding:10px 28px;border-bottom:1px solid var(--line);background:white;flex-wrap:wrap}.site-nav button{border:0;padding:4px 0;border-radius:0}.site-nav button:first-child{color:var(--accent);border-bottom:2px solid var(--accent)}main{max-width:1120px;margin:25px auto;padding:0 24px 45px}.toolbar,.actions{display:flex;gap:9px;flex-wrap:wrap}.toolbar{margin-bottom:20px}.id{color:var(--muted);font-size:13px;letter-spacing:.05em}h1{font-size:28px;line-height:1.3;margin:7px 0 17px;letter-spacing:-.5px}h2{font-size:19px;margin:0 0 16px}h3{font-size:16px}p{margin:10px 0 18px}.card{background:white;border:1px solid var(--line);border-radius:10px;padding:23px;margin:20px 0}.summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:19px 22px;margin:20px 0;padding:20px 23px;background:white;border:1px solid var(--line);border-radius:10px}dt{color:var(--muted);font-size:13px}dd{margin:4px 0 16px} .summary dd{margin:4px 0 0;display:flex;align-items:center;gap:4px}.summary dd .info{margin-left:0;flex:none}.field-label:has(.info){display:flex;align-items:center;gap:4px}.field-label:has(.info) label{margin-bottom:0}.field-label .info{margin-left:0;flex:none}.badge,.chip{display:inline-flex;align-items:center;gap:8px;border-radius:5px;padding:3px 9px;background:var(--soft);color:var(--accent);font-size:14px}.tabs{display:flex;gap:26px;border-bottom:1px solid var(--line);margin:20px 0}.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;padding:12px 0;background:none}.tabs button[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent);font-weight:650}.phone-section{display:none}.field{margin:0 0 20px}label,.field-label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}input,select,textarea{width:100%;border:1px solid #baccc0;background:white;color:var(--ink);border-radius:6px;padding:10px 12px}textarea{resize:vertical;min-height:100px}input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 20px}.check{display:flex;align-items:center;gap:9px;font-weight:400}.muted,small{color:var(--muted)}small{font-size:13px}.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.chip button{border:0;background:none;padding:0 3px;min-width:25px;color:inherit}.picker{margin:22px 0}.pickpanel{padding:12px;margin-top:10px;border:1px solid var(--line);border-radius:7px;max-width:480px}.options{max-height:210px;overflow:auto;margin:8px 0}.options label{padding:8px;font-weight:400}.options label:hover{background:var(--paper)}details{padding:15px 0;border-top:1px solid var(--line)}summary{cursor:pointer;font-weight:600}details>div{padding:15px 0}.tree{border:1px solid var(--line);border-radius:7px;padding:14px;margin:10px 0 18px}.tree details{margin-left:16px;border:0;padding:5px}.sketch{width:320px;max-width:100%;height:130px;display:block;border:1px solid var(--line);border-radius:6px;margin:10px 0}.info{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:4px;width:24px;height:24px;padding:4px;background:transparent;color:var(--muted);margin-left:2px;vertical-align:middle}.info:hover{background:transparent;color:var(--accent)}.info svg{width:16px;height:16px;flex:none;pointer-events:none}.tooltip{position:fixed;z-index:50;width:270px;max-width:calc(100vw - 24px);background:#24382f;color:white;border-radius:7px;padding:12px 15px;font-size:14px;box-shadow:0 5px 20px #0002}.footer-actions{padding:16px 0;display:flex;gap:10px}.notice{background:var(--soft);padding:12px;border-radius:6px}.warning{font-size:13px;color:#77511d}.map{font-size:14px}.map table{width:100%;border-collapse:collapse}.map td,.map th{text-align:left;padding:9px;border-bottom:1px solid var(--line)}.all-notes{font-size:13px;margin-top:28px}body[data-tone=blue]{--accent:#315dc8;--soft:#edf2ff;--paper:#f7f8fb} [hidden]{display:none!important}@media(max-width:700px){header{padding:15px 18px;gap:10px;flex-wrap:wrap}.account{margin:0;width:100%;justify-content:space-between}.site-nav{padding:10px 18px;gap:20px;font-size:14px}main{padding:0 17px;margin-top:20px}h1{font-size:24px}.summary{grid-template-columns:1fr 1fr;padding:18px;gap:16px}.grid{grid-template-columns:1fr}.card{padding:18px}.tabs{display:none}.phone-section{display:block;margin:18px 0}.review{padding:9px 17px}.map{overflow:auto}}
+
+/* Iteration 2 changes only the record heading and reading hierarchy. */
+.record-identity{display:flex;align-items:center;gap:15px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.identity-value{display:inline-flex;align-items:center;gap:3px}.record-identity .badge{font-size:13px}
+.next-action-strip{grid-template-columns:repeat(3,minmax(0,1fr));padding:14px 20px;gap:12px 24px;margin:18px 0;border:0;border-left:3px solid var(--accent);border-radius:0;background:var(--soft)}
+.next-action-strip dd{font-size:15px}.safety-notice{display:flex;gap:12px;align-items:baseline;background:#fff5e5;border-left:3px solid #a76518;padding:10px 15px;color:#74491c;font-size:14px;margin:15px 0}
+.record-details{padding:17px 0 5px;border-top:1px solid var(--line);margin-top:22px}.record-details dl{display:flex;gap:30px;flex-wrap:wrap;margin:0}.record-details dd{display:flex;align-items:center;gap:4px;margin-bottom:12px}.record-details h2{font-size:16px}
+.description-text{font-size:17px;line-height:1.7;margin-bottom:12px}.reading-location{border-top:1px solid var(--line);padding-top:20px;margin-top:12px}.sample-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin:12px 0 24px}.sample-controls button{font-size:13px;padding:5px 10px;min-height:32px}.sample-controls button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:var(--soft)}
+@media(max-width:700px){.next-action-strip{grid-template-columns:1fr;padding:12px 15px;gap:8px}.next-action-strip>div{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:baseline;gap:10px}.next-action-strip dd{margin:0}.record-identity{gap:10px}.safety-notice{display:block}.safety-notice strong,.safety-notice span{display:block}.record-details dl{gap:14px 25px}.sample-controls small{width:100%}}
+dialog.review-panel{margin:0 0 0 auto;height:100dvh;max-height:100dvh;width:600px;max-width:100vw;border:0;border-left:1px solid var(--line);padding:0;color:var(--ink);background:var(--paper)}dialog.review-panel::backdrop{background:#203a3255}.panel-heading{position:sticky;top:0;z-index:1;background:white;border-bottom:1px solid var(--line);display:flex;gap:16px;justify-content:space-between;align-items:center;padding:18px 23px}.panel-heading h2{margin:3px 0}.panel-body{padding:0 23px 24px}.panel-body .card{padding:18px}.panel-body .field{margin-bottom:12px}.panel-body .grid{grid-template-columns:1fr 1fr}.sample-label{font-size:12px;letter-spacing:.04em;color:var(--muted)}.history-entry{border-left:2px solid var(--line);padding:0 0 24px 18px;margin-left:4px}.history-entry h3{margin:3px 0}.history-entry time{font-size:13px;color:var(--muted)}.history-entry dl{margin-bottom:0}.history-entry dd{margin-bottom:8px}.file-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--line)}.file-row>span{flex:1;min-width:180px}.measurement-table{overflow:auto}.measurement-table table{border-collapse:collapse;width:100%}.measurement-table td,.measurement-table th{padding:10px;text-align:left;border-bottom:1px solid var(--line)}.panel-body .notice{margin:14px 0}.panel-body .actions{margin:12px 0}.log-entry{border-top:1px solid var(--line);padding:16px 0}.log-entry p{margin-bottom:8px}@media(max-width:700px){dialog.review-panel{width:100%;border:0}.panel-heading{padding:14px 17px}.panel-body{padding:0 17px 20px}.panel-body .grid{grid-template-columns:1fr}.measurement-table{font-size:14px}}
+body.editing-record #record-identity,body.editing-record #record-title,body.editing-record main>.actions,body.editing-record #record-summary,body.editing-record #safety-notice,body.editing-record .tabs,body.editing-record .phone-section,body.editing-record .toolbar{display:none!important}.edit-heading{margin:22px 0}.edit-heading h2{font-size:25px;margin:4px 0}.focused-form{padding-bottom:90px}.focused-form .card{margin:16px 0}.focused-form .card h3{font-size:18px;margin:0 0 20px}.focused-form .grid{grid-template-columns:1fr 1fr}.focused-form details>summary small{display:block;margin:3px 0 0 18px;font-weight:400}.focused-form .optional-card details{border:0;padding:0}.focused-form .optional-card details>div{padding-top:20px}.edit-savebar{position:fixed;z-index:10;bottom:0;left:0;right:0;border-top:1px solid var(--line);background:#fffffff7;box-shadow:0 -3px 14px #203a3208;padding:12px 24px;display:flex;justify-content:flex-end;align-items:center;gap:10px}.edit-savebar small{margin-right:auto}.editor-images{margin-top:18px;border-top:1px solid var(--line);padding-top:18px}.editor-images h4{margin:0 0 10px}.focused-form .tree{margin-bottom:20px}.focused-form .picker{margin-top:0}@media(min-width:1120px){.edit-savebar{padding-left:calc((100vw - 1072px)/2);padding-right:calc((100vw - 1072px)/2)}}@media(max-width:700px){.focused-form .grid{grid-template-columns:1fr}.edit-savebar{padding:10px 17px}.edit-savebar small{max-width:125px;font-size:12px}.edit-savebar button{min-height:44px}.edit-heading h2{font-size:23px}}
+.gallery-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.gallery-head h4{margin:0}.location-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}.location-image{border:1px solid var(--line);border-radius:7px;padding:10px;min-width:0}.location-image img,.location-image .sketch{width:100%;height:140px;object-fit:contain;margin:0 0 8px}.location-image p{font-size:14px;overflow-wrap:anywhere;margin:4px 0}.location-image .actions{margin-top:10px}.location-image button{font-size:14px;padding:6px 10px}.location-image small{display:block}.upload-pending{margin:12px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sample-dialog{border:1px solid var(--line);border-radius:10px;width:550px;max-width:calc(100vw - 24px);max-height:90dvh;overflow:auto;color:var(--ink);padding:22px}.sample-dialog::backdrop{background:#203a3255}.sample-dialog .actions{margin-top:20px}.sample-dialog .grid{grid-template-columns:1fr 1fr}.sample-dialog h2{margin-top:0}@media(max-width:700px){.sample-dialog .grid{grid-template-columns:1fr}}
+.photo-icon,.location-image .photo-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:7px;border-color:transparent;background:transparent}.photo-icon:hover{background:var(--soft);border-color:var(--line)}.photo-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.photo-icon[title="Delete photo"]:hover{color:#a33636;background:#fff0ed}@media(pointer:coarse){.photo-icon,.location-image .photo-icon{width:44px;height:44px}}
+.sample-controls label{margin:0}.sample-controls select{width:auto;max-width:100%}.subtype-fields{border-top:1px solid var(--line);padding-top:18px;margin-top:16px}.problem-options{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin:12px 0}.problem-choice{display:flex;align-items:center;gap:4px}.problem-choice label{margin:0;font-weight:400}.decision-block h3{margin-top:0}.options-list article{border-top:1px solid var(--line);padding:12px 0}.option-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.option-heading h4{margin:0}.options-list p{margin:5px 0;white-space:pre-wrap}.rule-hint{font-size:13px;color:var(--muted);margin:8px 0 16px}.decision-block textarea{min-height:110px}.reading-decision{border-top:1px solid var(--line);margin-top:18px;padding-top:18px}.reading-decision dd{white-space:pre-wrap}.sample-dialog textarea{min-height:120px}@media(max-width:700px){.problem-options{grid-template-columns:1fr}.sample-controls select{width:100%}}
+.delete-record{margin-left:auto;color:#933c35;border-color:transparent;background:transparent}.danger{background:#a3322c;color:white;border-color:#a3322c}.status-catalog{display:grid;grid-template-columns:1fr 1fr;gap:12px}.status-catalog p{margin:3px 0;font-size:13px}.status-error{background:#fff0ed;color:#832c25;padding:12px;border-radius:6px}.sample-controls .preview-only{width:100%;border-top:1px dashed var(--line);padding-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.preview-only label{font-weight:400}.preview-only select{font-size:13px;padding:5px 9px}#status-extra fieldset{border:1px solid var(--line);border-radius:7px;margin:12px 0;padding:15px}#delete-dialog strong{overflow-wrap:anywhere}@media(max-width:700px){.delete-record{margin-left:0}.status-catalog{grid-template-columns:1fr}}
+
+/* Colour comparison only. Neutral surfaces; blue identifies interactive elements. */
+:root,body[data-tone=blue]{--accent:#315dc8;--soft:#eef3fd;--ink:#27313f;--muted:#616b78;--line:#dfe3e8;--paper:#f5f6f8}
+button,input,select,textarea{border-color:#bbc3cf}.chip{background:#f0f2f5;color:#374151}.next-action-strip{background:#fff;border:1px solid var(--line);border-left:3px solid #bbc3cf;border-radius:7px}.notice{background:#f0f3f8}.tooltip{background:#27313f}.review{background:#edf1f7;color:#445165}.review-panel::backdrop,.sample-dialog::backdrop{background:#1f293755!important}.edit-savebar{box-shadow:0 -3px 14px #1f293708}.badge{background:#edf0f3;color:#505b69}.status-colour[data-status=open],.status-colour[data-status=issued],.status-colour[data-status=in_progress]{background:#eaf0fd;color:#264da0}.status-colour[data-status=awaiting_decision],.status-colour[data-status=on_hold]{background:#fff3d9;color:#86520c}.status-colour[data-status=ready_for_verification]{background:#f0eafa;color:#70419c}.status-colour[data-status=closed]{background:#e9f4eb;color:#326843}.palette-strip{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.blueprint-controls{font-size:13px;border:0;padding:4px 0 14px}.blueprint-controls summary{color:var(--muted);font-weight:400}.blueprint-controls .sample-controls{margin:12px 0}.blueprint-controls>div{padding:0}
+
+/* Iteration 7 · work-package pages, editor package field, record refinements and colour review. */
+:root{--focus:#ba741f;--overdue:#a3322c}
+:focus-visible{outline-color:var(--focus)}
+[tabindex="-1"]:focus{outline:none}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+input[type=radio]{width:18px;height:18px;flex:none;margin:0;accent-color:var(--accent)}
+.flash{animation:flash 1.8s ease}@keyframes flash{0%,45%{box-shadow:0 0 0 5px #315dc840;border-radius:6px}100%{box-shadow:0 0 0 0 transparent}}
+@media(prefers-reduced-motion:reduce){.flash{animation:none}}
+
+/* Navigation: active state follows the current page; phones scroll the menu instead of wrapping it. */
+.site-nav button{border:0;border-bottom:2px solid transparent;color:var(--ink)}
+.site-nav button:first-child{color:var(--ink);border-bottom-color:transparent}
+.site-nav button[aria-current=page]{color:var(--accent);border-bottom-color:var(--accent)}
+@media(max-width:700px){.site-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:22px;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}.site-nav::-webkit-scrollbar{display:none}.site-nav button{white-space:nowrap;flex:none}}
+
+/* Review map */
+.iter-map{background:white;border:1px solid var(--line);border-radius:10px;padding:2px 18px;margin:0 0 14px;font-size:14px}
+.iter-map summary{padding:11px 0}
+.iter-map>.iter-body{padding:0 0 12px}
+.iter-body>p{margin:0 0 8px;color:var(--muted)}
+.iter-map table{width:100%;border-collapse:collapse}
+.iter-map th,.iter-map td{text-align:left;padding:9px 8px;border-top:1px solid var(--line);vertical-align:top}
+.iter-map th{font-size:13px;color:var(--muted);font-weight:600}
+.iter-map td:first-child{font-weight:600;width:170px}
+.iter-map td:last-child{width:1%;white-space:nowrap}
+.iter-map button{font-size:13px;padding:4px 12px}
+@media(max-width:700px){.iter-map{padding:2px 14px}.iter-map thead{display:none}.iter-map tr{display:grid;grid-template-columns:minmax(0,1fr) auto;border-top:1px solid var(--line);padding:8px 0}.iter-map td{border:0;padding:2px 4px}.iter-map td:first-child{width:auto}.iter-map td:nth-child(2){grid-column:1/-1;grid-row:2}}
+
+/* Page views share the main column with the record. */
+#page-view{display:none}
+body[data-view=page] #page-view{display:block}
+body[data-view=page] main>:not(#page-view):not(.blueprint-controls):not(.iter-map):not(#notice){display:none!important}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 20px;flex-wrap:wrap;margin:8px 0 18px}
+.page-head h1{margin:0}
+.page-sub{margin:4px 0 0;font-size:14px}
+.breadcrumb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:4px 0 12px}
+.breadcrumb [aria-current]{color:var(--ink);overflow-wrap:anywhere}
+.package-title{overflow-wrap:anywhere}
+.list-tools{display:flex;align-items:flex-end;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:12px}
+.list-tools .field{flex:0 1 380px;margin:0}
+.list-count{margin:0 0 10px;font-size:14px}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:4px 16px;flex-wrap:wrap}
+.section-head h2{margin:0 0 14px}
+.note{font-size:13px;margin:12px 0 0}
+.empty-state{max-width:640px}
+.empty-state h2{margin-top:0}
+
+/* Package status: outlined pill with a dot. Record status stays a filled tag, so Completed is never read as Closed. */
+.pkg-badge{display:inline-flex;align-items:center;gap:6px;border:1.5px solid currentColor;border-radius:999px;padding:0 10px;font-size:13px;font-weight:600;line-height:22px;background:white;white-space:nowrap}
+.pkg-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pkg-badge[data-pkg=planned],.pkg-badge[data-pkg=cancelled]{color:#505b69}
+.pkg-badge[data-pkg=cancelled]::before{background:none;box-shadow:inset 0 0 0 1.5px currentColor}
+.pkg-badge[data-pkg=in_progress]{color:#264da0}
+.pkg-badge[data-pkg=on_hold]{color:#86520c}
+.pkg-badge[data-pkg=completed]{color:#326843}
+
+/* Dates and overdue: red is reserved for overdue and destructive actions, always with words. */
+.summary dd{flex-wrap:wrap}
+.date-chip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;border-radius:4px;padding:1px 7px;margin-left:6px;background:#eef0f3;color:#505b69;white-space:nowrap;line-height:20px}
+.date-chip.overdue{background:#fdeeec;color:var(--overdue)}
+.date-chip svg{width:13px;height:13px;flex:none}
+.overdue-text{color:var(--overdue);font-weight:600}
+.attention-notice{display:flex;gap:10px;align-items:baseline;background:#fff;border:1px solid #ecdcbc;border-left:4px solid #b97a10;border-radius:6px;padding:10px 14px;margin:14px 0;font-size:14px;color:#5e4413}
+
+/* Record-status bar colours: checked for colour-blind separation; legend, counts and the table carry the values too. */
+.f-closed{background:#3d8655}.f-verify{background:#a8468e}.f-active{background:#315dc8}.f-waiting{background:#b97a10}.f-draft{background:#c3c9d2}
+.f-void{background:repeating-linear-gradient(135deg,#aab2bd 0 2px,#fff 2px 5px);box-shadow:inset 0 0 0 1px #c3c9d2}
+.meter{display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden;width:100%;max-width:200px;margin:5px 0 6px}
+.meter span{flex-basis:0;min-width:4px}
+.meter.large{height:14px;max-width:none;margin:4px 0 10px}
+.meter-legend{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;margin:0 0 6px;font-size:14px}
+.meter-legend li{display:inline-flex;align-items:center;gap:7px}
+.meter-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;flex:none}
+.stat-row{display:flex;gap:12px 44px;flex-wrap:wrap;margin:0 0 16px}
+.stat{display:block;font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.stat-label{font-size:14px;color:var(--muted)}
+.table-scroll{overflow-x:auto}
+.matrix-table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+.matrix-table th,.matrix-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.matrix-table th:first-child{text-align:left}
+.matrix-table thead th{font-size:13px;color:var(--muted);font-weight:600}
+.matrix-table tfoot th,.matrix-table tfoot td{font-weight:650;border-bottom:0}
+.matrix-table .zero{color:#a0a8b4}
+
+/* Package list: a table on desktop, cards on phones. */
+.pkg-table{width:100%;border-collapse:separate;border-spacing:0;background:white;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pkg-table th{font-size:13px;color:var(--muted);font-weight:600;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);background:#fafbfc}
+.pkg-table td{padding:14px;border-bottom:1px solid var(--line);vertical-align:top;font-size:15px}
+.pkg-table tbody tr:last-child td{border-bottom:0}
+.pkg-table tbody tr{cursor:pointer}
+.pkg-table tbody tr:hover{background:#f8f9fb}
+.pkg-name a{font-weight:650;text-decoration:none;overflow-wrap:anywhere}
+.pkg-name a:hover{text-decoration:underline}
+.pkg-name small{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+.pkg-records{min-width:190px;font-size:14px}
+.pkg-records .rec-line{display:block}
+.pkg-table td .cell{min-width:0}
+@media(max-width:700px){
+ .pkg-table,.pkg-table tbody,.pkg-table tr,.pkg-table td{display:block}
+ .pkg-table thead{display:none}
+ .pkg-table{border:0;background:none;overflow:visible}
+ .pkg-table tbody tr{background:white;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+ .pkg-table td{border:0!important;padding:4px 0;display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:baseline}
+ .pkg-table td::before{content:attr(data-label);color:var(--muted);font-size:13px}
+ .pkg-table td.pkg-name{display:block;padding-bottom:8px}
+ .pkg-table td.pkg-name::before{content:none}
+ .pkg-name small{-webkit-line-clamp:2}
+}
+
+/* Record list cards, matching the current app's record list. */
+.record-list{display:grid;gap:10px}
+.record-card{background:white;border:1px solid var(--line);border-radius:10px;padding:15px 18px}
+.card .record-card{border-color:#e6e9ee}
+.record-card>a{text-decoration:none;color:var(--ink);display:flex;gap:4px 14px;align-items:baseline;flex-wrap:wrap}
+.record-card>a strong{color:var(--muted);font-size:14px;letter-spacing:.03em;font-weight:600}
+.record-card h3{margin:0;font-size:17px;color:var(--accent);overflow-wrap:anywhere}
+.record-card>a:hover h3{text-decoration:underline}
+.record-card.live{border-color:#b9c7e6}
+.opens-tag{font-size:12px;color:var(--muted);border:1px dashed #c3cad4;border-radius:4px;padding:0 6px}
+.record-facts{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:14px;margin-top:10px;align-items:center}
+.fact-package{display:inline-flex;gap:5px;align-items:center;color:var(--muted)}
+.fact-package svg{width:15px;height:15px;flex:none}
+.filters-card{padding:18px 20px}
+.filters-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr);gap:0 20px}
+.filters-grid .field{margin-bottom:14px}
+.filters-card details{padding:10px 0 0}
+.filters-card details p{margin:8px 0 0;font-size:14px}
+.filter-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 6px}
+.filter-chips button{font-size:14px;padding:4px 12px;border-radius:999px;background:var(--soft);border-color:#c9d6f2;color:#264da0}
+.totals{font-size:14px;color:var(--muted);margin:8px 0}
+@media(max-width:700px){.filters-grid{grid-template-columns:1fr}.record-facts{display:grid;grid-template-columns:1fr 1fr}.record-card{padding:14px}}
+
+/* Record header: package sits in the identity line. */
+.package-ref{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.package-ref svg{width:15px;height:15px;flex:none;color:var(--muted)}
+.package-ref a,.package-ref>span:last-child{overflow-wrap:anywhere}
+.package-ref>span:last-child{color:var(--ink)}
+
+/* Phone: secondary record actions move to a bottom sheet. */
+.more-wrap{display:none}
+.more-wrap>button{display:inline-flex;align-items:center;gap:6px}
+.more-wrap>button svg{width:16px;height:16px}
+@media(max-width:700px){main>.actions #sharing-open,main>.actions #activity-open,main>.actions #delete-record{display:none}.more-wrap{display:block}}
+.more-menu{position:fixed;left:12px;right:12px;bottom:12px;z-index:30;background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #1f293738;padding:8px;display:flex;flex-direction:column}
+.more-menu button{border:0;border-radius:8px;text-align:left;padding:12px 14px;min-height:48px;background:white}
+.more-menu button:hover{background:var(--soft)}
+.more-menu .danger-text{color:var(--overdue);border-top:1px solid var(--line);border-radius:0 0 8px 8px;margin-top:4px}
+.more-menu .menu-title{font-size:13px;color:var(--muted);padding:6px 14px 2px;margin:0}
+
+/* Overview: short values in two columns, long text full width, issued instruction quoted. */
+#content article.card h2,.record-details h2{font-size:17px}
+.record-details h2{margin-top:0}
+dl.pairs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row dense;gap:2px 28px;margin:0 0 4px}
+dl.pairs>div{min-width:0}
+dl.pairs>div.wide{grid-column:1/-1}
+dl.pairs dd{margin:4px 0 14px;overflow-wrap:anywhere}
+.instruction-quote{border-left:3px solid var(--accent);background:#f6f8fc;padding:10px 14px!important;border-radius:0 6px 6px 0;white-space:pre-wrap}
+.reading-decision{margin-top:20px}
+.gallery-head{justify-content:flex-start;gap:6px}
+@media(max-width:700px){dl.pairs{grid-template-columns:1fr}}
+
+/* Editor: package field after Description, searchable single choice. */
+.field-label.split{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.text-action{border:0;background:none;padding:2px 6px;color:var(--accent);font-weight:600;font-size:14px;min-height:32px;border-radius:5px}
+.text-action:hover{background:var(--soft)}
+.choose-one{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;padding:9px 12px;border-radius:6px;min-height:46px}
+.choose-one>span{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.choose-one .one-name{overflow-wrap:anywhere}
+.choose-one>svg{width:18px;height:18px;flex:none;color:var(--muted)}
+.one-picker .pickpanel{max-width:none;background:white}
+.one-picker .options{max-height:260px}
+.opt-group{font-size:12px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 8px 2px}
+.one-option{display:flex!important;align-items:center;gap:10px;padding:9px 8px!important;border-radius:6px;margin:0}
+.one-option .one-name{flex:1;min-width:0;overflow-wrap:anywhere}
+#wp-pending{color:#264da0;font-weight:600;margin:8px 0 0}
+.created-note{background:#eef3fd;border-radius:6px;padding:8px 12px;font-size:14px;margin:8px 0 0}
+
+/* Package form */
+#package-form .field{margin-bottom:16px}
+.field-error{color:#8f2b25;font-size:14px;margin:6px 0 0}
+input[aria-invalid=true]{border-color:var(--overdue);box-shadow:0 0 0 1px var(--overdue)}
+.req{font-weight:400;color:var(--muted)}
+.compact-list{margin:8px 0 12px;padding-left:20px}
+.compact-list li{margin:2px 0}
+
+/* Colour review controls */
+.blueprint-controls summary{min-height:32px}
+.control-group{border-top:1px dashed var(--line);padding-top:10px;margin-top:8px;font-size:14px}
+.control-group h3{margin:4px 0 8px;font-size:15px}
+.control-group h4{margin:14px 0 6px;font-size:14px}
+.inline-choice{border:0;padding:0;margin:8px 0}
+.inline-choice legend{font-weight:600;padding:0;margin-bottom:4px}
+.choice-row{display:flex;flex-wrap:wrap;gap:4px 20px}
+.choice-row .check{margin:0}
+.colour-notes{margin:6px 0;padding-left:18px}
+.colour-notes li{margin:4px 0}
+.contrast-table{border-collapse:collapse;width:100%;font-size:13px}
+.contrast-table td,.contrast-table th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:middle}
+.contrast-table th{color:var(--muted);font-weight:600}
+.swatch-sample{display:inline-block;padding:1px 8px;border-radius:4px;font-weight:650;border:1px solid var(--line)}
+.swatch-ui{display:inline-flex;padding:4px;border-radius:4px;border:1px solid var(--line)}
+.swatch-ui i{display:block;width:30px;height:12px;border-radius:2px}
+.hazard-icon{display:none}
+
+/* Proposed colour adjustments (toggle in the blueprint controls). */
+body[data-colour=adjusted]{--focus:#315dc8}
+body[data-colour=adjusted] .badge:not([data-status]),body[data-colour=adjusted] .status-colour[data-status=draft],body[data-colour=adjusted] .status-colour[data-status=cancelled],body[data-colour=adjusted] .status-colour[data-status=superseded]{box-shadow:inset 0 0 0 1px #cdd3dc}
+body[data-colour=adjusted] .status-colour[data-status=ready_for_verification]{background:#f8ebf3;color:#8a2f6e}
+body[data-colour=adjusted] .safety-notice{display:grid;grid-template-columns:20px minmax(0,1fr);gap:2px 10px;align-items:start;border-left-width:4px}
+body[data-colour=adjusted] .safety-notice .hazard-icon{display:block;grid-row:1/3;width:20px;height:20px;margin-top:1px;color:#a76518}
+body[data-colour=adjusted] .safety-notice strong,body[data-colour=adjusted] .safety-notice span{grid-column:2}
+body[data-colour=adjusted] .sketch rect:first-of-type{fill:#eef1f5;stroke:#9aa4b2}
+body[data-colour=adjusted] .sketch path{stroke:#7d8796}
+body[data-colour=adjusted] .sketch rect:last-of-type{fill:#eef3fd;stroke:#315dc8}
+body[data-colour=adjusted] .sketch text{fill:#264da0}
+</style>
+<body>
+<div class="review"><span><strong>Iteration 7 · Work packages and refinements</strong> · Standalone preview</span><span><a href="2026-10-06-ui-work-packages.html">Iteration 6 · work packages</a> · <a href="2026-10-05-ui-batch-5.html">Iteration 5</a> · <a href="2026-10-05-ui-batch-4-panels.html">Iteration 4</a> · <a href="2026-10-05-ui-batch-3.html">Iteration 3</a> · <a href="2026-10-05-ui-batch-2.html">Iteration 2</a> · <a href="2026-10-05-ui-batch-1.html">Iteration 1</a> · <a href="2026-10-05-ui-blueprint.html">Original direction</a> · <a href="2026-10-06-ui-batch-6.html">Previous colours</a></span></div>
+<header><span class="brand">Built<b>Basis</b></span><span>Γεννάδι 822Α</span><div class="account"><span>Language · English</span><span>Konstantinos</span><button data-demo="Sign out is unchanged and is not connected in this blueprint.">Sign out</button></div></header>
+<nav class="site-nav" aria-label="Main"><button type="button" data-view="records">Records</button><button type="button" data-view="packages">Work packages</button><button data-demo="Managed lists stays here. Its pages are not redesigned in this batch.">Managed lists</button><button data-demo="Projects stays here, including the existing project management controls.">Projects</button><button data-demo="Administration stays here, including backup and storage status.">Administration</button></nav>
+<main>
+<details class="iter-map" open><summary>What changed in iteration 7?</summary><div class="iter-body"><p>Each row opens the change. Everything else behaves as in iteration 6.</p><table><thead><tr><th scope="col">Area</th><th scope="col">Proposal</th><th scope="col"><span class="sr-only">Open</span></th></tr></thead><tbody>
+<tr><td>Work packages page</td><td>A project page next to Records, not a panel over a record. Status, responsible person, target date and record counts worked out from the records, with overdue and past-target warnings. Search ignores accents and case.</td><td><button type="button" data-show="packages">Show</button></td></tr>
+<tr><td>Package page</td><td>Breadcrumb, status in the identity line, the same summary strip as records, progress by status and subtype, its records, New record, and a quiet Delete that explains why a package with records cannot be deleted.</td><td><button type="button" data-show="package">Show</button></td></tr>
+<tr><td>Completing a package</td><td>Marking a package Completed or Cancelled while records are still outstanding asks first and lists them. Records never change.</td><td><button type="button" data-show="confirm">Show</button></td></tr>
+<tr><td>Records filter</td><td>Work package filter with an explicit Ungrouped choice. Record cards name their package.</td><td><button type="button" data-show="records">Show</button></td></tr>
+<tr><td>Record header</td><td>The package sits in the ID · type · status line. Owners get a link; contributors and shared readers see plain text (switch in the blueprint controls).</td><td><button type="button" data-show="identity">Show</button></td></tr>
+<tr><td>Editing a record</td><td>Work package moves below Description. Searchable choice with completed and cancelled packages listed last. “+ New package” beside the label. A note says the change applies when the record is saved.</td><td><button type="button" data-show="editor">Show</button></td></tr>
+<tr><td>Package form</td><td>Spaced fields, separate messages for a missing or duplicate name, and the status definition under Status. Try “tiling WORKS” as a name.</td><td><button type="button" data-show="form">Show</button></td></tr>
+<tr><td>Record overview</td><td>Priority, severity and completion first. Short values in two columns. Issued instruction quoted. Photo add button beside its heading. Dates written out, with “Due tomorrow” or “Overdue” beside the due date.</td><td><button type="button" data-show="overview">Show</button></td></tr>
+<tr><td>Phone</td><td>Sharing, Activity history and Delete record move into a More sheet. The main menu scrolls sideways instead of wrapping onto two lines. Narrow the window below 700 px to check.</td><td></td></tr>
+<tr><td>Colours</td><td>Agreed blue kept. Small adjustments to compare: blue focus ring, edged neutral tags, plum for verification, safety icon. Contrast checks included.</td><td><button type="button" data-show="colours">Show</button></td></tr>
+</tbody></table></div></details>
+<details class="map"><summary>What changed in iteration 6?</summary><div><table><tr><th>Area</th><th>Proposal</th></tr><tr><td>Status</td><td>Working Change status dialog. Only permitted next steps are selectable. The complete status list remains available to inspect.</td></tr><tr><td>Required information</td><td>Reasons, reopening notes and verification appear when needed. Missing record fields are explained before applying.</td></tr><tr><td>Delete record</td><td>Separate, quieter action. Confirm by typing the record ID. Referenced records must be unlinked first. This deletion policy is proposed for review.</td></tr><tr><td>Preview controls</td><td>Jump between sample statuses to inspect each flow without walking through every step.</td></tr></table><p>Standalone blueprint only. All changes affect this browser sample. Earlier layouts are retained.</p></div></details>
+<div class="sample-controls"><label for="record-type-sample">Sample record type</label><select id="record-type-sample"><option value="quality_issue">Quality Issue</option><option value="detail_clarification">Detail Clarification</option><option value="task">Task</option></select><span>Content:</span><button type="button" id="full-sample" aria-pressed="true">Filled record</button><button type="button" id="minimal-sample" aria-pressed="false">Minimal record</button><small>Sample switch only; no live data.</small></div>
+<p id="notice" class="notice" role="status" hidden></p>
+<div class="toolbar"><button data-demo="Back would return to the record list.">Back</button><button data-demo="Refresh is unchanged. Reload the browser to reset this sample.">Refresh</button></div>
+<div class="record-identity" id="record-identity"></div><h1 id="record-title"></h1><div class="actions"><button class="primary" id="edit">Edit record</button><button id="change-status">Change status</button><button id="sharing-open" aria-haspopup="dialog">Sharing</button><button id="activity-open" aria-haspopup="dialog">Activity history</button><button id="delete-record" class="delete-record">Delete record</button></div>
+<dl class="summary next-action-strip" id="record-summary"></dl><div id="safety-notice" class="safety-notice" hidden><strong>Safety implications</strong><span>This work has a flagged safety concern. Check the instructions before proceeding.</span></div>
+<div class="tabs" role="tablist" aria-label="Record sections"></div>
+<div class="phone-section"><label for="section-choice">Record section</label><select id="section-choice"></select></div>
+<section id="content"></section><section id="page-view"></section>
+<footer class="all-notes muted">Proposed seventh iteration · 6 October 2026. Builds on iteration 6 and the agreed blue colours; adds work-package pages and the review refinements. One responsive layout for desktop and phone. English labels and Greek sample content. Task fields are retained in Edit record; optional reading fields appear only when populated. Quality Issue, Detail Clarification and Task fields are represented; the full bilingual consistency review remains a later review item. Sharing and Activity history open in panels. Secondary forms use illustrative sample data only. No production code or data is changed.</footer>
+</main>
+<dialog class="review-panel" id="sharing-panel" aria-labelledby="sharing-heading"><div class="panel-heading"><div><span class="sample-label">T-0001 · SAMPLE ONLY</span><h2 id="sharing-heading">Sharing and access</h2></div><button data-close="sharing-panel">Close</button></div><div class="panel-body"><p class="warning">This sample record is Draft. Links and contributor grants do not make a Draft readable.</p><p id="sharing-feedback" class="notice" role="status" hidden></p>
+<section class="card"><h3>Print / PDF</h3><p>Print a sheet without creating a share link. Drafts can be printed without QR.</p><button id="print-options">Open print options</button><div id="print-settings" hidden><div class="grid"><div class="field"><label for="print-language">Language</label><select id="print-language"><option>English</option><option>Ελληνικά</option></select></div><div class="field"><label for="print-size">Paper</label><select id="print-size"><option>A3 landscape</option></select></div></div><label class="check"><input type="checkbox" disabled>Include QR link</label><small>Unavailable for Draft records. Private fields are excluded from print.</small><div class="actions"><button id="preview-sheet">Preview sample sheet</button></div><article id="sample-sheet" hidden><span class="badge">DRAFT / ΠΡΟΧΕΙΡΟ</span><h3>T-0001</h3><p id="print-title"></p><p id="print-description"></p><small>Illustrative content preview. PDF generation is unchanged and is not run by this blueprint.</small></article></div></section>
+<section class="card"><h3>Read-only links</h3><p>Anyone holding a link can read the public record once it is no longer Draft, until expiry or revocation.</p><article><strong>Contractor · sample link</strong><dl><dt>Availability</dt><dd id="link-state">Draft — unavailable</dd><dt>Created / Expires</dt><dd>5 October 2026 / No expiry</dd><dt>Last viewed / Views</dt><dd>Never / 0</dd></dl><label for="sample-url">Sample address — not a working link</label><input id="sample-url" readonly value="https://example.invalid/share#sample-only"><div class="actions"><button id="select-link">Select link text</button><button id="revoke-link">Revoke sample link</button></div></article><details><summary>Create a read-only link</summary><div><label for="link-label">Label / whom it is for</label><input id="link-label" placeholder="e.g. Architect"><label for="link-expiry">Expiry (optional)</label><input id="link-expiry" type="date"><button id="create-link">Preview creation</button></div></details></section>
+<section class="card"><h3>Named-user access</h3><div class="field"><label for="contributor">Contributor</label><select id="contributor"><option>Sample contractor</option><option>Sample architect</option></select></div><label class="check"><input id="grant-upload" type="checkbox" checked>Upload photos and attachments</label><label class="check"><input id="grant-log" type="checkbox">Add Log entries</label><p><small>Both off means read-only access. Notes remain owner-editable. Draft access stays blocked.</small></p><div class="actions"><button id="save-grant">Save sample permissions</button><button id="remove-grant">Remove sample access</button></div></section></div></dialog>
+<dialog class="review-panel" id="activity-panel" aria-labelledby="activity-heading"><div class="panel-heading"><div><span class="sample-label">T-0001 · SAMPLE ONLY</span><h2 id="activity-heading">Activity history</h2></div><button data-close="activity-panel">Close</button></div><div class="panel-body"><p class="muted">Automatic record changes, newest first. Site updates you write remain in Log.</p><article class="history-entry"><time>5 October 2026 · 11:40</time><h3>Location Notes changed</h3><small>Konstantinos</small><dl><dt>Previous</dt><dd>Μπροστά από τα μπάνια.</dd><dt>New</dt><dd>Μπροστά από τα παράθυρα των μπάνιων, στο ισόγειο.</dd></dl></article><article class="history-entry"><time>5 October 2026 · 11:20</time><h3>Location photo added</h3><small>Konstantinos</small><p>Planter sketch</p></article><article class="history-entry"><time>5 October 2026 · 11:00</time><h3>Record created</h3><small>Konstantinos</small><p>T-0001 · Task · Draft</p></article></div></dialog>
+<dialog class="sample-dialog" id="measurement-dialog" aria-labelledby="measurement-title"><h2 id="measurement-title">Add measurement set</h2><p class="muted">Sample entry form. Values stay in this page only.</p><form id="measurement-form"><div class="field"><label for="set-name">Set name</label><input id="set-name" required value="Planter check"></div><div class="grid"><div class="field"><label for="measurement-date">Date</label><input id="measurement-date" type="date" required value="2026-10-05"></div><div class="field"><label for="measurement-phase">Phase</label><select id="measurement-phase"><option>Before</option><option>During</option><option>After</option></select></div></div><div class="field"><label for="measurement-person">Measured by</label><select id="measurement-person"><option>Owner</option><option>Project contractor</option></select></div><div class="field"><label for="measurement-item">Item</label><input id="measurement-item" required value="Planter"></div><div class="grid"><div class="field"><label for="quantity-label">Quantity</label><input id="quantity-label" required value="Length"></div><div class="field"><label for="measurement-value">Value</label><input id="measurement-value" type="number" step="any" required value="1.60"></div><div class="field"><label for="measurement-unit">Unit</label><select id="measurement-unit"><option>m</option><option>mm</option><option>cm</option></select></div></div><div class="actions"><button type="button" onclick="document.querySelector('#measurement-dialog').close()">Cancel</button><button type="submit" class="primary">Save sample measurement</button></div></form></dialog>
+<dialog id="entry-panel" class="review-panel" aria-labelledby="entry-panel-heading"><div class="panel-heading"><div><span class="sample-label">T-0001 · RECORD EDITS KEPT OPEN</span><h2 id="entry-panel-heading"></h2></div><button type="button" id="close-entry-panel">Close</button></div><div class="panel-body"><p class="muted">Entries save separately. Your unfinished record edits are preserved.</p><div id="entry-panel-content"></div></div></dialog><dialog class="sample-dialog" id="option-dialog" aria-labelledby="option-heading"><h2 id="option-heading">Option considered</h2><form id="option-form"><div class="field"><label for="option-label">Short label</label><input id="option-label" maxlength="200" required></div><div class="field"><label for="option-description">Description</label><textarea id="option-description"></textarea></div><p class="muted">Sample proposal only. Choosing an option is a separate decision.</p><div class="actions"><button type="button" onclick="document.querySelector('#option-dialog').close()">Cancel</button><button type="submit" class="primary">Save sample option</button></div></form></dialog><div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+<dialog id="status-dialog" class="sample-dialog" aria-labelledby="status-title"><h2 id="status-title">Change status</h2><p id="status-current" class="muted"></p><form id="status-form"><label for="status-target">New status</label><select id="status-target" required></select><p id="status-definition" class="rule-hint"></p><div id="status-extra"></div><div id="status-errors" class="status-error" role="alert" hidden></div><details><summary>See all statuses for this record type</summary><div id="status-catalog" class="status-catalog"></div></details><div class="actions"><button type="submit" class="primary" id="apply-status">Apply status</button><button type="button" data-close="status-dialog">Cancel</button></div></form></dialog>
+<dialog id="delete-dialog" class="sample-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Delete record?</h2><p id="delete-description"></p><p>This permanently removes the record, its Log, measurements, activity history and attached evidence from the app. Its share links and contributor access stop working. The record number is not reused.</p><p class="muted">To retain the history of work that will not proceed, use the Cancelled status where available.</p><p id="delete-blocked" class="status-error" hidden>This record is referenced in T-0002’s “Must be done before” field. Remove that reference before deleting it.</p><button type="button" id="delete-blocked-close" hidden>Keep record</button><form id="delete-form"><label for="delete-confirm" id="delete-confirm-label"></label><input id="delete-confirm" autocomplete="off" spellcheck="false" required><div class="actions"><button class="danger" id="delete-confirm-button" disabled>Delete record</button><button type="button" data-close="delete-dialog">Keep record</button></div></form><small>Proposed owner-only deletion. Stored file bytes and existing backups follow the retention policy; this is not secure erasure.</small></dialog>
+<dialog id="package-form-dialog" class="sample-dialog" aria-labelledby="package-form-title"><h2 id="package-form-title">New work package</h2><form id="package-form" novalidate>
+<div class="field"><label for="package-name">Name <span class="req">(required)</span></label><input id="package-name" maxlength="200" autocomplete="off" aria-describedby="package-name-error"><p id="package-name-error" class="field-error" hidden></p></div>
+<div class="field"><label for="package-description">Description</label><textarea id="package-description" maxlength="10000"></textarea></div>
+<div class="grid"><div class="field"><label for="package-person">Responsible person</label><select id="package-person"><option value="">Not specified</option><option>Owner</option><option>Project contractor</option><option>Project architect</option></select></div><div class="field"><label for="package-date">Target date</label><input id="package-date" type="date"></div></div>
+<div class="field"><div class="field-label" id="package-status-row"><label for="package-status" style="display:inline">Status</label></div><select id="package-status" aria-describedby="package-status-hint"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="on_hold">On hold</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><p id="package-status-hint" class="rule-hint"></p></div>
+<p id="package-record-note" class="muted" hidden>Created straight away and selected in this record. It stays even if you cancel your record edits.</p>
+<div class="actions"><button type="submit" class="primary" id="package-save">Create work package</button><button type="button" id="package-cancel">Cancel</button></div></form></dialog>
+<dialog id="package-confirm-dialog" class="sample-dialog" aria-labelledby="package-confirm-title"><h2 id="package-confirm-title"></h2><p id="package-confirm-text"></p><ul id="package-confirm-list" class="compact-list"></ul><p class="muted">Their statuses, due dates and people do not change.</p><div class="actions"><button type="button" class="primary" id="package-confirm-yes"></button><button type="button" id="package-confirm-no">Go back</button></div></dialog>
+<dialog id="package-delete-dialog" class="sample-dialog" aria-labelledby="package-delete-title"><h2 id="package-delete-title">Delete work package?</h2><p><strong id="package-delete-name"></strong></p>
+<div id="package-delete-blocked" hidden><p id="package-delete-count" class="status-error"></p><div class="actions"><button type="button" id="package-delete-show">Show its records</button><button type="button" data-close="package-delete-dialog">Keep package</button></div></div>
+<form id="package-delete-form"><p>The package is empty, so no record is affected. Its name stays in the history of records that used it.</p><label for="package-delete-confirm">Type the package name to confirm</label><input id="package-delete-confirm" autocomplete="off" spellcheck="false"><div class="actions"><button class="danger" id="package-delete-yes" disabled>Delete package</button><button type="button" data-close="package-delete-dialog">Keep package</button></div></form></dialog><script>
+const $=s=>document.querySelector(s);const tabs=['Overview','Photos & files','Measurements','Log'];let active='Overview',editing=false,draft;let nextSection=null;
+let record={title:'Επέκταση του παρτεριού μπροστά από τα μπάνια',description:'Τα αρχικά παρτέρια ήταν μικρά. Θέλουμε να επεκταθούν σε διάσταση 1,60 × 1,40 μ. Θα σκαφτεί μόνο η τσιμεντοκονία. Προσοχή να μην τρυπηθούν καλώδια.',reference:'Μελέτη εφαρμογής σελ. 15',ball:'Project contractor',responsible:'Project contractor',severity:'Major',priority:'Urgent',due:'2026-10-07',completion:'33',safety:true,trades:['Landscaping'],tags:['External works'],locations:true,locationNotes:'Μπροστά από τα παράθυρα των μπάνιων, στο ισόγειο.',before:false,publicNotes:'',notes:'',outside:false,cost:''};
+const filledSample=structuredClone(record);
+function loadSample(minimal){if(editing&&!confirm('Discard sample edits?'))return;editing=false;active='Overview';record=structuredClone(filledSample);if(minimal)Object.assign(record,{severity:'',priority:'',completion:'',safety:false,trades:[],tags:[],reference:'',locationNotes:'',publicNotes:'',notes:'',outside:false,cost:''});$('#minimal-sample').setAttribute('aria-pressed',String(minimal));$('#full-sample').setAttribute('aria-pressed',String(!minimal));$('#notice').hidden=true;render()}
+$('#full-sample').onclick=()=>loadSample(false);$('#minimal-sample').onclick=()=>loadSample(true);
+let sampleSequence=10,measurementEditId=null,entrySection='Measurements',sampleLogDraft='';let sampleMeasurements=[{id:1,name:'Planter dimensions',date:'2026-10-05',phase:'Before',person:'Owner',item:'Planter',quantity:'Length',value:'1.60',unit:'m'}];let sampleLogs=[{id:1,text:'Ελέγξαμε τη θέση πριν ξεκινήσει η εργασία.',private:false}];
+const definitions={'Next action by':'The person whose action is needed next. This can differ from the person responsible for doing the work.',Subtype:'Task: a piece of work to be done.',Status:'Draft: not finished being written. Never shown in share links.',Severity:'Consequences of the problem. Minor, Major or Critical; separate from how soon action is needed.',Priority:'How urgently action is needed; separate from the consequences of the problem.'};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const info=(label,text)=>`<button type="button" class="info" aria-label="About ${esc(label)}" data-help="${esc(text)}"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.25" stroke-dasharray="0.1 2.35" stroke-linecap="round"/><path d="M8 7.25v4" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><circle cx="8" cy="4.75" r=".8" fill="currentColor"/></svg></button>`;
+function notify(text){$('#notice').textContent=text;$('#notice').hidden=false}
+function field(key,label,type='text'){return `<div class="field"><label for="${key}">${label}</label>${type==='textarea'?`<textarea id="${key}" name="${key}">${esc(draft[key])}</textarea>`:`<input id="${key}" name="${key}" type="${type}" value="${esc(draft[key])}" ${key==='completion'?'min="0" max="100"':''}>`}</div>`}
+function select(key,label,values){return `<div class="field"><div class="field-label"><label style="display:inline" for="${key}">${label}</label>${definitions[label]?info(label,definitions[label]):''}</div><select id="${key}" name="${key}"><option value="" ${draft[key]===''?'selected':''}>Not specified</option>${values.map(v=>`<option ${draft[key]===v?'selected':''}>${v}</option>`).join('')}</select></div>`}
+const sketch=`<svg class="sketch" viewBox="0 0 320 130" role="img" aria-label="Sample location sketch of a planter outside bathroom windows"><rect x="30" y="20" width="260" height="45" fill="#e8ede7" stroke="#98a69d"/><path d="M160 20V65M65 65H115M205 65H255" stroke="#708a7c" stroke-width="3"/><rect x="60" y="80" width="200" height="28" rx="3" fill="#e8f4ef" stroke="#08776c" stroke-dasharray="5 4"/><text x="113" y="100" fill="#245b49" font-size="12">1.60 × 1.40 m</text></svg>`;
+function photos(){return '<div id="location-gallery"></div>'}
+function row(label,value,help){if(value===null||value===undefined||String(value).trim()==='')return '';return '<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+(help?info(label,help):'')+'</dd></div>'}
+function render(){
+ document.body.classList.toggle('editing-record',editing);
+ $('#record-title').textContent=record.title;$('#edit').hidden=editing;
+ $('#record-identity').innerHTML='<span class="id">T-0001</span><span class="identity-value">Task'+info('Subtype',definitions.Subtype)+'</span><span class="identity-value"><span class="badge">Draft</span>'+info('Status',definitions.Status)+'</span>';
+ $('#record-summary').innerHTML=row('Next action by',record.ball)+row('Responsible',record.responsible)+row('Due date',record.due);
+ $('#record-summary').hidden=!$('#record-summary').innerHTML;
+ $('#safety-notice').hidden=!record.safety;
+ $('.tabs').innerHTML=tabs.map(t=>'<button role="tab" aria-selected="'+(active===t)+'" data-tab="'+t+'">'+t+'</button>').join('');
+ $('#section-choice').innerHTML=tabs.map(t=>'<option '+(active===t?'selected':'')+'>'+t+'</option>').join('');
+ if(editing){editor();return}
+ if(active!=='Overview'){renderPrimary();return}
+ const details=row('Priority',record.priority,definitions.Priority)+row('Severity',record.severity,definitions.Severity)+row('Completion',record.completion===''?'':record.completion+'%');
+ const places=row('Location',record.locations?'Villa 1 / Ground floor / Outside':'')+row('Location Notes',record.locationNotes)+row('Trades',record.trades.join(', '))+row('Tags',record.tags.join(', '))+row('Reference',record.reference);
+ const sequence=row('Must be done before',record.before?'T-0002 · Final landscaping inspection':'')+row('Created','5 October 2026 · Sample')+row('Updated','5 October 2026 · Sample');
+ const privateContent=row('Private Notes',record.notes)+(record.outside?row('Outside contract scope','Yes')+row('Estimated cost (€)',record.cost):'');
+ $('#content').innerHTML='<article class="card"><h2>Description</h2>'+(record.description.trim()?'<p class="description-text">'+esc(record.description)+'</p>':'<p class="muted">No description yet. Use Edit record to add one.</p>')+(details?'<section class="record-details"><h2>Record details</h2><dl>'+details+'</dl></section>':'')+'<section class="reading-location"><h2>Location and references</h2><dl>'+places+'</dl>'+photos()+'</section></article><details><summary>Sequence and dates</summary><div><dl>'+sequence+'</dl></div></details>'+(record.publicNotes.trim()?'<section class="card"><h2>Public Notes</h2><p>'+esc(record.publicNotes)+'</p></section>':'')+(privateContent?'<details><summary>Private · owner only</summary><div><dl>'+privateContent+'</dl></div></details>':'');
+}
+function updateSummaries(){ $('#references-summary').textContent=[draft.reference.trim()?'Reference added':'',draft.before?'Sequence set':'',draft.publicNotes.trim()?'Public notes added':''].filter(Boolean).join(' · ')||'Optional — not filled';$('#private-summary').textContent=draft.notes.trim()||draft.outside?'Private information entered':'Optional — not filled';}
+function editor(){$('#content').innerHTML='<div class="edit-heading"><span class="id">T-0001 · DRAFT</span><h2>Edit Task</h2><small>Open Measurements or Log without saving this form. Close the panel to resume your edits.</small><div class="actions"><button type="button" data-open-entry="Measurements">Measurements</button><button type="button" data-open-entry="Log">Log</button></div></div><form id="record-form" class="focused-form"><section class="card"><h3>Work</h3>'+field('title','Title')+field('description','Description','textarea')+'<div class="grid">'+select('severity','Severity',['Minor','Major','Critical'])+field('completion','Completion (%)','number')+'</div><label class="check"><input type="checkbox" name="safety" '+(draft.safety?'checked':'')+'>Safety implications</label></section><section class="card"><h3>People and timing</h3><div class="grid">'+select('ball','Next action by',['Project contractor','Project architect','Owner'])+select('responsible','Responsible',['Project contractor','Project architect','Owner'])+field('due','Due date','date')+select('priority','Priority',['Low','Normal','High','Urgent'])+'</div></section><section class="card"><h3>Location</h3><div class="tree"><small>Selected location: '+(draft.locations?'Villa 1 / Ground floor / Outside':'None')+'</small><details open><summary>Villa 1</summary><details open><summary>Ground floor</summary><label class="check"><input name="locations" type="checkbox" '+(draft.locations?'checked':'')+'>Outside</label></details></details></div>'+field('locationNotes','Location Notes','textarea')+'<section class="editor-images"><div id="location-gallery"></div></section></section><section class="card"><h3>Trades and tags</h3><div class="grid"><div id="trades-picker" class="picker"></div><div id="tags-picker" class="picker"></div></div><details><summary>Add a new tag</summary><div><p class="muted">Existing explicit tag creation. Prototype additions affect this page only.</p><label for="newtag">Tag name</label><input id="newtag"><button type="button" id="addtag">Add tag</button></div></details></section><section class="card optional-card"><details><summary>References, sequence and notes <small id="references-summary"></small></summary><div>'+field('reference','Reference')+'<h4>Must be done before</h4><label class="check"><input name="before" type="checkbox" '+(draft.before?'checked':'')+'>T-0002 · Final landscaping inspection</label>'+field('publicNotes','Public Notes','textarea')+'</div></details></section><section class="card optional-card"><details><summary>Private · owner only <small id="private-summary"></small></summary><div>'+field('notes','Private Notes','textarea')+'<label class="check"><input name="outside" type="checkbox" '+(draft.outside?'checked':'')+'>Outside contract scope</label><div id="costbox" '+(draft.outside?'':'hidden')+'>'+field('cost','Estimated cost (€)','number')+'</div></div></details></section><div class="edit-savebar"><small>Blueprint only · no live changes</small><button type="button" id="cancel">Cancel</button><button type="submit" class="primary">Save record</button></div></form>';renderPicker('trades');renderPicker('tags');renderGallery();updateSummaries();$('#record-form').oninput=e=>{const t=e.target;if(t.name){draft[t.name]=t.type==='checkbox'?t.checked:t.value;if(t.name==='outside')$('#costbox').hidden=!t.checked;updateSummaries()}};$('#record-form').onsubmit=e=>{e.preventDefault();record=structuredClone(draft);editing=false;if(nextSection){active=nextSection;nextSection=null}render();notify('Sample updated. Nothing was saved to BuiltBasis.');window.scrollTo(0,0)};$('#cancel').onclick=()=>{editing=false;render()};$('#addtag').onclick=()=>{const value=$('#newtag').value.trim();if(!value)return;if(!lists.tags.includes(value))lists.tags.push(value);if(!draft.tags.includes(value))draft.tags.push(value);$('#newtag').value='';renderPicker('tags')}}
+const lists={trades:['Aluminium','Carpentry','Electrical','Excavation','Glazing','Landscaping','Painting','Plumbing','Stonework','Waterproofing'],tags:['Bathrooms','Close-out','External works','Owner decision','Pool','Stone','Villa 1','Villa 2','Villa 3']};
+function renderPicker(key){const root=$('#'+key+'-picker');const label=key==='trades'?'Trades':'Tags';root.innerHTML=`<span class="field-label">${label}</span><div class="chips"></div><button type="button" class="choose" aria-expanded="false">Choose ${key}…</button><div class="pickpanel" hidden><label for="search-${key}">Search ${key}</label><input id="search-${key}" type="search"><div class="options"></div><button type="button" class="done">Done</button></div>`;const chips=root.querySelector('.chips');for(const value of draft[key]){const chip=document.createElement('span');chip.className='chip';chip.append(document.createTextNode(value));const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','Remove '+value);remove.onclick=()=>{draft[key]=draft[key].filter(v=>v!==value);renderPicker(key);$('#'+key+'-picker .choose').focus()};chip.append(remove);chips.append(chip)}const trigger=root.querySelector('.choose'),panel=root.querySelector('.pickpanel'),search=root.querySelector('input'),options=root.querySelector('.options');function populate(){options.replaceChildren();const found=lists[key].filter(v=>v.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()));if(!found.length)options.textContent='No matches';for(const value of found){const row=document.createElement('label');row.className='check';const check=document.createElement('input');check.type='checkbox';check.checked=draft[key].includes(value);check.onchange=()=>{draft[key]=check.checked?[...draft[key],value]:draft[key].filter(v=>v!==value)};row.append(check,document.createTextNode(value));options.append(row)}}trigger.onclick=()=>{panel.hidden=!panel.hidden;trigger.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden){populate();search.focus()}};search.oninput=populate;const close=()=>{renderPicker(key);$('#'+key+'-picker .choose').focus()};root.querySelector('.done').onclick=close;panel.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();close()}}}
+$('#edit').onclick=()=>{active='Overview';editing=true;draft=structuredClone(record);render();$('.edit-heading').scrollIntoView({block:'start'})};
+function changeTab(t){if(editing&&!confirm('Discard the sample edits?'))return;editing=false;active=t;render()}$('#section-choice').onchange=e=>changeTab(e.target.value);
+let tipOwner=null,tipTimer;function hideTip(){if(tipOwner)tipOwner.removeAttribute('aria-describedby');tipOwner=null;$('#tooltip').hidden=true}function showTip(b){clearTimeout(tipTimer);hideTip();tipOwner=b;b.setAttribute('aria-describedby','tooltip');const tip=$('#tooltip');tip.textContent=b.dataset.help;tip.hidden=false;const r=b.getBoundingClientRect();tip.style.left=Math.max(12,Math.min(r.left,innerWidth-tip.offsetWidth-12))+'px';tip.style.top=(r.bottom+tip.offsetHeight+12<innerHeight?r.bottom+6:Math.max(12,r.top-tip.offsetHeight-6))+'px'}
+document.addEventListener('pointerover',e=>{const b=e.target.closest('[data-help]');if(b)showTip(b);if(e.target.closest('#tooltip'))clearTimeout(tipTimer)});document.addEventListener('pointerout',e=>{if(e.target.closest('[data-help],#tooltip'))tipTimer=setTimeout(()=>{if(document.activeElement!==tipOwner)hideTip()},160)});document.addEventListener('focusin',e=>{if(e.target.matches('[data-help]'))showTip(e.target)});document.addEventListener('focusout',e=>{if(e.target.matches('[data-help]'))hideTip()});document.addEventListener('keydown',e=>{if(e.key==='Escape')hideTip()});document.addEventListener('scroll',hideTip,true);window.addEventListener('resize',hideTip);
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(b?.dataset.help){showTip(b);return}if(!e.target.closest('#tooltip'))hideTip();if(b?.dataset.demo)notify(b.dataset.demo);if(b?.dataset.tab)changeTab(b.dataset.tab);if(b?.dataset.tone)document.body.dataset.tone=b.dataset.tone==='blue'?'blue':''});render();
+
+function renderEvidenceSample(){
+ if(active==='Photos & files'){$('#content').innerHTML='<section class="card"><h2>Photos &amp; files</h2><small>Sample evidence. Location images remain in Overview.</small><h3>Photos · Before</h3>'+sketch+'<p>Before work · Illustrative photo position</p><div class="actions"><button data-demo="Photo editing stays here; this is a sample.">Edit photo</button><button data-demo="Photo deletion stays here; no sample is deleted.">Delete photo</button></div><h3>Attachments</h3><div class="file-row"><span><strong>Planter detail.pdf</strong><br><small>Sample drawing · PDF</small></span><button data-demo="The existing file viewer would open here.">View</button><button data-demo="Original-file download stays available. No real file is attached to this blueprint.">Download</button></div><details><summary>Upload photos or attachments</summary><div><label for="upload-kind">Upload type</label><select id="upload-kind"><option>Photos</option><option>Attachments</option></select><p>Existing upload controls and limits are retained. Uploads are not connected in this preview.</p><button data-demo="Sample only; no file chooser or upload is started.">Choose files</button></div></details></section>';return}
+ if(active==='Measurements'){$('#content').innerHTML='<section class="card"><h2>Measurements</h2><p class="muted">Sample set · 5 October 2026 · Planned</p><div class="actions"><button id="add-measurement">Add measurement set</button><button data-demo="The existing comparison view stays in this section.">Compare sets</button></div><div class="measurement-table"><table><thead><tr><th>Item</th><th>Quantity</th><th>Value</th><th>Unit</th></tr></thead><tbody><tr><td>Planter</td><td>Length</td><td>1.60</td><td>m</td></tr><tr><td>Planter</td><td>Width</td><td>1.40</td><td>m</td></tr></tbody></table></div><div class="actions"><button data-demo="Editing stays in the existing measurement form.">Edit set</button><button data-demo="Existing deletion confirmation stays here.">Delete set</button></div></section>';return}
+ $('#content').innerHTML='<section class="card"><h2>Log</h2><p class="muted">Site updates and decisions recorded by people.</p><button id="open-log-form">Add Log entry</button><details id="log-form"><summary>Log entry form</summary><div><label for="log-note">Entry</label><textarea id="log-note"></textarea><label class="check"><input id="log-private" type="checkbox">Private · owner only</label><button id="sample-log-add">Add sample entry</button></div></details><div id="log-entries"><article class="log-entry"><small>5 October 2026 · 11:45 · Konstantinos</small><p>Ελέγξαμε τη θέση πριν ξεκινήσει η εργασία.</p><div class="actions"><button data-demo="The existing log editor stays here.">Edit entry</button><button data-demo="The existing log deletion confirmation stays here.">Delete entry</button></div></article></div></section>';
+ $('#open-log-form').onclick=()=>{$('#log-form').open=true;$('#log-note').focus()};$('#sample-log-add').onclick=()=>{const text=$('#log-note').value.trim();if(!text)return;const entry=document.createElement('article');entry.className='log-entry';const meta=document.createElement('small');meta.textContent='Sample entry'+($('#log-private').checked?' · Private':'');const body=document.createElement('p');body.textContent=text;entry.append(meta,body);$('#log-entries').prepend(entry);$('#log-note').value=''};
+}
+
+function iconAction(label,kind,handler){const button=document.createElement('button');button.type='button';button.className='photo-icon';button.title=label;button.setAttribute('aria-label',label);const paths={add:'M12 5v14M5 12h14',edit:'m4 16-1 5 5-1L21 7l-4-4L4 16Z M14 6l4 4',delete:'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7'};button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+paths[kind]+'"/></svg>';button.onclick=handler;return button}
+function renderPrimary(target=$('#content'),section=active){
+ if(section==='Photos & files'){renderEvidenceSample();return}
+ const card=document.createElement('section');card.className='card';const head=document.createElement('div');head.className='gallery-head';const heading=document.createElement('h2');heading.textContent=section;head.append(heading);card.append(head);target.replaceChildren(card);
+ if(section==='Measurements'){
+  head.append(iconAction('Add measurement set','add',()=>openMeasurement(null)));const compare=document.createElement('button');compare.textContent='Compare sets';compare.onclick=()=>alert('The existing comparison view is retained; this prototype focuses on entry panels.');card.append(compare);
+  for(const set of sampleMeasurements){const article=document.createElement('article');article.className='log-entry';const title=document.createElement('h3');title.textContent=set.name;const meta=document.createElement('small');meta.textContent=set.date+' · '+set.phase+' · '+set.person;const text=document.createElement('p');text.textContent=set.item+' · '+set.quantity+': '+set.value+' '+set.unit;const actions=document.createElement('div');actions.className='actions';actions.append(iconAction('Edit '+set.name,'edit',()=>openMeasurement(set.id)),iconAction('Delete '+set.name,'delete',()=>{if(confirm('Delete this sample measurement set?')){sampleMeasurements=sampleMeasurements.filter(x=>x.id!==set.id);renderPrimary(target,section)}}));article.append(title,meta,text,actions);card.append(article)}return;
+ }
+ const form=document.createElement('form');form.hidden=true;form.innerHTML='<div class="field"><label for="log-note">Log entry</label><textarea id="log-note" required></textarea></div><label class="check"><input id="log-private" type="checkbox">Private · owner only</label><div class="actions"><button type="submit" class="primary">Save Log entry</button><button type="button" id="cancel-log-entry">Cancel entry</button></div>';card.append(form);let editingLog=null;
+ const openLog=entry=>{editingLog=entry?.id??null;form.hidden=false;form.querySelector('textarea').value=entry?.text??sampleLogDraft;form.querySelector('input').checked=entry?.private??false;form.querySelector('textarea').focus()};head.append(iconAction('Add Log entry','add',()=>openLog(null)));form.querySelector('textarea').oninput=e=>{if(editingLog===null)sampleLogDraft=e.target.value};form.querySelector('#cancel-log-entry').onclick=()=>{form.hidden=true};
+ form.onsubmit=e=>{e.preventDefault();const entry={id:editingLog??++sampleSequence,text:form.querySelector('textarea').value,private:form.querySelector('input').checked};if(editingLog!==null)sampleLogs=sampleLogs.map(x=>x.id===editingLog?entry:x);else{sampleLogs.unshift(entry);sampleLogDraft=''}renderPrimary(target,section)};
+ for(const entry of sampleLogs){const article=document.createElement('article');article.className='log-entry';const meta=document.createElement('small');meta.textContent='Konstantinos · Sample entry'+(entry.private?' · Private':'');const text=document.createElement('p');text.textContent=entry.text;const actions=document.createElement('div');actions.className='actions';actions.append(iconAction('Edit Log entry','edit',()=>openLog(entry)),iconAction('Delete Log entry','delete',()=>{if(confirm('Delete this sample Log entry?')){sampleLogs=sampleLogs.filter(x=>x.id!==entry.id);renderPrimary(target,section)}}));article.append(meta,text,actions);card.append(article)}
+}
+function openEntryPanel(section){entrySection=section;$('#entry-panel-heading').textContent=section;renderPrimary($('#entry-panel-content'),section);$('#entry-panel').showModal()}
+function openMeasurement(id){measurementEditId=id;const set=sampleMeasurements.find(x=>x.id===id)??{name:'New measurement set',date:'2026-10-05',phase:'Before',person:'Owner',item:'Planter',quantity:'Length',value:'1.60',unit:'m'};for(const [field,key] of [['set-name','name'],['measurement-date','date'],['measurement-phase','phase'],['measurement-person','person'],['measurement-item','item'],['quantity-label','quantity'],['measurement-value','value'],['measurement-unit','unit']])$('#'+field).value=set[key];$('#measurement-title').textContent=id===null?'Add measurement set':'Edit measurement set';$('#measurement-dialog').showModal()}
+function shareFeedback(text){$('#sharing-feedback').textContent=text;$('#sharing-feedback').hidden=false}
+for(const [button,panel] of [['sharing-open','sharing-panel'],['activity-open','activity-panel']])$('#'+button).onclick=()=>$('#'+panel).showModal();
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());
+$('#print-options').onclick=()=>$('#print-settings').hidden=!$('#print-settings').hidden;
+$('#preview-sheet').onclick=()=>{$('#sample-sheet').hidden=false;$('#print-title').textContent=record.title;$('#print-description').textContent=record.description};
+$('#select-link').onclick=()=>{$('#sample-url').focus();$('#sample-url').select();shareFeedback('Sample address selected. No clipboard or server action performed.')};
+$('#revoke-link').onclick=()=>{if(!confirm('Revoke this sample link? No real link is affected.'))return;$('#link-state').textContent='Revoked · sample only';$('#revoke-link').disabled=true;shareFeedback('Sample link marked revoked.')};
+$('#create-link').onclick=()=>shareFeedback($('#link-label').value.trim()?'Link creation previewed for '+$('#link-label').value.trim()+'. A Draft remains unavailable. No working link was created.':'Enter a label to preview this action.');
+$('#save-grant').onclick=()=>shareFeedback('Sample permissions: uploads '+($('#grant-upload').checked?'allowed':'off')+', Log entries '+($('#grant-log').checked?'allowed':'off')+'. Draft access remains blocked.');
+$('#remove-grant').onclick=()=>{if(confirm('Remove this sample grant? No real user is affected.'))shareFeedback('Sample grant removed. No real permissions changed.')};
+
+const localPhotos=[{id:1,name:'Planter sketch',url:null,pending:false}];let photoSequence=1;
+function renderGallery(){const root=$('#location-gallery');if(!root)return;root.innerHTML='<div class="gallery-head"><h4>Location photos</h4><button type="button" id="add-location-photos" class="photo-icon" aria-label="Add photos" title="Add photos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div><input type="file" id="location-file-input" accept="image/*" multiple hidden><div class="location-gallery-grid"></div><div class="upload-pending"></div><small>Blueprint only: files stay in this page, and Upload is simulated. Images are independent of the location tree and record-text saving.</small>';const grid=root.querySelector('.location-gallery-grid');
+ for(const photo of localPhotos){const card=document.createElement('article');card.className='location-image';if(photo.url){const img=document.createElement('img');img.src=photo.url;img.alt=photo.name;img.onerror=()=>{img.hidden=true;const fallback=document.createElement('p');fallback.textContent='Preview unavailable for this format';card.prepend(fallback)};card.append(img)}else card.innerHTML=sketch;const name=document.createElement('p');name.textContent=photo.name;const state=document.createElement('small');state.textContent=photo.pending?'Ready to upload (sample)':'Added (sample)';const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.type='button';edit.className='photo-icon';edit.title='Edit photo';edit.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L21 7l-4-4L4 16Z M14 6l4 4"/></svg>';edit.setAttribute('aria-label','Edit '+photo.name);edit.onclick=()=>{const caption=prompt('Photo caption',photo.name);if(caption!==null){photo.name=caption;renderGallery()}};const remove=document.createElement('button');remove.type='button';remove.className='photo-icon';remove.title='Delete photo';remove.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';remove.setAttribute('aria-label','Delete '+photo.name);remove.onclick=()=>{if(!confirm('Remove this sample image?'))return;if(photo.url)URL.revokeObjectURL(photo.url);localPhotos.splice(localPhotos.indexOf(photo),1);renderGallery()};actions.append(edit,remove);card.append(name,state,actions);grid.append(card)}
+ if(!localPhotos.length)grid.textContent='No location photos yet.';const pending=localPhotos.filter(p=>p.pending);if(pending.length){const bar=root.querySelector('.upload-pending');const text=document.createElement('span');text.textContent=pending.length+' photo(s) ready';const upload=document.createElement('button');upload.type='button';upload.textContent='Upload photos';upload.onclick=()=>{pending.forEach(p=>p.pending=false);renderGallery()};bar.append(text,upload)}
+ $('#add-location-photos').onclick=()=>$('#location-file-input').click();$('#location-file-input').onchange=e=>{for(const file of e.target.files){localPhotos.push({id:++photoSequence,name:file.name,url:URL.createObjectURL(file),pending:true})}renderGallery()};
+}
+// Closing a selector never discards its selected values or steals outside focus.
+function dismissOutsidePickers(target){if(!editing)return;for(const key of ['trades','tags']){const root=$('#'+key+'-picker');if(root&&!root.querySelector('.pickpanel').hidden){const insidePanel=root.querySelector('.pickpanel').contains(target);const onTrigger=root.querySelector('.choose').contains(target);const onChip=Array.from(root.querySelectorAll('.chips button')).some(button=>button.contains(target));if(!insidePanel&&!onTrigger&&!onChip)renderPicker(key)}}}
+document.addEventListener('pointerdown',e=>dismissOutsidePickers(e.target));document.addEventListener('focusin',e=>dismissOutsidePickers(e.target));
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(b?.dataset.openEntry){openEntryPanel(b.dataset.openEntry)}if(b?.id==='add-measurement')openMeasurement(null)});
+$('#measurement-form').onsubmit=e=>{e.preventDefault();const set={id:measurementEditId??++sampleSequence,name:$('#set-name').value,date:$('#measurement-date').value,phase:$('#measurement-phase').value,person:$('#measurement-person').value,item:$('#measurement-item').value,quantity:$('#quantity-label').value,value:$('#measurement-value').value,unit:$('#measurement-unit').value};if(measurementEditId===null)sampleMeasurements.push(set);else sampleMeasurements=sampleMeasurements.map(x=>x.id===measurementEditId?set:x);$('#measurement-dialog').close();if($('#entry-panel').open)renderPrimary($('#entry-panel-content'),entrySection);else renderPrimary()};
+$('#close-entry-panel').onclick=()=>$('#entry-panel').close();$('#entry-panel').addEventListener('close',()=>$('#entry-panel-content').replaceChildren());
+
+const renderRecord=render;render=function(){renderRecord();renderGallery()};render();
+
+const subtypeVocabulary={"subtype":[{"code":"quality_issue","en":"Quality Issue","el":"Ζήτημα ποιότητας","defEn":"Something wrong with work that has already been built.","defEl":"Πρόβλημα σε εργασία που έχει ήδη εκτελεστεί."},{"code":"detail_clarification","en":"Detail Clarification","el":"Τεχνική διευκρίνιση","defEn":"An instruction or detail agreed before something is built, to prevent problems.","defEl":"Οδηγία ή λεπτομέρεια που συμφωνείται πριν από την κατασκευή, ώστε να προληφθούν προβλήματα."},{"code":"task","en":"Task","el":"Εργασία","defEn":"Any other piece of work to track.","defEl":"Οποιαδήποτε άλλη εργασία προς παρακολούθηση."}],"problemType":[{"code":"nonconformance","en":"Nonconformance","el":"Μη συμμόρφωση","defEn":"Differs from an agreed requirement (drawing, specification, instruction or clarification). Write the requirement in Reference.","defEl":"Διαφέρει από συμφωνημένη απαίτηση (σχέδιο, προδιαγραφή, εντολή ή διευκρίνιση). Η απαίτηση σημειώνεται στο πεδίο Αναφορά."},{"code":"defect","en":"Defect","el":"Ελάττωμα","defEn":"Faulty workmanship or material.","defEl":"Κακοτεχνία ή ελαττωματικό υλικό."},{"code":"incomplete","en":"Incomplete work","el":"Ημιτελής εργασία","defEn":"Work that has not been finished.","defEl":"Εργασία που δεν έχει ολοκληρωθεί."},{"code":"damage","en":"Damage","el":"Φθορά / Ζημιά","defEn":"Was fine, damaged afterwards.","defEl":"Ήταν σε καλή κατάσταση και υπέστη ζημιά αργότερα."},{"code":"design_coordination","en":"Design / coordination issue","el":"Σφάλμα μελέτης / συντονισμού","defEn":"Built as drawn, but the design is wrong, incomplete, or clashes with other work.","defEl":"Κατασκευάστηκε σύμφωνα με τα σχέδια, αλλά η μελέτη είναι λανθασμένη, ελλιπής ή συγκρούεται με άλλες εργασίες."},{"code":"other","en":"Other","el":"Άλλο","defEn":"None of the above.","defEl":"Κανένα από τα παραπάνω."}],"stage":[{"code":"construction","en":"Construction","el":"Κατασκευή","defEn":"Found while the works are still ongoing.","defEl":"Εντοπίστηκε ενώ οι εργασίες βρίσκονται σε εξέλιξη."},{"code":"pre_handover","en":"Pre-handover","el":"Προ-παράδοση","defEn":"Found in the owner's own checks before the formal handover inspection (\"pre-punch\").","defEl":"Εντοπίστηκε σε ελέγχους του ιδιοκτήτη πριν από την επίσημη αυτοψία παράδοσης."},{"code":"handover","en":"Handover","el":"Παράδοση","defEn":"Found at the formal handover inspection (punch / snag list).","defEl":"Εντοπίστηκε στην επίσημη αυτοψία παράδοσης (λίστα παρατηρήσεων)."},{"code":"warranty","en":"Warranty","el":"Περίοδος εγγύησης","defEn":"Found after handover, during the defects liability period.","defEl":"Εντοπίστηκε μετά την παράδοση, εντός της περιόδου εγγύησης."}],"disposition":[{"code":"rework","en":"Rework","el":"Επανεκτέλεση","defEn":"Modify the existing work until it matches what was agreed.","defEl":"Τροποποίηση της υφιστάμενης εργασίας ώστε να συμφωνεί με τα συμφωνημένα."},{"code":"replace","en":"Replace","el":"Αντικατάσταση","defEn":"Remove and build again.","defEl":"Αφαίρεση και εκ νέου κατασκευή."},{"code":"repair","en":"Repair","el":"Επισκευή","defEn":"Make it acceptable without fully matching what was agreed. Requires approval from the authorised decision-maker, recorded in Decided by / Decided on.","defEl":"Αποκατάσταση σε αποδεκτό επίπεδο χωρίς πλήρη συμφωνία με τα συμφωνημένα. Απαιτεί έγκριση από τον αρμόδιο, με καταγραφή του ονόματος και της ημερομηνίας απόφασης."},{"code":"accept_as_is","en":"Accept as is","el":"Αποδοχή ως έχει","defEn":"Leave it; the deviation is accepted by whoever has the authority.","defEl":"Παραμένει ως έχει· η απόκλιση γίνεται αποδεκτή από τον αρμόδιο."}],"route":[{"code":"rfi","en":"RFI","el":"Αίτημα διευκρίνισης","defEn":"The contractor asks the designer to clarify something before building.","defEl":"Ο εργολάβος ζητά από τον μελετητή διευκρίνιση πριν από την κατασκευή."},{"code":"instruction","en":"Instruction","el":"Εντολή","defEn":"A detail or instruction is issued, on the issuer's own initiative or after discussion.","defEl":"Εκδίδεται λεπτομέρεια ή εντολή, με πρωτοβουλία του εκδότη ή μετά από συζήτηση."},{"code":"submittal","en":"Submittal","el":"Υποβολή προς έγκριση","defEn":"The contractor submits a drawing, product or sample for approval before using it.","defEl":"Ο εργολάβος υποβάλλει σχέδιο, προϊόν ή δείγμα προς έγκριση πριν από τη χρήση του."},{"code":"mockup","en":"Mock-up","el":"Δείγμα / δοκιμαστική κατασκευή","defEn":"One is built first and approved, then repeated.","defEl":"Κατασκευάζεται πρώτα ένα δείγμα, εγκρίνεται και έπειτα επαναλαμβάνεται."},{"code":"other","en":"Other","el":"Άλλο","defEn":"Any other route.","defEl":"Άλλη διαδικασία."}]};
+const subtypeNames={task:'Task',quality_issue:'Quality Issue',detail_clarification:'Detail Clarification'};
+const subtypeIds={task:'T-0001',quality_issue:'QI-0001',detail_clarification:'DC-0001'};
+const commonExtra={problemTypes:[],stage:'',disposition:'',correction:'',question:'',route:'',issuedBy:'',chosenOption:'',decidedBy:'',decidedOn:'',instruction:'',options:[]};
+const subtypeSamples={
+ task:{...structuredClone(filledSample),...structuredClone(commonExtra),subtype:'task'},
+ quality_issue:{...structuredClone(filledSample),...structuredClone(commonExtra),subtype:'quality_issue',title:'Ρωγμή στο τελείωμα του παρτεριού',description:'Εντοπίστηκε ρωγμή στο εξωτερικό τελείωμα του παρτεριού μπροστά από τα μπάνια.',problemTypes:['defect'],stage:'pre_handover',disposition:'repair',correction:'Τοπική αποκατάσταση του τελειώματος και επανέλεγχος.',safety:false,options:[{id:1,label:'Τοπική επισκευή',description:'Αποκατάσταση στο σημείο της ρωγμής.'},{id:2,label:'Αντικατάσταση τελειώματος',description:'Αφαίρεση και νέα εφαρμογή σε όλη την επιφάνεια.'}],chosenOption:'1',decidedBy:'Owner',decidedOn:'2026-10-05',instruction:'Να γίνει τοπική αποκατάσταση στο σημείο της ρωγμής. Να διατηρηθεί η τελική υφή.'},
+ detail_clarification:{...structuredClone(filledSample),...structuredClone(commonExtra),subtype:'detail_clarification',title:'Τελική διάσταση παρτεριού πριν την επέκταση',description:'Χρειάζεται οριστικοποίηση της διάστασης πριν ξεκινήσει η εργασία.',question:'Να επεκταθεί το παρτέρι σε 1,60 × 1,40 μ. ή να παραμείνει στην αρχική διάσταση;',route:'instruction',issuedBy:'Project architect',safety:false,options:[{id:1,label:'Επέκταση 1,60 × 1,40 μ.',description:'Περισσότερος χώρος φύτευσης.'},{id:2,label:'Διατήρηση αρχικής διάστασης',description:'Χωρίς επέμβαση στο υφιστάμενο παρτέρι.'}],chosenOption:'1',decidedBy:'Owner',decidedOn:'2026-10-05',instruction:'Εγκρίνεται η επέκταση σε 1,60 × 1,40 μ. Να προστατευθούν τα υπάρχοντα καλώδια.'}
+};
+let subtype='quality_issue',optionEditing=null,optionSequence=10;
+const vocabularyLabel=(list,code)=>subtypeVocabulary[list].find(x=>x.code===code)?.en??'';
+function vocabularyField(key,label,list){return '<div class="field"><div class="field-label"><label style="display:inline" for="'+key+'">'+label+'</label>'+info(label,subtypeVocabulary[list].find(x=>x.code===draft[key])?.defEn??'Optional until specified; choose a value to see its definition.')+'</div><select id="'+key+'" name="'+key+'"><option value="">Not specified</option>'+subtypeVocabulary[list].map(x=>'<option value="'+x.code+'" '+(draft[key]===x.code?'selected':'')+'>'+esc(x.en)+'</option>').join('')+'</select></div>'}
+function chooseSample(type,minimal=false){if(editing&&!confirm('Discard unfinished sample record edits?')){$('#record-type-sample').value=subtype;return}subtype=type;editing=false;active='Overview';record=structuredClone(subtypeSamples[type]);if(minimal)Object.assign(record,{severity:'',priority:'',completion:'',safety:false,trades:[],tags:[],reference:'',locationNotes:'',publicNotes:'',notes:'',outside:false,cost:'',...structuredClone(commonExtra)});$('#record-type-sample').value=type;$('#minimal-sample').setAttribute('aria-pressed',String(minimal));$('#full-sample').setAttribute('aria-pressed',String(!minimal));$('#notice').hidden=true;render()}
+$('#record-type-sample').onchange=e=>chooseSample(e.target.value);$('#full-sample').onclick=()=>chooseSample(subtype);$('#minimal-sample').onclick=()=>chooseSample(subtype,true);
+function optionPicker(){const node=$('#chosenOption');if(!node)return;node.replaceChildren(new Option('None',''));for(const option of draft.options)node.append(new Option(option.label,String(option.id)));node.value=draft.chosenOption}
+function renderOptions(){const host=$('#options-list');if(!host)return;host.replaceChildren();if(!draft.options.length)host.textContent='No proposals yet. Adding options is optional.';for(const option of draft.options){const article=document.createElement('article');const head=document.createElement('div');head.className='option-heading';const title=document.createElement('h4');title.textContent=option.label;const controls=document.createElement('div');controls.className='actions';controls.append(iconAction('Edit '+option.label,'edit',()=>openOption(option.id)),iconAction('Delete '+option.label,'delete',()=>{if(draft.chosenOption===String(option.id)){alert('Choose a different option or None before deleting the chosen sample option.');return}if(confirm('Delete this sample proposal? Unchosen alternatives normally remain as history.')){draft.options=draft.options.filter(x=>x.id!==option.id);renderOptions()}}));head.append(title,controls);const body=document.createElement('p');body.textContent=option.description;article.append(head,body);host.append(article)}optionPicker()}
+function openOption(id){optionEditing=id;const option=draft.options.find(x=>x.id===id);$('#option-label').value=option?.label??'';$('#option-description').value=option?.description??'';$('#option-dialog').showModal()}
+$('#option-form').onsubmit=e=>{e.preventDefault();const option={id:optionEditing??++optionSequence,label:$('#option-label').value,description:$('#option-description').value};if(optionEditing===null)draft.options.push(option);else draft.options=draft.options.map(x=>x.id===optionEditing?option:x);renderOptions();$('#option-dialog').close()};
+const originalEditor=editor;
+editor=function(){originalEditor();$('.edit-heading .id').textContent=subtypeIds[subtype]+' · DRAFT';$('.edit-heading h2').textContent='Edit '+subtypeNames[subtype];if(subtype==='task')return;
+ const work=$('#record-form .card');const classification=document.createElement('div');classification.className='subtype-fields';
+ if(subtype==='quality_issue'){classification.innerHTML='<h4>Type of problem</h4><p class="rule-hint">Required when this record leaves Draft for an active status. Select all that apply.</p><div class="problem-options">'+subtypeVocabulary.problemType.map(x=>'<div class="problem-choice"><label class="check"><input type="checkbox" data-problem="'+x.code+'" '+(draft.problemTypes.includes(x.code)?'checked':'')+'>'+esc(x.en)+'</label>'+info(x.en,x.defEn)+'</div>').join('')+'</div><p id="reference-hint" class="rule-hint" '+(draft.problemTypes.includes('nonconformance')?'':'hidden')+'>Nonconformance: identify the agreed requirement in Reference, under References, sequence and notes.</p>'+vocabularyField('stage','Stage','stage');classification.querySelectorAll('[data-problem]').forEach(input=>input.onchange=()=>{draft.problemTypes=input.checked?[...draft.problemTypes,input.dataset.problem]:draft.problemTypes.filter(x=>x!==input.dataset.problem);$('#reference-hint').hidden=!draft.problemTypes.includes('nonconformance')})}
+ else classification.innerHTML=field('question','Question','textarea')+'<p class="rule-hint">Required in active statuses. Describe what needs defining or agreeing before work begins.</p>';
+ work.append(classification);
+ const decision=document.createElement('section');decision.className='card decision-block';decision.innerHTML='<h3>Decision and instruction</h3>'+(subtype==='quality_issue'?vocabularyField('disposition','Disposition','disposition')+'<p id="decision-rule" class="rule-hint"></p>'+field('correction','Correction','textarea'):vocabularyField('route','Route','route')+select('issuedBy','Issued by',['Project architect','Project contractor','Owner']))+'<div class="gallery-head"><h4>Options considered</h4><span id="add-option-action"></span></div><div id="options-list" class="options-list"></div><div class="field"><label for="chosenOption">Chosen option</label><select id="chosenOption" name="chosenOption"></select></div><div class="grid">'+select('decidedBy','Decided by',['Project architect','Project contractor','Owner'])+field('decidedOn','Decided on','date')+'</div>'+field('instruction','Instruction text','textarea')+'<p class="rule-hint">Exact wording as issued. Choosing an option does not fill or rewrite this text.</p>';
+ work.after(decision);$('#add-option-action').append(iconAction('Add option','add',()=>openOption(null)));renderOptions();
+ const rule=()=>{if(subtype!=='quality_issue')return;$('#decision-rule').textContent=['repair','accept_as_is'].includes(draft.disposition)?'Repair and Accept as is require Decided by and Decided on in every active status. This Draft may remain incomplete.':'Disposition is required before Issued or In progress, and for closing without verification.'};rule();$('#disposition')?.addEventListener('change',rule);
+ decision.addEventListener('change',e=>{if(e.target.name)draft[e.target.name]=e.target.value;const help=e.target.closest('.field')?.querySelector('[data-help]');if(help&&['disposition','route'].includes(e.target.name))help.dataset.help=subtypeVocabulary[e.target.name].find(x=>x.code===e.target.value)?.defEn??'Not specified';rule()});
+};
+const previousRender=render;
+render=function(){previousRender();const id=subtypeIds[subtype];if(!editing){$('#record-identity').innerHTML='<span class="id">'+id+'</span><span class="identity-value">'+subtypeNames[subtype]+info('Subtype',subtypeVocabulary.subtype.find(x=>x.code===subtype).defEn)+'</span><span class="identity-value"><span class="badge">Draft</span>'+info('Status',definitions.Status)+'</span>';if(active==='Overview'&&subtype!=='task'){const article=$('#content > article');const extra=document.createElement('section');extra.className='reading-decision';const classification=subtype==='quality_issue'?row('Type of problem',record.problemTypes.map(x=>vocabularyLabel('problemType',x)).join(', '))+row('Stage',vocabularyLabel('stage',record.stage)):row('Question',record.question);const chosen=record.options.find(x=>String(x.id)===record.chosenOption);const decision=(subtype==='quality_issue'?row('Disposition',vocabularyLabel('disposition',record.disposition))+row('Correction',record.correction):row('Route',vocabularyLabel('route',record.route))+row('Issued by',record.issuedBy))+row('Chosen option',chosen?.label)+row('Decided by',record.decidedBy)+row('Decided on',record.decidedOn)+row('Instruction text',record.instruction);extra.innerHTML=(classification?'<h2>Classification</h2><dl>'+classification+'</dl>':'')+(decision?'<h2>Decision and instruction</h2><dl>'+decision+'</dl>':'')+(record.options.length?'<details><summary>Options considered ('+record.options.length+')</summary>'+record.options.map(x=>'<article><h4>'+esc(x.label)+(String(x.id)===record.chosenOption?' · Chosen':'')+'</h4><p>'+esc(x.description)+'</p></article>').join('')+'</details>':'');article.querySelector('.description-text')?.after(extra)}}document.querySelectorAll('.sample-label').forEach(el=>el.textContent=el.textContent.replace(/(?:T|QI|DC)-0001/g,id))};
+chooseSample('quality_issue');
+
+// Frozen domain rules for this standalone review; no application module is changed.
+const lifecycleVocabulary={"status":[{"code":"draft","en":"Draft","el":"Πρόχειρο","defEn":"Not finished being written. Never shown in share links.","defEl":"Η καταχώριση δεν έχει ολοκληρωθεί. Δεν εμφανίζεται ποτέ σε συνδέσμους κοινοποίησης."},{"code":"open","en":"Open","el":"Ανοιχτό","defEn":"Logged and complete, but nobody has yet been asked to decide or act.","defEl":"Καταγράφηκε πλήρως, αλλά δεν έχει ζητηθεί ακόμη από κανέναν να αποφασίσει ή να ενεργήσει."},{"code":"awaiting_decision","en":"Awaiting decision","el":"Αναμονή απόφασης","defEn":"Someone (usually the architect) has been asked to decide what should be done.","defEl":"Έχει ζητηθεί από κάποιον (συνήθως τον αρχιτέκτονα) να αποφασίσει τι πρέπει να γίνει."},{"code":"issued","en":"Issued","el":"Εκδόθηκε","defEn":"The decision is made and the instruction has gone to whoever does the work; the work has not started.","defEl":"Η απόφαση πάρθηκε και η εντολή δόθηκε σε όποιον εκτελεί την εργασία· η εργασία δεν έχει ξεκινήσει."},{"code":"in_progress","en":"In progress","el":"Σε εξέλιξη","defEn":"The work has started.","defEl":"Η εργασία έχει ξεκινήσει."},{"code":"ready_for_verification","en":"Ready for verification","el":"Προς έλεγχο","defEn":"Reported as done; waiting for someone to check it.","defEl":"Δηλώθηκε ως ολοκληρωμένο· αναμένεται έλεγχος."},{"code":"on_hold","en":"On hold","el":"Σε αναμονή","defEn":"Paused by a decision or by circumstances. A reason is required.","defEl":"Σε παύση λόγω απόφασης ή συνθηκών. Απαιτείται αιτιολογία."},{"code":"closed","en":"Closed","el":"Κλειστό","defEn":"Finished; nothing more to do.","defEl":"Ολοκληρώθηκε· δεν απαιτείται άλλη ενέργεια."},{"code":"cancelled","en":"Cancelled","el":"Ακυρώθηκε","defEn":"Will not be pursued. A reason is required.","defEl":"Δεν θα προχωρήσει. Απαιτείται αιτιολογία."},{"code":"superseded","en":"Superseded","el":"Αντικαταστάθηκε","defEn":"Replaced by a later clarification and kept as history. Detail Clarification only.","defEl":"Αντικαταστάθηκε από μεταγενέστερη διευκρίνιση και διατηρείται ως ιστορικό. Μόνο για τεχνικές διευκρινίσεις."}],"onHoldReason":[{"code":"waiting_material","en":"Waiting for material","el":"Αναμονή υλικού","defEn":"Needed material or equipment has not arrived.","defEl":"Δεν έχει φτάσει το απαιτούμενο υλικό ή εξοπλισμός."},{"code":"waiting_trade","en":"Waiting for another trade","el":"Αναμονή άλλης ειδικότητας","defEn":"Another trade must work first.","defEl":"Πρέπει πρώτα να εργαστεί άλλη ειδικότητα."},{"code":"waiting_information","en":"Waiting for information","el":"Αναμονή πληροφοριών","defEn":"Information or documents are missing.","defEl":"Λείπουν πληροφορίες ή έγγραφα."},{"code":"deferred","en":"Deferred","el":"Αναβολή","defEn":"Deliberately postponed, e.g. to winter or a later stage.","defEl":"Μετατέθηκε σκόπιμα, π.χ. για τον χειμώνα ή για επόμενο στάδιο."},{"code":"weather","en":"Weather","el":"Καιρικές συνθήκες","defEn":"The weather prevents the work.","defEl":"Οι καιρικές συνθήκες δεν επιτρέπουν την εργασία."},{"code":"other","en":"Other","el":"Άλλο","defEn":"Any other reason, explained in the note.","defEl":"Άλλος λόγος, που εξηγείται στη σημείωση."}],"cancellationReason":[{"code":"duplicate","en":"Duplicate","el":"Διπλοεγγραφή","defEn":"The same matter is already recorded.","defEl":"Το ίδιο θέμα έχει ήδη καταχωριστεί."},{"code":"raised_in_error","en":"Raised in error","el":"Λάθος καταχώριση","defEn":"Recorded by mistake.","defEl":"Καταχωρίστηκε κατά λάθος."},{"code":"no_longer_needed","en":"No longer needed","el":"Δεν χρειάζεται πλέον","defEn":"Circumstances changed; nothing needs doing.","defEl":"Οι συνθήκες άλλαξαν· δεν απαιτείται ενέργεια."},{"code":"replaced","en":"Replaced by another record","el":"Αντικαταστάθηκε από άλλη εγγραφή","defEn":"Continued in another record, whose ID is written in the note.","defEl":"Συνεχίζεται σε άλλη εγγραφή, ο κωδικός της οποίας σημειώνεται στη σημείωση."},{"code":"other","en":"Other","el":"Άλλο","defEn":"Any other reason, explained in the note.","defEl":"Άλλος λόγος, που εξηγείται στη σημείωση."}],"verificationMethod":[{"code":"visual","en":"Visual","el":"Οπτικός","defEn":"Checked by looking at the work, on site or in photos.","defEl":"Έλεγχος με επιθεώρηση της εργασίας, επί τόπου ή μέσω φωτογραφιών."},{"code":"measurement","en":"Measurement","el":"Μέτρηση","defEn":"Checked with a recorded measurement set.","defEl":"Έλεγχος με καταγεγραμμένες μετρήσεις."},{"code":"document","en":"Document","el":"Έγγραφο","defEn":"Checked against a certificate, declaration or report.","defEl":"Έλεγχος μέσω πιστοποιητικού, δήλωσης ή έκθεσης."},{"code":"test","en":"Test","el":"Δοκιμή","defEn":"Checked by a functional test (e.g. water, pressure, electrical).","defEl":"Έλεγχος με δοκιμή λειτουργίας (π.χ. στεγανότητας, πίεσης, ηλεκτρολογική)."}]};
+const codesOf=k=>lifecycleVocabulary[k].map(x=>x.code);
+const isCode=(k,c)=>codesOf(k).includes(c);
+const INCOMPLETE_ALLOWED = ['draft', 'cancelled', 'superseded'];
+const END_STATES = ['closed', 'cancelled', 'superseded'];
+/** Statuses a subtype may use (design §7.2). */
+function statusesFor(subtype) {
+    const all = codesOf('status');
+    return subtype === 'detail_clarification' ? all : all.filter((status) => status !== 'superseded');
+}
+/** Active statuses require complete required fields (design §5, §8.2). */
+function isActive(status) {
+    return !INCOMPLETE_ALLOWED.includes(status);
+}
+/** Non-terminal statuses can be superseded (design §8.1). */
+function isNonTerminal(status) {
+    return !END_STATES.includes(status);
+}
+const hasText = (value) => typeof value === 'string' && value.trim() !== '';
+const DECISION_DISPOSITIONS = ['repair', 'accept_as_is'];
+const DISPOSITION_STATUSES = ['issued', 'in_progress', 'ready_for_verification', 'closed'];
+/** Required fields missing for the record's current status (design §5.1, §6.1, §6.2). */
+function missingRequired(record) {
+    if (!isActive(record.status))
+        return [];
+    const missing = [];
+    if (!hasText(record.title))
+        missing.push('title');
+    if (record.subtype === 'quality_issue' && record.problemTypes.length === 0)
+        missing.push('problemTypes');
+    if (record.subtype === 'detail_clarification' && !hasText(record.question))
+        missing.push('question');
+    return missing;
+}
+/** Repair and Accept as is need Decided by and Decided on (design §5.6, §6.1). */
+function needsDecision(record) {
+    return (record.disposition !== null &&
+        DECISION_DISPOSITIONS.includes(record.disposition) &&
+        (record.decidedById === null || !hasText(record.decidedOn)));
+}
+/** Rules every save must satisfy in the record's current status (design §8.2). */
+function validateSave(record) {
+    const errors = missingRequired(record).map((field) => `required:${field}`);
+    if (record.subtype === 'quality_issue' && isActive(record.status)) {
+        if (DISPOSITION_STATUSES.includes(record.status) && record.disposition === null) {
+            errors.push('disposition_required');
+        }
+        // Repair and Accept as is need a recorded decision in every active status (design §5.6).
+        if (needsDecision(record))
+            errors.push('decision_required');
+    }
+    return errors;
+}
+const BASE_TARGETS = {
+    draft: ['open', 'cancelled'],
+    open: ['awaiting_decision', 'issued', 'in_progress', 'on_hold', 'cancelled', 'closed'],
+    awaiting_decision: ['issued', 'on_hold', 'cancelled', 'closed'],
+    issued: ['in_progress', 'on_hold', 'cancelled', 'closed'],
+    in_progress: ['ready_for_verification', 'on_hold', 'cancelled', 'closed'],
+    ready_for_verification: ['closed', 'in_progress'],
+    on_hold: [], // resume only: see allowedTargets
+    closed: ['open'],
+    cancelled: [],
+    superseded: [],
+};
+/** Which subtypes may close from which status without verification (design §8.1). */
+function closeAllowedFrom(record) {
+    switch (record.status) {
+        case 'open':
+            return record.subtype === 'quality_issue' || record.subtype === 'task';
+        case 'awaiting_decision':
+            return record.subtype === 'quality_issue';
+        case 'issued':
+            return record.subtype === 'quality_issue' || record.subtype === 'detail_clarification';
+        case 'in_progress':
+            return record.subtype === 'task';
+        default:
+            return true; // ready_for_verification → closed (with verification)
+    }
+}
+/** Statuses the record may move to, before field conditions are checked. */
+function allowedTargets(record) {
+    const own = statusesFor(record.subtype);
+    const base = record.status === 'on_hold'
+        ? record.statusBeforeHold
+            ? [record.statusBeforeHold]
+            : []
+        : [...BASE_TARGETS[record.status]];
+    const targets = base.filter((target) => target !== 'closed' || closeAllowedFrom(record));
+    if (record.subtype === 'detail_clarification' && isNonTerminal(record.status))
+        targets.push('superseded');
+    return targets.filter((target) => own.includes(target));
+}
+/** Checks a status change and derives the verification outcome where one applies. */
+function checkTransition(record, input) {
+    const { to } = input;
+    if (!allowedTargets(record).includes(to))
+        return { ok: false, errors: ['transition_not_allowed'] };
+    // The resulting record must satisfy every save rule: required fields, disposition, decision.
+    const errors = validateSave({ ...record, status: to });
+    const leavesVerification = record.status === 'ready_for_verification' && (to === 'closed' || to === 'in_progress');
+    if (record.subtype === 'quality_issue' &&
+        to === 'closed' &&
+        !leavesVerification &&
+        record.disposition !== null &&
+        record.disposition !== 'accept_as_is') {
+        errors.push('accept_as_is_required');
+    }
+    const checkReason = (list, noteRequiredFor) => {
+        const code = input.reasonCode;
+        if (!hasText(code))
+            errors.push('reason_required');
+        else if (!isCode(list, code))
+            errors.push('reason_invalid');
+        else if (noteRequiredFor.includes(code) && !hasText(input.reasonNote))
+            errors.push('reason_note_required');
+    };
+    if (to === 'on_hold')
+        checkReason('onHoldReason', ['other']);
+    if (to === 'cancelled')
+        checkReason('cancellationReason', ['replaced', 'other']);
+    const reopening = record.status === 'closed' && to === 'open';
+    if ((to === 'superseded' || reopening) && !hasText(input.note))
+        errors.push('note_required');
+    let verificationOutcome = null;
+    if (leavesVerification) {
+        const verification = input.verification;
+        if (!verification ||
+            verification.checkedById === null ||
+            !hasText(verification.date) ||
+            !isCode('verificationMethod', verification.method)) {
+            errors.push('verification_required');
+        }
+        verificationOutcome = to === 'closed' ? 'passed' : 'failed';
+    }
+    return errors.length > 0 ? { ok: false, errors } : { ok: true, verificationOutcome };
+}
+
+
+let sampleStatus='draft', heldFrom='in_progress', sampleDeleted=false, statusEvents=[];
+const statusName=c=>lifecycleVocabulary.status.find(x=>x.code===c)?.en||c;
+const domainState=()=>({subtype,status:sampleStatus,statusBeforeHold:heldFrom,title:record.title,problemTypes:record.problemTypes||[],question:record.question,disposition:record.disposition||null,decidedById:record.decidedBy?1:null,decidedOn:record.decidedOn||null});
+const preview=document.createElement('div');preview.className='preview-only';preview.innerHTML='<label for="preview-status">Preview current status</label><select id="preview-status"></select><label class="check"><input id="preview-referenced" type="checkbox">Another record references this one</label><small>Review controls only; not part of the app.</small>';$('.sample-controls').append(preview);
+const renderBeforeLifecycle=render;
+render=function(){renderBeforeLifecycle();if(!editing){$('#record-identity .badge').textContent=statusName(sampleStatus);$('#record-identity .badge').classList.add('status-colour');$('#record-identity .badge').dataset.status=sampleStatus;const button=$('#record-identity .badge').parentElement.querySelector('[data-help]');if(button)button.dataset.help=lifecycleVocabulary.status.find(x=>x.code===sampleStatus).defEn;$('#change-status').disabled=allowedTargets(domainState()).length===0;$('#change-status').title=$('#change-status').disabled?'This is a terminal status. No further changes are allowed.':'';}$('#preview-status').innerHTML=statusesFor(subtype).map(c=>'<option value="'+c+'">'+statusName(c)+'</option>').join('');$('#preview-status').value=sampleStatus;$('#sharing-panel .warning').textContent=sampleStatus==='draft'?'This sample record is Draft. Links and contributor grants do not make a Draft readable.':'Sharing controls are illustrative only. No working links are created.';if(sampleDeleted){$('#content').innerHTML='<section class="card"><h2>Sample record deleted</h2><p>No live record was changed.</p><button id="restore-sample">Reset sample</button></section>';$('#restore-sample').onclick=()=>chooseSample(subtype);document.querySelectorAll('main>.actions button').forEach(b=>b.disabled=true)}else document.querySelectorAll('main>.actions button').forEach(b=>{if(b.id!=='change-status')b.disabled=false});};
+const chooseBeforeLifecycle=chooseSample;chooseSample=function(type,minimal=false){if(editing){chooseBeforeLifecycle(type,minimal);if(editing)return}else chooseBeforeLifecycle(type,minimal);sampleStatus='draft';heldFrom='in_progress';sampleDeleted=false;statusEvents=[];render()};
+$('#preview-status').onchange=e=>{if(editing){e.target.value=sampleStatus;alert('Save or cancel your sample edits first.');return}sampleStatus=e.target.value;sampleDeleted=false;render()};
+const optionsFor=k=>'<option value="">Choose…</option>'+lifecycleVocabulary[k].map(x=>'<option value="'+x.code+'">'+esc(x.en)+'</option>').join('');
+function statusExtras(){const to=$('#status-target').value;$('#status-errors').hidden=true;$('#status-definition').textContent=lifecycleVocabulary.status.find(x=>x.code===to)?.defEn||'';const reasonList=to==='on_hold'?'onHoldReason':to==='cancelled'?'cancellationReason':null;const verify=sampleStatus==='ready_for_verification'&&['closed','in_progress'].includes(to);let s='';if(reasonList)s+='<label for="status-reason">Reason (required)</label><select id="status-reason" required>'+optionsFor(reasonList)+'</select><label for="status-reason-note">Reason note <span id="reason-needed">(optional)</span></label><textarea id="status-reason-note"></textarea>';if(to==='superseded'||(sampleStatus==='closed'&&to==='open'))s+='<label for="transition-note">'+(to==='superseded'?'Replacement record and reason':'Reason for reopening')+' (required)</label><textarea id="transition-note" required></textarea>';else if(to)s+='<details><summary>Add transition note</summary><label for="transition-note">Note (optional)</label><textarea id="transition-note"></textarea></details>';if(verify)s+='<fieldset><legend>Verification · '+(to==='closed'?'Passed':'Failed')+'</legend><label for="verify-person">Checked by (required)</label><select id="verify-person" required><option value="">Choose…</option><option value="1">Konstantinos</option><option value="2">Project contractor</option></select><label for="verify-date">Date (required)</label><input id="verify-date" type="date" value="2026-10-06" required><label for="verify-method">Method (required)</label><select id="verify-method" required>'+optionsFor('verificationMethod')+'</select><label for="verify-note">Verification note (optional)</label><textarea id="verify-note"></textarea></fieldset>';$('#status-extra').innerHTML=s;$('#apply-status').disabled=!to;if(reasonList)$('#status-reason').onchange=()=>{const required=$('#status-reason').value==='other'||(to==='cancelled'&&$('#status-reason').value==='replaced');$('#status-reason-note').required=required;$('#reason-needed').textContent=required?'(required)':'(optional)'}}
+$('#change-status').onclick=()=>{const targets=allowedTargets(domainState());$('#status-current').textContent=subtypeIds[subtype]+' · Currently '+statusName(sampleStatus)+(sampleStatus==='on_hold'?' · Resume to '+statusName(heldFrom):'');$('#status-target').innerHTML='<option value="">Choose next status…</option>'+targets.map(c=>'<option value="'+c+'">'+statusName(c)+'</option>').join('');$('#status-catalog').innerHTML=statusesFor(subtype).map(c=>'<article><strong>'+statusName(c)+'</strong><p>'+esc(lifecycleVocabulary.status.find(x=>x.code===c).defEn)+'</p><small>'+(c===sampleStatus?'Current status':targets.includes(c)?'Available next':'Not a next step from '+statusName(sampleStatus))+'</small></article>').join('');statusExtras();$('#status-dialog').showModal()};
+$('#status-target').onchange=statusExtras;
+const ruleMessages={'required:title':'Enter a Title in Edit record.','required:problemTypes':'Select at least one Type of problem in Edit record.','required:question':'Enter the Question in Edit record.',disposition_required:'Choose a Disposition in Edit record.',decision_required:'Enter Decided by and Decided on in Edit record.',accept_as_is_required:'Closing a Quality Issue without verification requires Accept as is. Otherwise complete the work and verification first.',reason_required:'Select a reason.',reason_invalid:'Choose a listed reason.',reason_note_required:'Add the required reason note.',note_required:'Add the required transition note.',verification_required:'Complete Checked by, Date and Method.',transition_not_allowed:'This status is not an available next step.'};
+$('#status-form').onsubmit=e=>{e.preventDefault();const val=id=>$('#'+id)?.value||null;const to=val('status-target');const input={to,reasonCode:val('status-reason'),reasonNote:val('status-reason-note'),note:val('transition-note'),verification:$('#verify-person')?{checkedById:Number(val('verify-person'))||null,date:val('verify-date'),method:val('verify-method'),note:val('verify-note')}:null};const result=checkTransition(domainState(),input);if(!result.ok){$('#status-errors').innerHTML='<strong>Status has not changed.</strong><ul>'+result.errors.map(x=>'<li>'+esc(ruleMessages[x])+'</li>').join('')+'</ul>';$('#status-errors').hidden=false;return}const from=sampleStatus;if(to==='on_hold')heldFrom=from;sampleStatus=to;statusEvents.push({from,to,input,outcome:result.verificationOutcome});$('#status-dialog').close();render();$('#notice').textContent='Sample status changed from '+statusName(from)+' to '+statusName(to)+(result.verificationOutcome?' · Verification '+result.verificationOutcome:'')+'.';$('#notice').hidden=false;};
+$('#delete-record').onclick=()=>{const blocked=$('#preview-referenced').checked;$('#delete-description').textContent=subtypeIds[subtype]+' · '+record.title;$('#delete-blocked').hidden=!blocked;$('#delete-form').hidden=blocked;$('#delete-blocked-close').hidden=!blocked;$('#delete-confirm-label').textContent='Type '+subtypeIds[subtype]+' to confirm';$('#delete-confirm').value='';$('#delete-confirm-button').disabled=true;$('#delete-dialog').showModal()};
+$('#delete-blocked-close').onclick=()=>$('#delete-dialog').close();
+$('#delete-confirm').oninput=()=>$('#delete-confirm-button').disabled=$('#delete-confirm').value!==subtypeIds[subtype];
+$('#delete-form').onsubmit=e=>{e.preventDefault();if($('#preview-referenced').checked||$('#delete-confirm').value!==subtypeIds[subtype])return;sampleDeleted=true;$('#delete-dialog').close();render()};
+for(const id of ['status-dialog','delete-dialog'])document.querySelector('[data-close="'+id+'"]').onclick=()=>$('#'+id).close();
+const openHistory=$('#activity-open').onclick;$('#activity-open').onclick=()=>{openHistory();$('#sample-status-history')?.remove();const section=document.createElement('section');section.id='sample-status-history';section.className='card';section.innerHTML='<h3>Status changes in this preview</h3>'+(statusEvents.length?statusEvents.slice().reverse().map(event=>'<article><p><strong>'+statusName(event.from)+' → '+statusName(event.to)+'</strong></p>'+[event.input.reasonCode,event.input.reasonNote,event.input.note,event.outcome&&'Verification '+event.outcome,event.input.verification?.note].filter(Boolean).map(x=>'<p>'+esc(x)+'</p>').join('')+'</article>').join(''):'<p>No sample status changes yet.</p>');$('#activity-panel .panel-body').prepend(section)};
+render();
+
+
+const controls=document.createElement('details');controls.className='blueprint-controls';controls.innerHTML='<summary>Blueprint testing controls and status colours</summary>';
+const sampleControls=$('.sample-controls');sampleControls.before(controls);controls.append(sampleControls);
+const palette=document.createElement('div');palette.className='palette-strip';palette.innerHTML=lifecycleVocabulary.status.map(s=>'<span class="badge status-colour" data-status="'+s.code+'">'+s.en+'</span>').join('');controls.append(palette);
+$('.map').hidden=true;
+
+
+// Iteration 7 · work packages as project pages, package field in the editor, record refinements and colour review.
+// Standalone sample only. Today is fixed so overdue states stay stable during review.
+const TODAY='2026-10-06';
+const fold=s=>String(s).trim().replace(/\s+/g,' ').toLocaleLowerCase('el').normalize('NFD').replace(/\p{M}/gu,'').replace(/ς/g,'σ');
+const toDay=iso=>{const [y,m,d]=iso.split('-').map(Number);return Date.UTC(y,m-1,d)};
+const fmtDate=iso=>iso?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(toDay(iso)):'';
+const daysAway=iso=>Math.round((toDay(iso)-toDay(TODAY))/864e5);
+const isOutstanding=status=>!END_STATES.includes(status);
+const icons={
+ package:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg>',
+ chevron:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+ clock:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+ hazard:'<svg class="hazard-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 2.5 20h19L12 3.5Z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".7" fill="currentColor"/></svg>'};
+function dueChip(iso,outstanding){if(!iso||!outstanding)return '';const d=daysAway(iso);if(d<0)return '<span class="date-chip overdue">'+icons.clock+'Overdue by '+(-d)+' day'+(d===-1?'':'s')+'</span>';if(d===0)return '<span class="date-chip">Due today</span>';if(d===1)return '<span class="date-chip">Due tomorrow</span>';return ''}
+
+// Readable dates everywhere a stored date is shown; Due date also says how close it is.
+const rowBeforeDates=row;
+row=function(label,value,help){if(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value))return '<div><dt>'+esc(label)+'</dt><dd>'+esc(fmtDate(value))+(label==='Due date'?dueChip(value,isOutstanding(sampleStatus)):'')+(help?info(label,help):'')+'</dd></div>';return rowBeforeDates(label,value,help)};
+
+// ---- Sample packages and records ----
+const packageStatuses=[
+ {code:'planned',en:'Planned',def:'Work in this package has not started.'},
+ {code:'in_progress',en:'In progress',def:'Work in this package is underway.'},
+ {code:'on_hold',en:'On hold',def:'Work in this package is temporarily paused.'},
+ {code:'completed',en:'Completed',def:'The owner considers the scope of this package finished. Separate from record Closed.'},
+ {code:'cancelled',en:'Cancelled',def:'This package will not proceed.'}];
+const pkgStatus=code=>packageStatuses.find(s=>s.code===code);
+const packageOrder=['in_progress','planned','on_hold','completed','cancelled'];
+const closedPackage=code=>code==='completed'||code==='cancelled';
+const sortPackages=list=>[...list].sort((a,b)=>packageOrder.indexOf(a.status)-packageOrder.indexOf(b.status)||a.name.localeCompare(b.name,'el'));
+let packages=[
+ {id:1,name:'Tiling works',description:'Complete tiling in both villas and resolve the related quality issues and clarifications.',person:'Project contractor',date:'2026-10-30',status:'in_progress'},
+ {id:2,name:'Frame corrections',description:'Adjust window and door frames and resolve sealing defects.',person:'Project contractor',date:'2026-10-02',status:'in_progress'},
+ {id:3,name:'Φυτεύσεις και παρτέρια μπροστά από τα μπάνια του ισογείου',description:'Επέκταση παρτεριών, χώμα και φυτεύσεις στην πρόσοψη του ισογείου.',person:'Owner',date:'2026-11-15',status:'planned'},
+ {id:4,name:'Pool equipment',description:'Pump, filter and lighting installation.',person:'Project contractor',date:'2026-09-20',status:'completed'},
+ {id:5,name:'Pergola option B',description:'Alternative pergola layout, replaced by the architect’s revised design.',person:'',date:'',status:'cancelled'}];
+let packageSequence=5;
+const findPackage=id=>packages.find(p=>String(p.id)===String(id));
+const otherRecords=[
+ {humanId:'QI-0002',subtype:'quality_issue',title:'Αποκόλληση πλακιδίου στο μπάνιο του ορόφου',status:'in_progress',ball:'Project contractor',due:'2026-10-04',pkg:1},
+ {humanId:'QI-0003',subtype:'quality_issue',title:'Ανομοιόμορφοι αρμοί στην κουζίνα',status:'open',ball:'Project contractor',due:'2026-10-12',pkg:1},
+ {humanId:'DC-0002',subtype:'detail_clarification',title:'Διάταξη πλακιδίων στο ντους',status:'closed',ball:'Project architect',due:'',pkg:1},
+ {humanId:'T-0003',subtype:'task',title:'Τοποθέτηση σοβατεπί στο σαλόνι',status:'ready_for_verification',ball:'Owner',due:'2026-10-08',pkg:1},
+ {humanId:'T-0004',subtype:'task',title:'Αρμολόγημα βεράντας',status:'closed',ball:'',due:'',pkg:1},
+ {humanId:'T-0005',subtype:'task',title:'Σφράγιση αρμών στην πισίνα',status:'draft',ball:'',due:'',pkg:1},
+ {humanId:'QI-0004',subtype:'quality_issue',title:'Διαρροή στο κούφωμα του υπνοδωματίου',status:'awaiting_decision',ball:'Project architect',due:'2026-10-03',pkg:2},
+ {humanId:'QI-0005',subtype:'quality_issue',title:'Λάθος φορά ανοίγματος πόρτας',status:'issued',ball:'Project contractor',due:'2026-10-10',pkg:2},
+ {humanId:'T-0006',subtype:'task',title:'Ρύθμιση μεντεσέδων',status:'closed',ball:'',due:'',pkg:2},
+ {humanId:'T-0002',subtype:'task',title:'Τελικός έλεγχος φυτεύσεων',status:'open',ball:'Owner',due:'2026-11-10',pkg:3},
+ {humanId:'DC-0003',subtype:'detail_clarification',title:'Είδος φυτών στο παρτέρι',status:'open',ball:'Owner',due:'2026-10-20',pkg:3},
+ {humanId:'T-0007',subtype:'task',title:'Μεταφορά χώματος',status:'on_hold',ball:'Project contractor',due:'',pkg:3},
+ {humanId:'T-0008',subtype:'task',title:'Εγκατάσταση αντλίας',status:'closed',ball:'',due:'',pkg:4},
+ {humanId:'QI-0006',subtype:'quality_issue',title:'Θόρυβος στην αντλία της πισίνας',status:'in_progress',ball:'Project contractor',due:'2026-10-15',pkg:4},
+ {humanId:'T-0009',subtype:'task',title:'Καθαρισμός εργοταξίου',status:'open',ball:'Project contractor',due:'2026-10-09',pkg:null},
+ {humanId:'QI-0007',subtype:'quality_issue',title:'Ρωγμή στο πεζοδρόμιο της εισόδου',status:'draft',ball:'',due:'',pkg:null}];
+const liveRecord=()=>({humanId:subtypeIds[subtype],subtype,title:record.title,status:sampleStatus,ball:record.ball,due:record.due,pkg:record.workPackageId?Number(record.workPackageId):null,live:true});
+const allRecords=()=>[...(sampleDeleted?[]:[liveRecord()]),...otherRecords];
+function totals(id){const records=allRecords().filter(r=>r.pkg===Number(id));const out=records.filter(r=>isOutstanding(r.status));return {records,total:records.length,outstanding:out.length,overdue:out.filter(r=>r.due&&daysAway(r.due)<0).length}}
+Object.values(subtypeSamples).forEach(s=>{s.workPackageId='3'});record.workPackageId='3';
+
+const pkgBadge=code=>'<span class="pkg-badge" data-pkg="'+code+'">'+esc(pkgStatus(code).en)+'</span>';
+const statusBadge=code=>'<span class="badge status-colour" data-status="'+code+'">'+esc(statusName(code))+'</span>';
+function targetChip(pkg){return pkg.date&&!closedPackage(pkg.status)&&daysAway(pkg.date)<0?'<span class="date-chip overdue">'+icons.clock+'Past target</span>':''}
+
+// Record status families for the progress bar. Values are always repeated in text and in the table.
+const families=[
+ {label:'Closed',codes:['closed'],cls:'f-closed'},
+ {label:'Ready for verification',codes:['ready_for_verification'],cls:'f-verify'},
+ {label:'Open, issued or in progress',codes:['open','issued','in_progress'],cls:'f-active'},
+ {label:'Awaiting decision or on hold',codes:['awaiting_decision','on_hold'],cls:'f-waiting'},
+ {label:'Draft',codes:['draft'],cls:'f-draft'},
+ {label:'Cancelled or superseded',codes:['cancelled','superseded'],cls:'f-void'}];
+const familyCounts=records=>families.map(f=>({f,n:records.filter(r=>f.codes.includes(r.status)).length})).filter(x=>x.n);
+function meter(records,large=false){const parts=familyCounts(records);return '<div class="meter'+(large?' large':'')+'" role="img" aria-label="'+esc('Records by status: '+parts.map(x=>x.f.label+' '+x.n).join(', '))+'">'+parts.map(x=>'<span class="'+x.f.cls+'" style="flex-grow:'+x.n+'" title="'+esc(x.f.label+': '+x.n)+'"></span>').join('')+'</div>'}
+const legend=records=>'<ul class="meter-legend">'+familyCounts(records).map(x=>'<li><i class="'+x.f.cls+'" aria-hidden="true"></i>'+esc(x.f.label)+' <strong>'+x.n+'</strong></li>').join('')+'</ul>';
+function matrix(records){
+ const codes=codesOf('status').filter(c=>records.some(r=>r.status===c));const types=['quality_issue','detail_clarification','task'].filter(t=>records.some(r=>r.subtype===t));
+ const count=(t,c)=>records.filter(r=>(!t||r.subtype===t)&&(!c||r.status===c)).length;const out=t=>records.filter(r=>(!t||r.subtype===t)&&isOutstanding(r.status)).length;const cell=n=>n?String(n):'<span class="zero">0</span>';
+ return '<div class="table-scroll"><table class="matrix-table"><caption class="sr-only">Records by subtype and status</caption><thead><tr><th scope="col">Subtype</th>'+codes.map(c=>'<th scope="col">'+esc(statusName(c))+'</th>').join('')+'<th scope="col">Outstanding</th><th scope="col">Total</th></tr></thead><tbody>'+types.map(t=>'<tr><th scope="row">'+esc(subtypeNames[t])+'</th>'+codes.map(c=>'<td>'+cell(count(t,c))+'</td>').join('')+'<td>'+cell(out(t))+'</td><td>'+count(t)+'</td></tr>').join('')+'</tbody><tfoot><tr><th scope="row">All records</th>'+codes.map(c=>'<td>'+count(null,c)+'</td>').join('')+'<td>'+out(null)+'</td><td>'+records.length+'</td></tr></tfoot></table></div>'}
+function recordCard(r,showPackage=true){const pkg=showPackage&&r.pkg?findPackage(r.pkg):null;return '<article class="record-card'+(r.live?' live':'')+'"><a href="#" data-record="'+esc(r.humanId)+'"><strong>'+esc(r.humanId)+'</strong><h3>'+esc(r.title||'Untitled draft')+'</h3>'+(r.live?'<span class="opens-tag">Opens in this blueprint</span>':'')+'</a><div class="record-facts"><span>'+esc(subtypeNames[r.subtype])+'</span>'+statusBadge(r.status)+(pkg?'<span class="fact-package">'+icons.package+'<span class="sr-only">Work package: </span>'+esc(pkg.name)+'</span>':'')+'<span>Next action by: '+esc(r.ball||'—')+'</span><span>Due: '+(r.due?esc(fmtDate(r.due)):'—')+dueChip(r.due,isOutstanding(r.status))+'</span></div></article>'}
+
+// ---- Views: the record, the Records list, Work packages and one package ----
+const pageRoot=$('#page-view');
+let view='record',packageDetailId=null,recordsFilter='',recordsQuery='',packageQuery='',backTo=null,viewerRole='owner',packagesEmptyPreview=false;
+function pageNotify(text){notify(text);$('#notice').scrollIntoView({block:'nearest'})}
+function setNav(){document.querySelectorAll('.site-nav [data-view]').forEach(b=>{const on=b.dataset.view==='packages'?['packages','package'].includes(view):['records','record'].includes(view);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
+function go(next,opts={}){
+ if(view==='record'&&next!=='record'&&editing){if(!confirm('Discard the sample edits?'))return;editing=false;render()}
+ if(next==='record'&&view!=='record')backTo={view,packageId:packageDetailId};
+ if('packageId' in opts)packageDetailId=opts.packageId;
+ if('filter' in opts)recordsFilter=opts.filter;
+ view=next;document.body.dataset.view=next==='record'?'record':'page';
+ $('#notice').hidden=true;closeMore(false);setNav();
+ if(next==='record'){pageRoot.replaceChildren();render()}else paintPage();
+ window.scrollTo(0,0);
+ if(next!=='record'){const h=pageRoot.querySelector('h1');if(h){h.tabIndex=-1;h.focus({preventScroll:true})}}
+}
+function paintPage(){if(view==='packages')paintPackageList();else if(view==='package')paintPackageDetail();else if(view==='records')paintRecordList()}
+
+function packageRow(p){const t=totals(p.id);return '<tr data-open="'+p.id+'"><td class="pkg-name"><a href="#" data-package-link="'+p.id+'">'+esc(p.name)+'</a>'+(p.description?'<small>'+esc(p.description)+'</small>':'')+'</td><td data-label="Status"><div class="cell">'+pkgBadge(p.status)+'</div></td><td data-label="Responsible"><div class="cell">'+esc(p.person||'—')+'</div></td><td data-label="Target date"><div class="cell">'+(p.date?esc(fmtDate(p.date))+targetChip(p,t):'—')+'</div></td><td data-label="Records" class="pkg-records"><div class="cell">'+(t.total?meter(t.records)+'<span class="rec-line">'+t.outstanding+' of '+t.total+' outstanding</span>'+(t.overdue?'<span class="rec-line overdue-text">'+t.overdue+' overdue</span>':''):'<span class="muted">No records</span>')+'</div></td></tr>'}
+function paintPackageList(){
+ const list=packagesEmptyPreview?[]:packages;const head='<div class="page-head"><div><h1>Work packages</h1><p class="muted page-sub">Γεννάδι 822Α</p></div>'+(list.length?'<button class="primary" id="pkg-new">New work package</button>':'')+'</div>';
+ if(!list.length){pageRoot.innerHTML=head+'<section class="card empty-state"><h2>No work packages yet</h2><p>A work package groups related Tasks, Quality Issues and Detail Clarifications under one name, such as Tiling works.</p><button class="primary" id="pkg-new">New work package</button></section>';$('#pkg-new').onclick=()=>openPackage(null);return}
+ pageRoot.innerHTML=head+'<div class="list-tools"><div class="field"><label for="package-search">Find a work package</label><input id="package-search" type="search" autocomplete="off"></div><p class="muted list-count" id="package-count" role="status"></p></div><div id="package-table"></div>';
+ const paint=()=>{const q=fold(packageQuery);const shown=sortPackages(list).filter(p=>fold(p.name).includes(q));$('#package-count').textContent=shown.length===list.length?list.length+' work packages':shown.length+' of '+list.length+' work packages';$('#package-table').innerHTML=shown.length?'<table class="pkg-table"><thead><tr><th scope="col">Work package</th><th scope="col">Status</th><th scope="col">Responsible</th><th scope="col">Target date</th><th scope="col">Records</th></tr></thead><tbody>'+shown.map(packageRow).join('')+'</tbody></table>':'<p class="card">No work package matches “'+esc(packageQuery.trim())+'”.</p>'};
+ $('#package-search').value=packageQuery;$('#package-search').oninput=e=>{packageQuery=e.target.value;paint()};$('#pkg-new').onclick=()=>openPackage(null);paint();
+}
+function paintPackageDetail(){
+ const pkg=findPackage(packageDetailId);if(!pkg||packagesEmptyPreview){view='packages';setNav();paintPackageList();return}
+ const t=totals(pkg.id),st=pkgStatus(pkg.status),mismatch=closedPackage(pkg.status)&&t.outstanding>0;
+ const strip=(pkg.person?'<div><dt>Responsible person</dt><dd>'+esc(pkg.person)+'</dd></div>':'')+(pkg.date?'<div><dt>Target date</dt><dd>'+esc(fmtDate(pkg.date))+targetChip(pkg,t)+'</dd></div>':'')+'<div><dt>Outstanding records</dt><dd>'+(t.total?t.outstanding+' of '+t.total+(t.overdue?' · <span class="overdue-text">'+t.overdue+' overdue</span>':''):'None yet')+'</dd></div>';
+ const sorted=[...t.records].sort((a,b)=>Number(isOutstanding(b.status))-Number(isOutstanding(a.status))||a.humanId.localeCompare(b.humanId));
+ const closedCount=t.records.filter(r=>r.status==='closed').length;
+ pageRoot.innerHTML='<nav class="breadcrumb" aria-label="Breadcrumb"><a href="#" data-crumb="packages">Work packages</a><span aria-hidden="true">›</span><span aria-current="page">'+esc(pkg.name)+'</span></nav>'
+ +'<div class="record-identity"><span class="id">WORK PACKAGE</span><span class="identity-value">'+pkgBadge(pkg.status)+info('Package status',st.def)+'</span></div>'
+ +'<h1 class="package-title">'+esc(pkg.name)+'</h1>'
+ +'<div class="actions"><button class="primary" id="pkg-edit">Edit package</button><button id="pkg-new-record">New record</button><button class="delete-record" id="pkg-delete">Delete package</button></div>'
+ +'<dl class="summary next-action-strip">'+strip+'</dl>'
+ +(mismatch?'<div class="attention-notice" role="note"><strong>Marked '+esc(st.en)+'</strong><span>'+t.outstanding+(t.outstanding===1?' record is':' records are')+' still outstanding. Package status is set by hand and never changes records.</span></div>':'')
+ +(pkg.description?'<section class="card"><h2>Description</h2><p class="description-text">'+esc(pkg.description)+'</p></section>':'')
+ +(t.total?'<section class="card"><h2>Progress</h2><div class="stat-row"><div><span class="stat">'+t.outstanding+'</span><span class="stat-label">outstanding of '+t.total+' records</span></div><div><span class="stat'+(t.overdue?' overdue-text':'')+'">'+t.overdue+'</span><span class="stat-label">overdue</span></div><div><span class="stat">'+closedCount+'</span><span class="stat-label">closed</span></div></div>'+meter(t.records,true)+legend(t.records)+'<h3>By subtype and status</h3>'+matrix(t.records)+'<p class="muted note">Calculated from the records each time the page opens. Draft counts as outstanding.</p></section>':'')
+ +'<section class="card"><div class="section-head"><h2>Records'+(t.total?' ('+t.total+')':'')+'</h2>'+(t.total?'<a href="#" data-crumb="records">Open in Records with all filters</a>':'')+'</div>'+(t.total?'<div class="record-list">'+sorted.map(r=>recordCard(r,false)).join('')+'</div><p class="muted note">The implemented page reuses the existing record list, filters and sorting.</p>':'<p>No records in this package yet.</p><p class="muted">Choose this package in a record’s Work package field, or create a record here.</p><button id="pkg-new-record-empty">New record in this package</button>')+'</section>';
+ const newRecord=()=>pageNotify('New record opens the existing capture form with “'+pkg.name+'” already selected as its work package. Record-creation rules are unchanged.');
+ $('#pkg-edit').onclick=()=>openPackage(pkg.id);$('#pkg-new-record').onclick=newRecord;if($('#pkg-new-record-empty'))$('#pkg-new-record-empty').onclick=newRecord;$('#pkg-delete').onclick=()=>askDeletePackage(pkg);
+}
+function paintRecordList(){
+ if(recordsFilter&&recordsFilter!=='none'&&!findPackage(recordsFilter))recordsFilter='';
+ const activePackages=packages.filter(p=>!closedPackage(p.status)),closedPackages=packages.filter(p=>closedPackage(p.status));
+ const options=list=>sortPackages(list).map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(pkgStatus(p.status).en)+'</option>').join('');
+ pageRoot.innerHTML='<div class="page-head"><h1>Records</h1><button class="primary" data-demo="New record keeps the existing capture form. Started from a package page, it opens with that package selected.">New record</button></div><form class="card filters-card" id="records-filters"><div class="filters-grid"><div class="field"><label for="records-search">Search title, description or ID</label><input id="records-search" type="search" autocomplete="off"></div><div class="field"><label for="records-package">Work package</label><select id="records-package"><option value="">All records, with or without a package</option><option value="none">Ungrouped · no work package</option>'+(activePackages.length?'<optgroup label="Active packages">'+options(activePackages)+'</optgroup>':'')+(closedPackages.length?'<optgroup label="Completed or cancelled">'+options(closedPackages)+'</optgroup>':'')+'</select></div></div><details><summary>More filters</summary><p class="muted">Unchanged from the current app: subtype, status, priority, severity, stage, type of problem, trades, tags, zone type, people, location, safety, contract scope, dates and sequence.</p></details></form><div class="filter-chips" id="records-chips"></div><p class="totals" id="records-count" role="status"></p><div class="record-list" id="records-results"></div>';
+ const paint=()=>{const q=fold(recordsQuery);const shown=allRecords().filter(r=>recordsFilter===''||(recordsFilter==='none'?!r.pkg:r.pkg===Number(recordsFilter))).filter(r=>!q||fold(r.humanId+' '+r.title).includes(q));
+  const chips=[];if(recordsFilter)chips.push('<button type="button" data-clear="package" aria-label="Remove filter: Work package">Work package: '+esc(recordsFilter==='none'?'Ungrouped':findPackage(recordsFilter).name)+' ×</button>');if(recordsQuery.trim())chips.push('<button type="button" data-clear="search" aria-label="Remove filter: Search">Search: '+esc(recordsQuery.trim())+' ×</button>');
+  $('#records-chips').innerHTML=chips.join('');$('#records-count').textContent=shown.length+' record'+(shown.length===1?'':'s');$('#records-results').innerHTML=shown.length?shown.map(r=>recordCard(r,!recordsFilter||recordsFilter==='none')).join(''):'<p>No matching records.</p>';
+  $('#records-chips').querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>{if(b.dataset.clear==='package'){recordsFilter='';$('#records-package').value=''}else{recordsQuery='';$('#records-search').value=''}paint();$('#records-package').focus()})};
+ $('#records-package').value=recordsFilter;$('#records-search').value=recordsQuery;
+ $('#records-package').onchange=e=>{recordsFilter=e.target.value;paint()};$('#records-search').oninput=e=>{recordsQuery=e.target.value;paint()};$('#records-filters').onsubmit=e=>e.preventDefault();paint();
+}
+pageRoot.addEventListener('click',e=>{
+ const link=e.target.closest('[data-package-link]');if(link){e.preventDefault();go('package',{packageId:Number(link.dataset.packageLink)});return}
+ const crumb=e.target.closest('[data-crumb]');if(crumb){e.preventDefault();if(crumb.dataset.crumb==='records')go('records',{filter:String(packageDetailId)});else go('packages');return}
+ const rec=e.target.closest('[data-record]');if(rec){e.preventDefault();if(rec.dataset.record===subtypeIds[subtype]&&!sampleDeleted)go('record');else pageNotify('Only '+subtypeIds[subtype]+' opens in this blueprint. The other records are list samples.');return}
+ const row=e.target.closest('tr[data-open]');if(row&&!e.target.closest('a,button'))go('package',{packageId:Number(row.dataset.open)});
+});
+document.addEventListener('click',e=>{const b=e.target.closest('.site-nav [data-view]');if(b)go(b.dataset.view)});
+const backButton=$('.toolbar button');delete backButton.dataset.demo;backButton.onclick=()=>go(backTo?.view||'records',backTo?.view==='package'?{packageId:backTo.packageId}:{});
+
+// ---- Package form, status confirmation and deletion ----
+let packageEditId=null,packageFromRecord=false,pendingPackageValues=null;
+$('#package-status-row').insertAdjacentHTML('beforeend',info('Package status','Chosen by hand. Completed means the owner considers the scope finished; it is separate from record Closed and never changes records.'));
+const packageStatusHint=()=>{$('#package-status-hint').textContent=pkgStatus($('#package-status').value).def};
+$('#package-status').onchange=packageStatusHint;
+function clearNameError(){$('#package-name-error').hidden=true;$('#package-name').removeAttribute('aria-invalid')}
+function nameError(text){$('#package-name-error').textContent=text;$('#package-name-error').hidden=false;$('#package-name').setAttribute('aria-invalid','true');$('#package-name').focus()}
+$('#package-name').oninput=clearNameError;
+function openPackage(id,fromRecord=false){packageEditId=id;packageFromRecord=fromRecord;const pkg=findPackage(id)||{name:'',description:'',person:'',date:'',status:'planned'};$('#package-form-title').textContent=id?'Edit work package':'New work package';$('#package-name').value=pkg.name;$('#package-description').value=pkg.description;$('#package-person').value=pkg.person;$('#package-date').value=pkg.date;$('#package-status').value=pkg.status;$('#package-save').textContent=id?'Save package':'Create work package';$('#package-record-note').hidden=!fromRecord;clearNameError();packageStatusHint();$('#package-form-dialog').showModal()}
+$('#package-cancel').onclick=()=>$('#package-form-dialog').close();
+$('#package-form').onsubmit=e=>{e.preventDefault();const name=$('#package-name').value.trim();
+ if(!name)return nameError('Enter a name for the work package.');
+ const duplicate=packages.find(p=>p.id!==packageEditId&&fold(p.name)===fold(name));
+ if(duplicate)return nameError('“'+duplicate.name+'” already exists in this project. Names are compared without case or accents.');
+ const values={name,description:$('#package-description').value.trim(),person:$('#package-person').value,date:$('#package-date').value,status:$('#package-status').value};
+ const existing=findPackage(packageEditId);
+ if(existing&&values.status!==existing.status&&closedPackage(values.status)){const t=totals(existing.id);if(t.outstanding>0){askStatusConfirm(existing,values,t);return}}
+ savePackage(values)};
+function askStatusConfirm(pkg,values,t){pendingPackageValues=values;const st=pkgStatus(values.status);const outstanding=t.records.filter(r=>isOutstanding(r.status));
+ $('#package-confirm-title').textContent='Mark “'+pkg.name+'” as '+st.en+'?';
+ $('#package-confirm-text').textContent=t.outstanding+(t.outstanding===1?' record in this package is':' records in this package are')+' still outstanding'+(t.overdue?', '+t.overdue+' of them overdue':'')+':';
+ $('#package-confirm-list').innerHTML=outstanding.slice(0,5).map(r=>'<li><strong>'+esc(r.humanId)+'</strong> · '+esc(statusName(r.status))+'</li>').join('')+(outstanding.length>5?'<li>and '+(outstanding.length-5)+' more</li>':'');
+ $('#package-confirm-yes').textContent='Mark as '+st.en;$('#package-confirm-dialog').showModal()}
+$('#package-confirm-yes').onclick=()=>{const values=pendingPackageValues;pendingPackageValues=null;$('#package-confirm-dialog').close();if(values)savePackage(values)};
+$('#package-confirm-no').onclick=()=>{pendingPackageValues=null;$('#package-confirm-dialog').close();$('#package-status').focus()};
+function savePackage(values){const editedId=packageEditId;let id=editedId;
+ if(id)Object.assign(findPackage(id),values);else{id=++packageSequence;packages.push({id,...values});if(packagesEmptyPreview){packagesEmptyPreview=false;$('#empty-packages').checked=false}}
+ $('#package-form-dialog').close();
+ if(packageFromRecord&&editing){draft.workPackageId=String(id);refreshPackageField(values.name);$('#wp-trigger')?.focus();return}
+ if(view==='record'){render();return}
+ if(!editedId)go('package',{packageId:id});else paintPage();
+ pageNotify(editedId?'Package saved. Sample only; nothing was stored.':'Work package created. Sample only; nothing was stored.')}
+function askDeletePackage(pkg){const t=totals(pkg.id);const blocked=t.total>0;$('#package-delete-name').textContent=pkg.name;$('#package-delete-blocked').hidden=!blocked;$('#package-delete-form').hidden=blocked;
+ $('#package-delete-count').textContent='This package contains '+t.total+(t.total===1?' record':' records')+'. Move them to another package or set them to No work package first. Deleting a package never deletes records.';
+ $('#package-delete-confirm').value='';$('#package-delete-yes').disabled=true;$('#package-delete-dialog').showModal()}
+$('#package-delete-confirm').oninput=e=>{$('#package-delete-yes').disabled=e.target.value!==findPackage(packageDetailId)?.name};
+$('#package-delete-form').onsubmit=e=>{e.preventDefault();const pkg=findPackage(packageDetailId);if(!pkg||$('#package-delete-confirm').value!==pkg.name)return;packages=packages.filter(p=>p!==pkg);$('#package-delete-dialog').close();go('packages');pageNotify('Sample package “'+pkg.name+'” deleted. No records were affected.')};
+$('#package-delete-show').onclick=()=>{$('#package-delete-dialog').close();go('records',{filter:String(packageDetailId)})};
+
+// ---- Editor: Work package after Description, searchable single choice, pending-assignment note ----
+function packageHint(){const el=$('#wp-pending');if(!el)return;const saved=String(record.workPackageId||''),next=String(draft.workPackageId||'');if(saved===next){el.hidden=true;return}const name=id=>'“'+(findPackage(id)?.name||'')+'”';el.textContent=!saved?'Joins '+name(next)+' when you save the record.':!next?'Leaves '+name(saved)+' when you save the record.':'Moves from '+name(saved)+' to '+name(next)+' when you save the record.';el.hidden=false}
+function refreshPackageField(createdName){const value=$('#wp-value');if(!value)return;const pkg=findPackage(draft.workPackageId);value.innerHTML=pkg?'<span class="one-name">'+esc(pkg.name)+'</span>'+pkgBadge(pkg.status):'<span class="muted">No work package</span>';packageHint();if(createdName){$('#wp-created').textContent='“'+createdName+'” was created and selected. The package stays even if you cancel these record edits.';$('#wp-created').hidden=false}}
+function choosePackage(value){draft.workPackageId=value;$('#wp-created').hidden=true;refreshPackageField()}
+function closeWp(focusTrigger){const panel=$('#wp-panel');if(!panel||panel.hidden)return;panel.hidden=true;$('#wp-trigger').setAttribute('aria-expanded','false');if(focusTrigger)$('#wp-trigger').focus()}
+function openWp(){$('#wp-panel').hidden=false;$('#wp-trigger').setAttribute('aria-expanded','true');$('#wp-search').value='';paintPackageOptions();$('#wp-search').focus()}
+function paintPackageOptions(){const q=fold($('#wp-search').value);const host=$('#wp-options');host.replaceChildren();
+ const option=(value,name,status)=>{const label=document.createElement('label');label.className='check one-option';const radio=document.createElement('input');radio.type='radio';radio.name='wp-choice';radio.value=value;radio.checked=String(draft.workPackageId||'')===value;radio.onchange=()=>choosePackage(value);const text=document.createElement('span');text.className='one-name';text.textContent=name;label.append(radio,text);if(status)label.insertAdjacentHTML('beforeend',pkgBadge(status));label.onclick=e=>{if(e.detail>0)setTimeout(()=>closeWp(true))};return label};
+ if(!q)host.append(option('','No work package'));let any=false;
+ for(const [title,items] of [['Active',packages.filter(p=>!closedPackage(p.status))],['Completed or cancelled',packages.filter(p=>closedPackage(p.status))]]){const shown=sortPackages(items).filter(p=>fold(p.name).includes(q));if(!shown.length)continue;any=true;const heading=document.createElement('p');heading.className='opt-group';heading.textContent=title;host.append(heading);for(const p of shown)host.append(option(String(p.id),p.name,p.status))}
+ if(q&&!any){const none=document.createElement('p');none.className='muted';none.textContent='No work package matches. Use + New package to create one.';host.append(none)}}
+const editorBeforeIteration7=editor;
+editor=function(){editorBeforeIteration7();const anchor=$('#description')?.closest('.field');if(!anchor)return;
+ if(draft.workPackageId===undefined)draft.workPackageId=record.workPackageId||'';
+ const block=document.createElement('div');block.className='field package-field';
+ block.innerHTML='<div class="field-label split"><span id="wp-label">Work package</span><button type="button" class="text-action" id="inline-package">+ New package</button></div><div class="one-picker"><button type="button" class="choose-one" id="wp-trigger" aria-expanded="false" aria-controls="wp-panel" aria-labelledby="wp-label wp-value"><span id="wp-value"></span>'+icons.chevron+'</button><div class="pickpanel" id="wp-panel" hidden><label for="wp-search">Search work packages</label><input id="wp-search" type="search" autocomplete="off"><div id="wp-options" class="options" role="radiogroup" aria-labelledby="wp-label"></div></div></div><p class="rule-hint" id="wp-pending" hidden></p><p class="created-note" id="wp-created" role="status" hidden></p>';
+ anchor.after(block);const panel=$('#wp-panel');
+ panel.addEventListener('input',e=>e.stopPropagation());
+ $('#wp-trigger').onclick=()=>panel.hidden?openWp():closeWp(true);$('#wp-search').oninput=paintPackageOptions;
+ panel.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeWp(true)}else if(e.key==='Enter'){e.preventDefault();closeWp(true)}};
+ $('#inline-package').onclick=()=>{closeWp(false);openPackage(null,true)};refreshPackageField()};
+for(const type of ['pointerdown','focusin'])document.addEventListener(type,e=>{if(editing&&!e.target.closest('.one-picker'))closeWp(false)});
+
+// ---- Record page: package in the identity line, overview layout, phone action sheet ----
+const longValues=['Correction','Instruction text','Question','Location Notes','Private Notes','Public Notes'];
+function refineOverview(){const article=$('#content > article.card');if(!article)return;
+ const details=article.querySelector('.record-details'),anchor=article.querySelector('.description-text')||article.querySelector('h2 + p');if(details&&anchor)anchor.after(details);
+ article.querySelectorAll('.reading-decision dl, .reading-location dl').forEach(dl=>{dl.classList.add('pairs');for(const item of dl.children){const term=item.querySelector('dt')?.textContent;if(longValues.includes(term))item.classList.add('wide');if(term==='Instruction text')item.querySelector('dd').classList.add('instruction-quote')}})}
+const renderBeforeIteration7=render;
+render=function(){renderBeforeIteration7();
+ if(!editing&&!sampleDeleted){const pkg=findPackage(record.workPackageId);if(pkg){const ref=document.createElement('span');ref.className='identity-value package-ref';ref.innerHTML=icons.package+'<span class="sr-only">Work package: </span>'+(viewerRole==='owner'?'<a href="#"></a>':'<span></span>');ref.lastElementChild.textContent=pkg.name;if(viewerRole==='owner')ref.lastElementChild.onclick=e=>{e.preventDefault();go('package',{packageId:pkg.id})};$('#record-identity').append(ref)}
+  if(active==='Overview')refineOverview()}};
+const chooseBeforeIteration7=chooseSample;
+chooseSample=function(type,minimal=false){chooseBeforeIteration7(type,minimal);if(!editing&&minimal){record.workPackageId='';render()}};
+$('#safety-notice').insertAdjacentHTML('afterbegin',icons.hazard);
+const moreWrap=document.createElement('div');moreWrap.className='more-wrap';
+moreWrap.innerHTML='<button type="button" id="more-actions" aria-expanded="false" aria-controls="more-menu">More'+icons.chevron+'</button><div id="more-menu" class="more-menu" hidden><p class="menu-title">More record actions</p><button type="button" data-proxy="sharing-open">Sharing</button><button type="button" data-proxy="activity-open">Activity history</button><button type="button" data-proxy="delete-record" class="danger-text">Delete record</button></div>';
+$('main>.actions').append(moreWrap);
+function closeMore(focusTrigger){const menu=$('#more-menu');if(menu.hidden)return;menu.hidden=true;$('#more-actions').setAttribute('aria-expanded','false');if(focusTrigger)$('#more-actions').focus()}
+$('#more-actions').onclick=()=>{const menu=$('#more-menu');if(!menu.hidden){closeMore(true);return}menu.hidden=false;$('#more-actions').setAttribute('aria-expanded','true');menu.querySelector('[data-proxy]').focus()};
+$('#more-menu').onclick=e=>{const item=e.target.closest('[data-proxy]');if(!item)return;closeMore(true);$('#'+item.dataset.proxy).click()};
+$('#more-menu').onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();closeMore(true)}};
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.more-wrap'))closeMore(false)});
+
+// ---- Blueprint controls: colour review, viewer, empty list ----
+controls.querySelector('summary').textContent='Blueprint controls, colours and sample states';
+const lum=hex=>{const v=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:((x+.055)/1.055)**2.4);return .2126*v[0]+.7152*v[1]+.0722*v[2]};
+const contrast=(a,b)=>{const [x,y]=[lum(a),lum(b)].sort((m,n)=>n-m);return (x+.05)/(y+.05)};
+const contrastRows=[
+ ['Body text on white','#27313f','#ffffff',4.5,'text'],['Muted text on the grey page','#616b78','#f5f6f8',4.5,'text'],['Links and active navigation','#315dc8','#ffffff',4.5,'text'],['Primary button text','#ffffff','#315dc8',4.5,'text'],
+ ['Focus ring, agreed amber','#ba741f','#f5f6f8',3,'ui'],['Focus ring, proposed blue','#315dc8','#f5f6f8',3,'ui'],
+ ['Open / Issued / In progress','#264da0','#eaf0fd',4.5,'text'],['Awaiting decision / On hold','#86520c','#fff3d9',4.5,'text'],['Ready for verification, agreed purple','#70419c','#f0eafa',4.5,'text'],['Ready for verification, proposed plum','#8a2f6e','#f8ebf3',4.5,'text'],['Closed','#326843','#e9f4eb',4.5,'text'],['Draft / Cancelled / Superseded','#505b69','#edf0f3',4.5,'text'],
+ ['Overdue on white','#a3322c','#ffffff',4.5,'text'],['Overdue chip','#a3322c','#fdeeec',4.5,'text']];
+const reviewPanel=document.createElement('section');reviewPanel.className='control-group';
+reviewPanel.innerHTML='<h3>Iteration 7 review controls</h3><fieldset class="inline-choice"><legend>Colours</legend><div class="choice-row"><label class="check"><input type="radio" name="colour-mode" value="adjusted" checked>Blue with the proposed adjustments</label><label class="check"><input type="radio" name="colour-mode" value="agreed">Agreed blue, as in iteration 6</label></div></fieldset>'
+ +'<fieldset class="inline-choice"><legend>Package name on a record, as seen by</legend><div class="choice-row"><label class="check"><input type="radio" name="viewer-role" value="owner" checked>Owner · link to the package</label><label class="check"><input type="radio" name="viewer-role" value="reader">Contributor or shared reader · plain text</label></div></fieldset>'
+ +'<label class="check"><input type="checkbox" id="empty-packages">Show the Work packages page before any package exists</label><p class="muted">Today is fixed at 6 October 2026 so overdue states stay stable.</p>'
+ +'<h4>What the colour adjustments change</h4><ul class="colour-notes"><li>Focus ring turns blue. Amber now means “waiting” and “safety”, so an amber ring competes with them.</li><li>Draft, Cancelled and Superseded tags get a thin edge so they stay visible on the grey page.</li><li>Ready for verification moves from purple to plum, so it stays distinct from blue in the progress bar, including for colour-blind readers.</li><li>The safety notice gains a warning icon, so it no longer relies on amber alone.</li><li>The location sketch drops green left over from the earlier theme.</li></ul>'
+ +'<h4>New in both modes</h4><ul class="colour-notes"><li>Package status uses outlined pills with a dot; record status keeps filled tags. Package Completed and record Closed are both green but never look the same.</li><li>Red is reserved for overdue dates and destructive actions, and always comes with words.</li><li>Progress bar colours, checked for colour-blind separation. Draft is light grey and Cancelled is hatched, so neither depends on hue:</li></ul><ul class="meter-legend">'+families.map(f=>'<li><i class="'+f.cls+'" aria-hidden="true"></i>'+esc(f.label)+'</li>').join('')+'</ul>'
+ +'<h4>Contrast checks (WCAG)</h4><div class="table-scroll"><table class="contrast-table"><thead><tr><th scope="col">Use</th><th scope="col">Sample</th><th scope="col">Ratio</th><th scope="col">Needs</th></tr></thead><tbody>'+contrastRows.map(([use,fg,bg,need,kind])=>{const r=contrast(fg,bg);return '<tr><td>'+esc(use)+'</td><td>'+(kind==='ui'?'<span class="swatch-ui" style="background:'+bg+'"><i style="background:'+fg+'"></i></span>':'<span class="swatch-sample" style="color:'+fg+';background:'+bg+'">Aa</span>')+'</td><td>'+r.toFixed(1)+':1</td><td>'+(r>=need?'Passes ':'Below ')+need+':1</td></tr>'}).join('')+'</tbody></table></div>';
+controls.append(reviewPanel);
+reviewPanel.querySelectorAll('[name=colour-mode]').forEach(input=>input.onchange=()=>{document.body.dataset.colour=input.value});
+reviewPanel.querySelectorAll('[name=viewer-role]').forEach(input=>input.onchange=()=>{viewerRole=input.value;if(view!=='record')go('record');else render()});
+$('#empty-packages').onchange=e=>{packagesEmptyPreview=e.target.checked;go('packages')};
+
+// ---- "What changed" map ----
+function flash(el){if(!el)return;el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');el.scrollIntoView({block:'center'})}
+const showers={
+ packages:()=>go('packages'),
+ package:()=>go('package',{packageId:1}),
+ confirm:()=>{go('package',{packageId:1});if(view!=='package')return;openPackage(1);$('#package-status').value='completed';packageStatusHint();$('#package-form').requestSubmit()},
+ records:()=>go('records',{filter:'1'}),
+ identity:()=>{go('record');if(editing)return;if(active!=='Overview')changeTab('Overview');flash($('#record-identity .package-ref')||$('#record-identity'))},
+ editor:()=>{go('record');if(!editing)$('#edit').click();flash($('.package-field'))},
+ form:()=>{go('packages');if(view==='packages')openPackage(null)},
+ overview:()=>{go('record');if(!editing&&active!=='Overview')changeTab('Overview');flash($('#content .reading-decision')||$('#content'))},
+ colours:()=>{controls.open=true;reviewPanel.scrollIntoView({block:'start'})}};
+document.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>{$('.iter-map').open=false;showers[b.dataset.show]()});
+
+document.body.dataset.view='record';document.body.dataset.colour='adjusted';setNav();render();
+</script></body></html>

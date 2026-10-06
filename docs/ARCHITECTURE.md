@@ -16,6 +16,14 @@ Fastify / TypeScript (Node.js) ── serves the built web app
 
 Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. Release `6247a9f` is active. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
 
+## Proposed change
+
+The [record interface and work-package design](designs/2026-10-06-record-ui-and-work-packages-design.md) is the single consolidated draft for review, including iteration 7 and all six accepted owner decisions. The work-package concept is agreed; its database migration and interface have not been implemented.
+
+## Data model
+
+The [data model reference](reference/data-model.md) leads with the conceptual model for architectural decisions, followed by the logical relational model and SQLite implementation. It describes the implemented schema separately from UI blueprint proposals.
+
 ## Parts
 
 | Part | Responsibility |
