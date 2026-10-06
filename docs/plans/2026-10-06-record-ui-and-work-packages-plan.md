@@ -2,13 +2,13 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` for inline execution. Use `superpowers:subagent-driven-development` only if the owner requests delegation. Execute task-by-task and track checkboxes.
 >
-> **Document type:** Implementation plan · **Status:** Draft · **Date:** 2026-10-06
-> **Retention:** Current planning document; not an instruction to begin implementation in this turn.
+> **Document type:** Implementation plan · **Status:** Completed · **Date:** 2026-10-06
+> **Retention:** Historical execution record. Do not execute again.
 > **Implements:** [Consolidated design](../designs/2026-10-06-record-ui-and-work-packages-design.md), including corrections at `ae88ee9`.
-> **Implemented by:** Not implemented.
-> **Verified:** Repository interfaces and design coverage checked during planning. Proposed implementation and tests have not been replayed.
-> **Merged to main:** Documentation publication only; no implementation merged.
-> **Checklist note:** Unchecked tasks are future implementation work.
+> **Implemented by:** `aae261e` through `311bf7c` on `feature/record-ui-packages`, followed by this documentation reconciliation. Base: `563294e`.
+> **Verified:** 2026-10-07. Typecheck, production build, 583 unit/server tests in 84 files and 85 Chrome browser tests passed. See execution evidence below.
+> **Merged to main:** No. Implementation is committed on the feature branch; it has not been pushed or deployed.
+> **Checklist note:** Completed task checklists are retained as execution history. Tests combine related acceptance cases; evidence below records actual suite results.
 
 **Goal:** Deliver the simplified record UI, optional project work packages and safe record deletion while preserving existing evidence, history, permissions and recovery capability.
 
@@ -16,7 +16,7 @@
 
 **Tech stack:** Existing React/Vite, TypeScript, Fastify, better-sqlite3, Zod, Vitest and Playwright. Node >=22.13.0. No new runtime dependencies.
 
-**Spec:** The consolidated design linked above is the single baseline. [Iteration 7 HTML](../designs/2026-10-06-ui-batch-7.html) is illustrative. The old amendment is superseded. The written design wins over incomplete sample behaviour.
+**Spec:** The consolidated design linked above was the implementation baseline. The reconciled [v1 specification](../specs/v1.md#appendix-c-work-packages-and-simplified-record-interface) now governs enduring requirements. [Iteration 7 HTML](../designs/2026-10-06-ui-batch-7.html) is illustrative. The old amendment is superseded. The written design wins over incomplete sample behaviour.
 
 ## Global constraints
 
@@ -99,7 +99,7 @@ export function calendarDayDifference(from: string, to: string): number;
 
 Export strict Zod WorkPackageCreate and WorkPackagePatch schemas with inferred WorkPackageInput/WorkPackagePatchInput types matching the shape above. Create defaults nullable fields to null and status to planned; PATCH has no defaults. Name trims, length 1–200. Description <=10,000, blank to null, otherwise preserve prose. Dates are valid ISO dates; IDs positive integers. foldText(name) supplies normalized uniqueness/search keys.
 
-- [ ] Add create/PATCH tests for omission versus null, five bilingual package statuses/definitions and approved sort order. Add calendar assertions:
+- [x] Add create/PATCH tests for omission versus null, five bilingual package statuses/definitions and approved sort order. Add calendar assertions:
 
 ```ts
 expect(calendarToday(new Date('2026-10-06T20:59:59Z'))).toBe('2026-10-06');
@@ -113,9 +113,9 @@ expect(isPastTarget('planned', '2026-10-05', '2026-10-06')).toBe(true);
 expect(isPastTarget('completed', '2026-10-05', '2026-10-06')).toBe(false);
 ```
 
-- [ ] Run `npm test -- tests/domain/work-packages.test.ts tests/domain/calendar.test.ts`; confirm missing behaviour fails.
-- [ ] Implement calendarToday with Intl.DateTimeFormat/formatToParts and explicit timezone. Day differences subtract UTC representations of validated date-only strings; DST does not create fractional days. Export through index.ts. Do not change isActive, which means required-field enforcement, not outstanding work.
-- [ ] Run targeted tests and `npm run typecheck`. Commit `feat: define package contracts and Athens calendar rules`.
+- [x] Run `npm test -- tests/domain/work-packages.test.ts tests/domain/calendar.test.ts`; confirm missing behaviour fails.
+- [x] Implement calendarToday with Intl.DateTimeFormat/formatToParts and explicit timezone. Day differences subtract UTC representations of validated date-only strings; DST does not create fractional days. Export through index.ts. Do not change isActive, which means required-field enforcement, not outstanding work.
+- [x] Run targeted tests and `npm run typecheck`. Commit `feat: define package contracts and Athens calendar rules`.
 
 ## Task 2 — Migration 0007 and recovery compatibility
 
@@ -123,12 +123,12 @@ expect(isPastTarget('completed', '2026-10-05', '2026-10-06')).toBe(false);
 
 **Produces:** MIGRATION_0007_WORK_PACKAGES, id `0007_work_packages`, registered after 0006. Use design §5 DDL without changing earlier migrations.
 
-- [ ] Build a fixture at migration 0006 with all subtypes, selected option, measurements, failed/passed checks, dependency, private/public Log attachments, both photo purposes, grants and links. Capture row contents/counts and ID high-water marks.
-- [ ] Test upgrade: empty package table, null membership on every existing record, unchanged existing values and photo metadata, empty foreign_key_check, integrity_check=ok, second migrate call applies nothing, package IDs do not reuse deleted values, bare SQL cannot delete an in-use package.
-- [ ] Run `npm test -- tests/server/work-package-migration.test.ts` before adding the migration.
-- [ ] Add exact designed schema, indexes and registry entry. Exercise existing backup-before-migrate on the populated fixture.
-- [ ] Test new-schema bundle inspect/export/restore through src/server/operations/bundles.ts. Its inspectDatabase compares exact MIGRATIONS IDs. Keep rejection of incompatible old schemas; recovery of an old backup uses matching old release tools, then offline migration before opening with new code. Do not relax compatibility checks.
-- [ ] Update any tests that explicitly assert migration IDs/counts (including tests/server/db.test.ts) to include 0007 without weakening schema checks. Run migration, db and operations tests plus typecheck. Commit `feat: add work package schema migration`.
+- [x] Build a fixture at migration 0006 with all subtypes, selected option, measurements, failed/passed checks, dependency, private/public Log attachments, both photo purposes, grants and links. Capture row contents/counts and ID high-water marks.
+- [x] Test upgrade: empty package table, null membership on every existing record, unchanged existing values and photo metadata, empty foreign_key_check, integrity_check=ok, second migrate call applies nothing, package IDs do not reuse deleted values, bare SQL cannot delete an in-use package.
+- [x] Run `npm test -- tests/server/work-package-migration.test.ts` before adding the migration.
+- [x] Add exact designed schema, indexes and registry entry. Exercise existing backup-before-migrate on the populated fixture.
+- [x] Test new-schema bundle inspect/export/restore through src/server/operations/bundles.ts. Its inspectDatabase compares exact MIGRATIONS IDs. Keep rejection of incompatible old schemas; recovery of an old backup uses matching old release tools, then offline migration before opening with new code. Do not relax compatibility checks.
+- [x] Update any tests that explicitly assert migration IDs/counts (including tests/server/db.test.ts) to include 0007 without weakening schema checks. Run migration, db and operations tests plus typecheck. Commit `feat: add work package schema migration`.
 
 ## Task 3 — Package API, totals and lifecycle
 
@@ -150,14 +150,14 @@ Routes under `/api/projects/:projectId/work-packages`: GET list 200; POST create
 
 Errors: 404 work_package_not_found for unknown/wrong-project package; 409 work_package_name_taken with `{existingName}`; 409 work_package_not_empty with `{recordCount}`; 409 work_package_confirmation_mismatch. Person validation follows existing invalid_reference conventions. Preserve an unchanged retired assignee; disallow newly selecting one.
 
-- [ ] Add API tests for defaults, patch semantics, normalized duplicates (including Greek final sigma/accents), empty names, invalid project/person, retired retention, and typed deletion. Verify every endpoint rejects unauthenticated/contributor access; mutations require Origin.
-- [ ] Mixed fixture: Draft, Open, On hold, Closed, Cancelled and DC Superseded; first three due yesterday. Assert total=6, outstanding=3, overdue=3; every status key present with zeros where needed; subtype counts reconcile. Empty packages return zero counts.
-- [ ] Run `npm test -- tests/server/work-packages-api.test.ts` before implementation.
-- [ ] Implement writes in immediate transactions. Recheck membership count and exact name within delete; normalized name uniqueness uses foldText and a SQL constraint. Status changes never write record fields. No server confirmation flag.
-- [ ] List uses package retrieval plus one grouped record query, not one query per package. Group by package/subtype/status and conditionally sum overdue against one captured today. Avoid N:N joins that multiply records. Details reuse counting logic.
-- [ ] Register routes. Add package count to projectUsage and the project deletion preview. Delete project records first, packages next, then people. Modify src/web/projects/Projects.tsx and its ProjectUsage typing/display to include the new package count in project-deletion confirmation. Existing person routes do not delete people; do not add a new person-delete feature. Preserve retirement.
-- [ ] Test two connections using direct membership SQL at this stage (repeat through the API in Task 4): assignment first blocks deletion; deletion first makes assignment fail. No orphan. Project deletion removes packages/access but retains blobs.
-- [ ] Run package/project tests and typecheck. Commit `feat: add owner work package management and totals`.
+- [x] Add API tests for defaults, patch semantics, normalized duplicates (including Greek final sigma/accents), empty names, invalid project/person, retired retention, and typed deletion. Verify every endpoint rejects unauthenticated/contributor access; mutations require Origin.
+- [x] Mixed fixture: Draft, Open, On hold, Closed, Cancelled and DC Superseded; first three due yesterday. Assert total=6, outstanding=3, overdue=3; every status key present with zeros where needed; subtype counts reconcile. Empty packages return zero counts.
+- [x] Run `npm test -- tests/server/work-packages-api.test.ts` before implementation.
+- [x] Implement writes in immediate transactions. Recheck membership count and exact name within delete; normalized name uniqueness uses foldText and a SQL constraint. Status changes never write record fields. No server confirmation flag.
+- [x] List uses package retrieval plus one grouped record query, not one query per package. Group by package/subtype/status and conditionally sum overdue against one captured today. Avoid N:N joins that multiply records. Details reuse counting logic.
+- [x] Register routes. Add package count to projectUsage and the project deletion preview. Delete project records first, packages next, then people. Modify src/web/projects/Projects.tsx and its ProjectUsage typing/display to include the new package count in project-deletion confirmation. Existing person routes do not delete people; do not add a new person-delete feature. Preserve retirement.
+- [x] Test two connections using direct membership SQL at this stage (repeat through the API in Task 4): assignment first blocks deletion; deletion first makes assignment fail. No orphan. Project deletion removes packages/access but retains blobs.
+- [x] Run package/project tests and typecheck. Commit `feat: add owner work package management and totals`.
 
 ## Task 4 — Record membership, filters and activity
 
@@ -165,13 +165,13 @@ Errors: 404 work_package_not_found for unknown/wrong-project package; 409 work_p
 
 **Interfaces:** RecordPatch gains optional nullable workPackageId; RecordCreate inherits it. RecordRow, RecordDetail and RecordSummary gain workPackageId. Owner detail resolves workPackageName:string|null. RecordListQuery gains workPackageId?:number|'none'; absence is no filter. Preserve RecordList envelope and cost totals.
 
-- [ ] Test all subtypes create/assign/move/clear/omitted patch; invalid ID/project; valid completed/cancelled packages. Assert status, dates, people, grants and links do not change. Invalid membership rolls back other edits in the same save.
-- [ ] Test query absent/none/positive ID. Malformed input returns 400; unknown/wrong-project package gives 404 work_package_not_found, never another project's records. UI can show Invalid filter chip alongside that error.
-- [ ] Run `npm test -- tests/server/work-package-membership.test.ts tests/server/records-list.test.ts` and confirm intended failures.
-- [ ] Extend SQL aliases, schema, update fields and TRACKED_FIELDS. Check package ownership inside the record write transaction; use immediate create/update transactions to serialize validation against deletion.
-- [ ] Membership activity uses field workPackageId and owner from/to IDs, plus `detail:{fromPackage:{id,name}|null,toPackage:{id,name}|null}` captured inside the transaction. No no-op event. Follow existing chosen-option snapshot pattern. Keep names in historical events after ungrouping and empty-package deletion.
-- [ ] Add parameterized filters, parsing the literal none before coercing positive IDs. Repeat Task 3 membership/deletion races through the real record API. Resolve current package name on reads; rename does not touch record.updatedAt or emit false record edits. Test these properties.
-- [ ] Run targeted record tests/typecheck. Commit `feat: assign records to packages with filters and history`.
+- [x] Test all subtypes create/assign/move/clear/omitted patch; invalid ID/project; valid completed/cancelled packages. Assert status, dates, people, grants and links do not change. Invalid membership rolls back other edits in the same save.
+- [x] Test query absent/none/positive ID. Malformed input returns 400; unknown/wrong-project package gives 404 work_package_not_found, never another project's records. UI can show Invalid filter chip alongside that error.
+- [x] Run `npm test -- tests/server/work-package-membership.test.ts tests/server/records-list.test.ts` and confirm intended failures.
+- [x] Extend SQL aliases, schema, update fields and TRACKED_FIELDS. Check package ownership inside the record write transaction; use immediate create/update transactions to serialize validation against deletion.
+- [x] Membership activity uses field workPackageId and owner from/to IDs, plus `detail:{fromPackage:{id,name}|null,toPackage:{id,name}|null}` captured inside the transaction. No no-op event. Follow existing chosen-option snapshot pattern. Keep names in historical events after ungrouping and empty-package deletion.
+- [x] Add parameterized filters, parsing the literal none before coercing positive IDs. Repeat Task 3 membership/deletion races through the real record API. Resolve current package name on reads; rename does not touch record.updatedAt or emit false record edits. Test these properties.
+- [x] Run targeted record tests/typecheck. Commit `feat: assign records to packages with filters and history`.
 
 ## Task 5 — Reader and print projections
 
@@ -179,12 +179,12 @@ Errors: 404 work_package_not_found for unknown/wrong-project package; 409 work_p
 
 **Interfaces:** SharedRecord.record and PrintRecord.record gain workPackageName:string|null only. Public membership activity maps to display field workPackageName with name/null from/to values; it must not expose owner IDs/detail snapshots. Explicitly extend the existing public activity allowlist.
 
-- [ ] Add exact-key/canary assertions: name may appear; package ID, description, responsible person, target date, counts and sibling records must not. Package endpoints remain owner-only for a contributor with a member-record grant.
-- [ ] Test old/new activity names after assignment and ungrouping without IDs/private metadata. Unknown activity fields remain excluded. Keep per-occurrence evidence privacy tests passing.
-- [ ] Run the named server tests before modifying projections.
-- [ ] Build public fields explicitly; never spread owner snapshots. Add current name to buildPrintRecord and render only when assigned. Update typed fixtures/callers without adding unsafe casts.
-- [ ] Extend print freshness test: rename package after opening print, without changing record.updatedAt. Refresh/print must use the new name. Preserve QR rules, Greek rendering, private-field exclusions and multipage layout; do not add screen-only overdue chips.
-- [ ] Run server tests, build, print browser spec and typecheck. Commit `feat: expose safe package context to readers and print`.
+- [x] Add exact-key/canary assertions: name may appear; package ID, description, responsible person, target date, counts and sibling records must not. Package endpoints remain owner-only for a contributor with a member-record grant.
+- [x] Test old/new activity names after assignment and ungrouping without IDs/private metadata. Unknown activity fields remain excluded. Keep per-occurrence evidence privacy tests passing.
+- [x] Run the named server tests before modifying projections.
+- [x] Build public fields explicitly; never spread owner snapshots. Add current name to buildPrintRecord and render only when assigned. Update typed fixtures/callers without adding unsafe casts.
+- [x] Extend print freshness test: rename package after opening print, without changing record.updatedAt. Refresh/print must use the new name. Preserve QR rules, Greek rendering, private-field exclusions and multipage layout; do not add screen-only overdue chips.
+- [x] Run server tests, build, print browser spec and typecheck. Commit `feat: expose safe package context to readers and print`.
 
 ## Task 6 — Safe record deletion
 
@@ -192,12 +192,12 @@ Errors: 404 work_package_not_found for unknown/wrong-project package; 409 work_p
 
 **Interfaces:** `deleteRecord(db:Db,projectId:number,recordId:number,confirmHumanId:string):void`; `registerRecordDeleteRoutes(app,db)`. DELETE /api/projects/:projectId/records/:id receives JSON `{confirmHumanId}`, returns 204. Existing not-found behaviour applies. Wrong confirmation: 409 record_confirmation_mismatch. Any precedence edge in either direction: 409 record_has_dependencies with owner-only `{records:[{id,humanId,title}]}`.
 
-- [ ] Test wrong confirmation, owner/Origin checks, missing/wrong-project record and dependency edges in both directions. Rejection changes nothing.
-- [ ] Seed options including a chosen option, measurements, checks, Log, photos of both purposes, public/private attachments sharing bytes, history, grants and links. Successful deletion removes occurrences/children/access, retains sibling data and blob rows/files, and does not reuse record or human IDs.
-- [ ] Run `npm test -- tests/server/record-delete.test.ts` before implementation.
-- [ ] Implement one immediate transaction: require record/project, compare typed ID, recheck edges, remove photo/attachment occurrences and share links, clear chosen_option_id where necessary for FK ordering, delete record and cascade-owned rows. Keep counters and all immutable blobs. Never delete another record's history.
-- [ ] Test two-connection reference/deletion ordering. Pause an asynchronous upload before occurrence commit: if deletion wins, resumed upload fails and cannot recreate evidence; published unreferenced bytes may remain. If upload wins, deletion removes its occurrence. Reuse test-side I/O barriers; no production debug routes.
-- [ ] Run delete/race plus existing files/records/shared-access tests and typecheck. Commit `feat: safely delete records and revoke their access`.
+- [x] Test wrong confirmation, owner/Origin checks, missing/wrong-project record and dependency edges in both directions. Rejection changes nothing.
+- [x] Seed options including a chosen option, measurements, checks, Log, photos of both purposes, public/private attachments sharing bytes, history, grants and links. Successful deletion removes occurrences/children/access, retains sibling data and blob rows/files, and does not reuse record or human IDs.
+- [x] Run `npm test -- tests/server/record-delete.test.ts` before implementation.
+- [x] Implement one immediate transaction: require record/project, compare typed ID, recheck edges, remove photo/attachment occurrences and share links, clear chosen_option_id where necessary for FK ordering, delete record and cascade-owned rows. Keep counters and all immutable blobs. Never delete another record's history.
+- [x] Test two-connection reference/deletion ordering. Pause an asynchronous upload before occurrence commit: if deletion wins, resumed upload fails and cannot recreate evidence; published unreferenced bytes may remain. If upload wins, deletion removes its occurrence. Reuse test-side I/O barriers; no production debug routes.
+- [x] Run delete/race plus existing files/records/shared-access tests and typecheck. Commit `feat: safely delete records and revoke their access`.
 
 ## Task 7 — Reusable controls, calendar display and colours
 
@@ -221,14 +221,14 @@ useToday(): string;
 PackageStatusBar({counts,variant}: {counts:PackageCounts;variant:'list'|'detail'});
 ```
 
-- [ ] Test dotted 16 px info icon aligned to text, >=24 px hit area, hover/focus/click opening, Escape/outside dismissal and accessible name. Long Greek help fits 360 px.
-- [ ] Test picker search with accents/final sigma; multi chips/checkboxes; single null radio choice; arrow selection without closing; Enter/Escape closing with focus return; pointer choice closing single; outside pointer/focus including blank area beside trigger closing without focus theft. Search Enter never submits the parent form. Retired selected values remain readable/removable.
-- [ ] Test bar zero/mixed/sparse states. For 8 Closed and 2 On hold, assert exactly two segments in approved order, 2 px white gap, exact text/aria counts and no zero-group placeholders. Group sums equal total. Minimum segment widths are visual aids, not exact proportions for tiny groups.
-- [ ] Run unit/control tests before implementation. Add any isolated component fixture under tests/browser/fixtures using the existing Vite test harness; never expose it through production routes. Build before browser tests.
-- [ ] Implement design L/M2 tokens/grouping and dialog-backed Panel. Do not remove existing validation-error red when applying reserved status colours. Preserve print CSS unless an explicit print requirement applies.
-- [ ] useToday updates on mount, every 60 seconds, visibility return and focus; removes listeners/timers on unmount. Test fake-clock Athens midnight/DST. Task 9 refreshes totals so chips and aggregate data do not diverge.
-- [ ] Replace persistent definition blocks in VocabSelect with InfoButton; retain access to the selected and complete value-list definitions through compact help content. Reuse original labels and definitions.
-- [ ] Run focused tests and typecheck. Commit `feat: add accessible pickers panels and status presentation`.
+- [x] Test dotted 16 px info icon aligned to text, >=24 px hit area, hover/focus/click opening, Escape/outside dismissal and accessible name. Long Greek help fits 360 px.
+- [x] Test picker search with accents/final sigma; multi chips/checkboxes; single null radio choice; arrow selection without closing; Enter/Escape closing with focus return; pointer choice closing single; outside pointer/focus including blank area beside trigger closing without focus theft. Search Enter never submits the parent form. Retired selected values remain readable/removable.
+- [x] Test bar zero/mixed/sparse states. For 8 Closed and 2 On hold, assert exactly two segments in approved order, 2 px white gap, exact text/aria counts and no zero-group placeholders. Group sums equal total. Minimum segment widths are visual aids, not exact proportions for tiny groups.
+- [x] Run unit/control tests before implementation. Add any isolated component fixture under tests/browser/fixtures using the existing Vite test harness; never expose it through production routes. Build before browser tests.
+- [x] Implement design L/M2 tokens/grouping and dialog-backed Panel. Do not remove existing validation-error red when applying reserved status colours. Preserve print CSS unless an explicit print requirement applies.
+- [x] useToday updates on mount, every 60 seconds, visibility return and focus; removes listeners/timers on unmount. Test fake-clock Athens midnight/DST. Task 9 refreshes totals so chips and aggregate data do not diverge.
+- [x] Replace persistent definition blocks in VocabSelect with InfoButton; retain access to the selected and complete value-list definitions through compact help content. Reuse original labels and definitions.
+- [x] Run focused tests and typecheck. Commit `feat: add accessible pickers panels and status presentation`.
 
 ## Task 8 — Routes, navigation and shared record cards
 
@@ -236,12 +236,12 @@ PackageStatusBar({counts,variant}: {counts:PackageCounts;variant:'list'|'detail'
 
 **Interfaces:** `recordReturnPath(projectId:number,from:string|null):string`. RecordCard receives `{record:RecordSummary,people:{id:number;name:string}[],packageName?:string|null,hidePackage?:boolean,today:string,href:string}`. Package routes: /projects/:projectId/work-packages and /:packageId; support direct reload through the server's HTML route allowlist.
 
-- [ ] Test direct routes/refresh, exactly one active project-menu family, no owner package menu for readers. Back preserves origin list query or package page.
-- [ ] Return path tests: accept existing query-only `?status=open`, or same-project Records list/package-detail path with validated query. Reject external/protocol-relative URLs, backslashes, cross-project paths, malformed encoding and nested redirects; fall back to project Records. Construct allowed paths rather than testing only startsWith.
-- [ ] Run navigation/server tests before implementation.
-- [ ] Extend current regex-based routing without a new router. Mount minimal package route shells here for route tests; replace them with real pages in Task 9. Extract inline RecordList cards once. Preserve all record facts, add dateText/DueChip/status badge and optional package context. Keep real links and keyboard operation.
-- [ ] At <=650 px, navigation scrolls within itself with edge fade; current link is brought into view without page scrolling. Hidden scrollbar must not hide focus or prevent access to trailing items. Verify 360/390 px no page overflow.
-- [ ] Run routing/home tests/typecheck. Commit `feat: route package pages and reuse record cards`.
+- [x] Test direct routes/refresh, exactly one active project-menu family, no owner package menu for readers. Back preserves origin list query or package page.
+- [x] Return path tests: accept existing query-only `?status=open`, or same-project Records list/package-detail path with validated query. Reject external/protocol-relative URLs, backslashes, cross-project paths, malformed encoding and nested redirects; fall back to project Records. Construct allowed paths rather than testing only startsWith.
+- [x] Run navigation/server tests before implementation.
+- [x] Extend current regex-based routing without a new router. Mount minimal package route shells here for route tests; replace them with real pages in Task 9. Extract inline RecordList cards once. Preserve all record facts, add dateText/DueChip/status badge and optional package context. Keep real links and keyboard operation.
+- [x] At <=650 px, navigation scrolls within itself with edge fade; current link is brought into view without page scrolling. Hidden scrollbar must not hide focus or prevent access to trailing items. Verify 360/390 px no page overflow.
+- [x] Run routing/home tests/typecheck. Commit `feat: route package pages and reuse record cards`.
 
 ## Task 9 — Package list and detail pages
 
@@ -249,13 +249,13 @@ PackageStatusBar({counts,variant}: {counts:PackageCounts;variant:'list'|'detail'
 
 **Interfaces:** `loadPackages(projectId,signal):Promise<{today:string;packages:PackageSummary[]}>`; `loadPackage(projectId,id,signal):Promise<PackageDetail>`; PackageList({projectId,projectName}); PackagePage({projectId,packageId}). Use existing api<T>/ErrorNotice/AbortController patterns.
 
-- [ ] Create per-test data through owner API. Test empty/no-match/loading/error states, Greek search, approved status sorting then Intl.Collator(lang) name sorting (ID tie-break), long names and 360 px cards.
-- [ ] Test detail breadcrumb, omitted empty attributes, Past target for an empty planned package, no Past target for completed/cancelled, mismatch notice, subtype/status table and totals/legend agreement. Obtain records through existing endpoint plus workPackageId, not a second list API.
-- [ ] Run package browser spec after build; confirm absent screens fail.
-- [ ] Implement design A–C. Whole-row click respects selection/modifiers and the accessible name link; no nested interactive controls. Reuse RecordCard, outstanding first then human ID with ID tie-break; hide repeated package name. Table columns use existing vocabulary order for statuses present.
-- [ ] Refresh list/detail on entry, successful mutations, visibility return and changed useToday. Abort/ignore stale requests. During aggregate refresh use response.today for its labels; do not claim yesterday's totals are current. Task 10 separately refreshes confirmation data.
-- [ ] New/Edit/Delete connect to Task 10; do not call the pages delivered before those actions work. No fake sample data or blueprint controls.
-- [ ] Run package/browser/type checks. Commit `feat: show work package lists and record summaries`.
+- [x] Create per-test data through owner API. Test empty/no-match/loading/error states, Greek search, approved status sorting then Intl.Collator(lang) name sorting (ID tie-break), long names and 360 px cards.
+- [x] Test detail breadcrumb, omitted empty attributes, Past target for an empty planned package, no Past target for completed/cancelled, mismatch notice, subtype/status table and totals/legend agreement. Obtain records through existing endpoint plus workPackageId, not a second list API.
+- [x] Run package browser spec after build; confirm absent screens fail.
+- [x] Implement design A–C. Whole-row click respects selection/modifiers and the accessible name link; no nested interactive controls. Reuse RecordCard, outstanding first then human ID with ID tie-break; hide repeated package name. Table columns use existing vocabulary order for statuses present.
+- [x] Refresh list/detail on entry, successful mutations, visibility return and changed useToday. Abort/ignore stale requests. During aggregate refresh use response.today for its labels; do not claim yesterday's totals are current. Task 10 separately refreshes confirmation data.
+- [x] New/Edit/Delete connect to Task 10; do not call the pages delivered before those actions work. No fake sample data or blueprint controls.
+- [x] Run package/browser/type checks. Commit `feat: show work package lists and record summaries`.
 
 ## Task 10 — Package forms and lifecycle dialogs
 
@@ -263,13 +263,13 @@ PackageStatusBar({counts,variant}: {counts:PackageCounts;variant:'list'|'detail'
 
 **Interface:** PackageForm({projectId:number,initial?:WorkPackage,people:Person[],inline:boolean,onSaved:(p:WorkPackage)=>void,onCancel:()=>void}). Reuse for page actions and inline creation in Task 11. Use modal/dirty-guard patterns, not window.prompt/alert.
 
-- [ ] Test empty/duplicate inline Name errors with aria-invalid/describedby and focus; values survive every failure. Separate Create/Save button text. Retired current responsible remains readable but cannot be newly selected.
-- [ ] When saving a change into completed/cancelled, read fresh detail and current outstanding records before confirmation. Show <=5 ID/status entries, remaining count and overdue count. Go back preserves values and focuses Status. Same-status metadata edits do not confirm.
-- [ ] Test another tab adding a record after page load. Confirmation is informative, not a lock: a record may arrive after the fresh read; saving still changes only the package and refreshes the mismatch notice. Do not add a server confirmation flag.
-- [ ] Implement unknown-create-outcome handling using isUnknownOutcome/Projects.tsx pattern. Block repeat POST until refreshing the list reconciles the result; unresolved ambiguity retains draft and shows refreshed data, never automatically resubmits.
-- [ ] Delete always opens fresh-data dialog. Populated: count, Show its records, Keep package. Empty: exact typed name. On DELETE 409 work_package_not_empty, switch to blocked state with returned count. Name mismatch refreshes state without replacing typed confirmation. Unknown delete outcome refreshes list before retry.
-- [ ] Implement D–F, approved EN/EL phrases and singular/plural forms, busy guards and successful navigation/refresh. Test draft retention, conflict and unknown-outcome branches.
-- [ ] Run package browser tests/typecheck. Commit `feat: manage package forms and safe lifecycle confirmations`.
+- [x] Test empty/duplicate inline Name errors with aria-invalid/describedby and focus; values survive every failure. Separate Create/Save button text. Retired current responsible remains readable but cannot be newly selected.
+- [x] When saving a change into completed/cancelled, read fresh detail and current outstanding records before confirmation. Show <=5 ID/status entries, remaining count and overdue count. Go back preserves values and focuses Status. Same-status metadata edits do not confirm.
+- [x] Test another tab adding a record after page load. Confirmation is informative, not a lock: a record may arrive after the fresh read; saving still changes only the package and refreshes the mismatch notice. Do not add a server confirmation flag.
+- [x] Implement unknown-create-outcome handling using isUnknownOutcome/Projects.tsx pattern. Block repeat POST until refreshing the list reconciles the result; unresolved ambiguity retains draft and shows refreshed data, never automatically resubmits.
+- [x] Delete always opens fresh-data dialog. Populated: count, Show its records, Keep package. Empty: exact typed name. On DELETE 409 work_package_not_empty, switch to blocked state with returned count. Name mismatch refreshes state without replacing typed confirmation. Unknown delete outcome refreshes list before retry.
+- [x] Implement D–F, approved EN/EL phrases and singular/plural forms, busy guards and successful navigation/refresh. Test draft retention, conflict and unknown-outcome branches.
+- [x] Run package browser tests/typecheck. Commit `feat: manage package forms and safe lifecycle confirmations`.
 
 ## Task 11 — Assignment, Records filter and capture
 
@@ -277,13 +277,13 @@ PackageStatusBar({counts,variant}: {counts:PackageCounts;variant:'list'|'detail'
 
 **Interfaces:** PackagePicker({packages:WorkPackage[],value:number|null,savedValue:number|null,onChange,onCreate,triggerRef}). RecordData.owner gains packages:WorkPackage[]; loadRecord may receive PackageSummary[] from list API and retain the common fields. Capture gains initialWorkPackageId?:number|null and package-aware close/success handling; preserve its upload flow.
 
-- [ ] Test Work package position after Description/before Severity, active/finished choice groups, No work package, status pills, joins/leaves/moves notes and complete keyboard rules.
-- [ ] Inline creation preserves unsaved title and exact Instruction text, saves package immediately and selects it in draft. Cancelling record keeps package but saved membership unchanged; saving assigns it. Escape closes only the top dialog.
-- [ ] Other-tab rename/deletion while editing: refresh options without discarding draft; deleted selection gives actionable error, not silent null assignment. Unknown outcome obeys Task 10.
-- [ ] Capture from package preselects it but inherits no responsible/date. Retain create-then-upload and uncertain-create handling. Close returns to package and refreshes counts. Ordinary capture can remain ungrouped.
-- [ ] Records filter stays visible next to search with Apply. Test absent/none/ID URLs, invalid ID chip/error, combined search, chip removal and Back preserving applied filters. Hide repeated package name only when filtering to one package.
-- [ ] Implement Task 4 contracts, update initial draft and typed test fixtures, reuse SearchPicker, and place small + New package text action beside label. Preserve other filters and owner cost totals.
-- [ ] Run assignment/home/record-data checks and typecheck. Commit `feat: connect package assignment filters and capture`.
+- [x] Test Work package position after Description/before Severity, active/finished choice groups, No work package, status pills, joins/leaves/moves notes and complete keyboard rules.
+- [x] Inline creation preserves unsaved title and exact Instruction text, saves package immediately and selects it in draft. Cancelling record keeps package but saved membership unchanged; saving assigns it. Escape closes only the top dialog.
+- [x] Other-tab rename/deletion while editing: refresh options without discarding draft; deleted selection gives actionable error, not silent null assignment. Unknown outcome obeys Task 10.
+- [x] Capture from package preselects it but inherits no responsible/date. Retain create-then-upload and uncertain-create handling. Close returns to package and refreshes counts. Ordinary capture can remain ungrouped.
+- [x] Records filter stays visible next to search with Apply. Test absent/none/ID URLs, invalid ID chip/error, combined search, chip removal and Back preserving applied filters. Hide repeated package name only when filtering to one package.
+- [x] Implement Task 4 contracts, update initial draft and typed test fixtures, reuse SearchPicker, and place small + New package text action beside label. Preserve other filters and owner cost totals.
+- [x] Run assignment/home/record-data checks and typecheck. Commit `feat: connect package assignment filters and capture`.
 
 ## Task 12 — Record layout, panels and retained history
 
@@ -291,40 +291,40 @@ PackageStatusBar({counts,variant}: {counts:PackageCounts;variant:'list'|'detail'
 
 **Interfaces:** Preserve existing child data/mutation callbacks. Keep RecordEditor draft in a stable mounted editor or lift it into RecordPage; entry-panel saves/refreshes must never reset it. DeleteRecordDialog uses Task 6 API. No new state-management dependency.
 
-- [ ] Create populated fixtures for every applicable field in each subtype. Assert the four sections, panels and reading groups preserve all design §3 capabilities, not just the visible blueprint sample.
-- [ ] Add required review regression: failed check then passed check with distinct multiline notes, date/checker/method/outcome; incoming prerequisite and outgoing dependency. Expanding Overview exposes all history and both directions, Created and Updated. Contributor/shared views retain allowed verification fields but omit Draft references, internal dependency IDs and private fields. Activity is not a substitute for verification notes.
-- [ ] Test unsaved record -> Measurements/Log panel -> save entry -> close -> cancel record. Draft survives panel operations; saved child survives record cancellation. Cover failed refresh and access loss without stale private information remaining.
-- [ ] Run record-ui spec before implementation.
-- [ ] Implement identity/title/next-action strip, conditional safety, four tabs/mobile section selector, Sharing/Activity panels. On phone use More sheet for permitted secondary actions; Delete is last below separator. A panel launched from More returns focus to More. Readers never get edit/delete controls.
-- [ ] Implement Work, subtype decision block, People and timing, Location, Trades/tags, collapsible References and Private, fixed Save/Cancel. Preserve full measurements and Log fields, options, typed instruction and existing tag creation/retired selections.
-- [ ] Implement J1–J7 DOM order, formatted dates, instruction block, full verification history and Sequence/dates. Preserve current conditional status reason/note and Next action by “Since” information; place Since under that value without creating a new section.
-- [ ] Align Add icons after headings and reuse labelled edit/bin controls. Location gallery remains separate from tree; preserve upload progress/failures, existing limits and independent saves. Retain method/outcome definitions through info controls.
-- [ ] Change status uses real allowedTransitions and existing validation; missing-field guidance returns to editor without losing input. Delete dialog uses typed ID and dependency-blocked state; success returns through safe navigation and updates package totals.
-- [ ] Run record-ui and named existing browser specs plus typecheck. Commit `feat: simplify record screens without losing history or evidence`.
+- [x] Create populated fixtures for every applicable field in each subtype. Assert the four sections, panels and reading groups preserve all design §3 capabilities, not just the visible blueprint sample.
+- [x] Add required review regression: failed check then passed check with distinct multiline notes, date/checker/method/outcome; incoming prerequisite and outgoing dependency. Expanding Overview exposes all history and both directions, Created and Updated. Contributor/shared views retain allowed verification fields but omit Draft references, internal dependency IDs and private fields. Activity is not a substitute for verification notes.
+- [x] Test unsaved record -> Measurements/Log panel -> save entry -> close -> cancel record. Draft survives panel operations; saved child survives record cancellation. Cover failed refresh and access loss without stale private information remaining.
+- [x] Run record-ui spec before implementation.
+- [x] Implement identity/title/next-action strip, conditional safety, four tabs/mobile section selector, Sharing/Activity panels. On phone use More sheet for permitted secondary actions; Delete is last below separator. A panel launched from More returns focus to More. Readers never get edit/delete controls.
+- [x] Implement Work, subtype decision block, People and timing, Location, Trades/tags, collapsible References and Private, fixed Save/Cancel. Preserve full measurements and Log fields, options, typed instruction and existing tag creation/retired selections.
+- [x] Implement J1–J7 DOM order, formatted dates, instruction block, full verification history and Sequence/dates. Preserve current conditional status reason/note and Next action by “Since” information; place Since under that value without creating a new section.
+- [x] Align Add icons after headings and reuse labelled edit/bin controls. Location gallery remains separate from tree; preserve upload progress/failures, existing limits and independent saves. Retain method/outcome definitions through info controls.
+- [x] Change status uses real allowedTransitions and existing validation; missing-field guidance returns to editor without losing input. Delete dialog uses typed ID and dependency-blocked state; success returns through safe navigation and updates package totals.
+- [x] Run record-ui and named existing browser specs plus typecheck. Commit `feat: simplify record screens without losing history or evidence`.
 
 ## Task 13 — Integrated bilingual and permission acceptance
 
 **Tests:** Extend tests/browser/record-ui.spec.ts, work-packages.spec.ts, work-package-assignment.spec.ts, print.spec.ts and tests/server/api-privacy.test.ts. Production changes only for demonstrated in-scope defects.
 
-- [ ] EN/EL owner journey: create package and all record subtypes; assign/move/ungroup; upload multiple location images; save full Log and multi-row measurements; verify failed then passed; view both dependency directions; print current package name; delete unreferenced disposable record then empty package.
-- [ ] Upload-only contributor sees package name/upload only; Log-only can add entries; neither can manage packages, membership, notes or deletion. Anonymous view has no package navigation/endpoint or private metadata. Assert HTTP fields as well as hidden controls.
-- [ ] Public/private attachment occurrences sharing bytes remain independent. Private Log deletion still removes its occurrences atomically. Existing authorization/session-race tests must remain passing.
-- [ ] Desktop, 360/390 px, keyboard-only, long Greek names, empty/populated states, retained focus, conflict errors and narrow tables. Overflow tables inside their container, not the page.
-- [ ] Different browser timezone across Athens midnight: use fixed clocks; chips, totals and Past target agree after refresh. Planned empty past-target package warns; completed/cancelled does not.
-- [ ] Sparse Closed/On hold and mixed status bars retain exact text/aria counts and separators. Measure design L contrast pairs; do not treat the review's figures as independently verified. Preserve approved colours unless a real failure requires a documented correction.
-- [ ] Build and run relevant browser/API suites and typecheck. Commit `test: cover package and record UI acceptance journeys`.
+- [x] EN/EL owner journey: create package and all record subtypes; assign/move/ungroup; upload multiple location images; save full Log and multi-row measurements; verify failed then passed; view both dependency directions; print current package name; delete unreferenced disposable record then empty package.
+- [x] Upload-only contributor sees package name/upload only; Log-only can add entries; neither can manage packages, membership, notes or deletion. Anonymous view has no package navigation/endpoint or private metadata. Assert HTTP fields as well as hidden controls.
+- [x] Public/private attachment occurrences sharing bytes remain independent. Private Log deletion still removes its occurrences atomically. Existing authorization/session-race tests must remain passing.
+- [x] Desktop, 360/390 px, keyboard-only, long Greek names, empty/populated states, retained focus, conflict errors and narrow tables. Overflow tables inside their container, not the page.
+- [x] Different browser timezone across Athens midnight: use fixed clocks; chips, totals and Past target agree after refresh. Planned empty past-target package warns; completed/cancelled does not.
+- [x] Sparse Closed/On hold and mixed status bars retain exact text/aria counts and separators. Measure design L contrast pairs; do not treat the review's figures as independently verified. Preserve approved colours unless a real failure requires a documented correction.
+- [x] Build and run relevant browser/API suites and typecheck. Commit `test: cover package and record UI acceptance journeys`.
 
 ## Task 14 — Full verification, docs and release handoff
 
 **Modify:** docs/specs/v1.md, docs/ARCHITECTURE.md, docs/reference/data-model.md, docs/guides/web-interface.md, deployment.md, backup-restore.md, release-checklist.md, README.md; this plan and consolidated design lifecycle/evidence.
 
-- [ ] Run `npm run typecheck`, `npm test`, `npm run build`, `npm run test:browser`. Record actual counts, commands, environment and failures. Never copy an earlier plan's counts. After fixes rerun affected checks and justified integration checks.
-- [ ] Run a populated isolated migration/backup/restore rehearsal on synthetic temporary data: file hashes, membership, record children, new schema and cleared restored access. Verify old-schema rejection by new tools. No live data or recovery cutover during implementation.
-- [ ] Update current conceptual/logical/physical model from migration 0007; integrate packages and remove proposed-only wording only for delivered changes. Record server-enforced same-project constraints. Preserve provenance of the original schema snapshot.
-- [ ] Reconcile each design coverage row and A–M requirement with implemented components/tests. Explicitly record verification history, Requires first and sparse bars. All 76 approved phrases are accounted for; existing record vocabulary meanings stay unchanged.
-- [ ] Operator guide: verified pre-upgrade backup; deploy migration-aware code; fresh verified post-upgrade backup before relying on current scheduled export; retain matching old release with pre-upgrade backup. Old backup recovery uses old matching tooling then offline migration, never relaxed checks or an old-code-only rollback over new data.
-- [ ] Keep status honest: merged but not deployed leaves hosted acceptance pending. Design becomes Historical only after implemented enduring requirements are reconciled and commit range/deviations recorded. Amendment remains superseded.
-- [ ] Commit `docs: reconcile work packages and record interface delivery`. Hand over implementation commits, evidence and remaining hosted checks. Merge/push/deployment follow the owner's execution-stage instructions; publication of this plan is not deployment authorization.
+- [x] Run `npm run typecheck`, `npm test`, `npm run build`, `npm run test:browser`. Record actual counts, commands, environment and failures. Never copy an earlier plan's counts. After fixes rerun affected checks and justified integration checks.
+- [x] Run a populated isolated migration/backup/restore rehearsal on synthetic temporary data: file hashes, membership, record children, new schema and cleared restored access. Verify old-schema rejection by new tools. No live data or recovery cutover during implementation.
+- [x] Update current conceptual/logical/physical model from migration 0007; integrate packages and remove proposed-only wording only for delivered changes. Record server-enforced same-project constraints. Preserve provenance of the original schema snapshot.
+- [x] Reconcile each design coverage row and A–M requirement with implemented components/tests. Explicitly record verification history, Requires first and sparse bars. All 76 approved phrases are accounted for; existing record vocabulary meanings stay unchanged.
+- [x] Operator guide: verified pre-upgrade backup; deploy migration-aware code; fresh verified post-upgrade backup before relying on current scheduled export; retain matching old release with pre-upgrade backup. Old backup recovery uses old matching tooling then offline migration, never relaxed checks or an old-code-only rollback over new data.
+- [x] Keep status honest: merged but not deployed leaves hosted acceptance pending. Design becomes Historical only after implemented enduring requirements are reconciled and commit range/deviations recorded. Amendment remains superseded.
+- [x] Commit `docs: reconcile work packages and record interface delivery`. Hand over implementation commits, evidence and remaining hosted checks. Merge/push/deployment follow the owner's execution-stage instructions; publication of this plan is not deployment authorization.
 
 ## Coverage and dependencies
 
@@ -345,4 +345,43 @@ Execute in numbered order. Each task has a focused commit and test result. No pa
 
 ## Planning evidence
 
-The plan was checked against repository domain schemas, SQL stores/list/activity, guards, reader/print projections, routing, test helpers, build scripts and strict backup schema compatibility at ae88ee9. It specifies files, interfaces and regression assertions; it is not a full source-code transcript. Future implementation tests and the application suite have not been run during planning. The plan remains Draft for review before execution.
+The plan was checked against repository domain schemas, SQL stores/list/activity, guards, reader/print projections, routing, test helpers, build scripts and strict backup schema compatibility at ae88ee9. It specifies files, interfaces and regression assertions; it is not a full source-code transcript. Future implementation tests and the application suite have not been run during planning. That was the planning-stage status; the implementation results below supersede it.
+
+## Execution evidence — 2026-10-07
+
+All 14 tasks are complete in the isolated `feature/record-ui-packages` worktree. No live database, hosting configuration or backup schedule was changed. No runtime dependency was added. Implementation commits run from `aae261e` through `311bf7c`; this closeout reconciles the maintained documentation. No material design deviation was required.
+
+| Verification | Actual result |
+|---|---|
+| `npm run typecheck` | Passed |
+| `npm test -- --maxWorkers=2` | 583 tests in 84 files passed |
+| `npm run build` | Passed; existing bundle-size warning remains |
+| `PLAYWRIGHT_CHANNEL=chrome npm run test:browser` | 85 tests passed |
+| Populated migration and recovery rehearsal | Synthetic schema-0006 data migrated to 0007 with previous fields and children preserved; package membership, retained file hashes and restored access invalidation checked |
+| Backup compatibility | Current tools reject old-schema backups; recovery instructions preserve matching old tooling and offline migration |
+| Documentation | Physical inventory regenerated from isolated SQLite migrations 0001–0007; maintained specification and operator guides reconciled |
+
+Environment: Windows, Node 24.12 and desktop Chrome through Playwright. Phone coverage uses browser viewports and does not replace physical-device acceptance. Unit/server tests used two workers to avoid resource-related timeouts. A local tsx loader junction was needed for CLI subprocess tests. Initial browser failures from obsolete labels were corrected for the intentional UI changes. A backup test fixture initially reused the same backup timestamp; distinct pre/post-migration times fixed the fixture.
+
+One independent Astra Medium review found two dirty-state defects. Entering record editing could discard pending evidence, and opening Status or Sharing could overwrite the evidence dirty flag. Both were fixed. Regression checks cover pending selections, separate panel state and an active upload held over real HTTP. The final 85-test browser run includes those checks. The reviewer did not independently run the full suite; the execution checks above did.
+
+### Delivered coverage
+
+| Design destination | Implementation and verification |
+|---|---|
+| Model, migration and lifecycle | Domain package/calendar modules, migration 0007, package store/routes; migration, work-package API and membership tests |
+| A–C navigation, package list and detail | App navigation and package pages; routing and work-packages browser tests |
+| D–F confirmation, forms and deletion | PackageForm and DeletePackageDialog; fresh counts, conflicts, exact-name deletion and uncertain-create tests |
+| G–I filters, header and assignment | RecordList, Capture, RecordEditor and PackagePicker; assignment/filter/capture browser tests |
+| §3 and J retained reading/editing fields | Overview, RecordEditor and RecordPage; full field coverage, failed/passed verification with distinct notes, Requires first and Must be done before regressions |
+| K panels and phone actions | Panel controls and RecordPage; focus, keyboard, narrow viewport, draft retention and busy-upload tests |
+| L and M colours, dates and counts | Presentation helpers, styles and Athens calendar; contrast, timezone/midnight, sparse Closed/On hold bars and exact-count tests |
+| Privacy and print | Explicit reader projection and print refresh; owner/contributor/shared restrictions and renamed package printing tests |
+| Permanent record deletion | Transactional deletion store/routes; both dependency directions, concurrent upload, retained bytes and revoked-access tests |
+| Approved wording | All 76 rows retained in specification Appendix C8; package vocabulary, forms, filters, lifecycle dialogs and bilingual browser journeys use the approved terms |
+
+The maintained [specification](../specs/v1.md), [Architecture](../ARCHITECTURE.md), [data model](../reference/data-model.md) and [web guide](../guides/web-interface.md) now describe the delivered implementation. Deployment and recovery procedures preserve the schema compatibility boundary. The consolidated design is historical provenance.
+
+### Remaining release actions
+
+Merge, push and deployment require the owner's execution-stage instruction. Hosted acceptance is pending. Follow the schema-0007 procedure in the [deployment guide](../guides/deployment.md), verify pre/post-upgrade backups with matching tooling, update the PC verifier, and check real owner/contributor/shared behavior and phone layout before recording the release as deployed.

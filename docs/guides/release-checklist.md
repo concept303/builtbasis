@@ -152,3 +152,20 @@ Private evidence was recorded under `.superpowers/project-management-refresh/`: 
 The owner removed the obsolete trial application directory, test database, test log and two trial backup files. SSH checks confirmed all five named paths were absent and no `spike-*` backups remained. Before deletion, process and crontab inspection showed no running trial application or scheduled trial job. The live database, uploaded-file directory and production backups remained present. The active release link still selected `a3ff3e1`, and the HTTPS health endpoint returned HTTP 200 with `{"ok":true}`. The isolated `builtbasis-recovery-20261004` folder was retained.
 
 The [server directory reference](deployment.md#server-directory-layout) records the verified application layout, surrounding hosting folders, temporary files, retained recovery material and PC backup structure. The README links directly to it. Plan 0's historical metadata now records its deferred cleanup as complete; its original checklist is preserved. This closes that cleanup item without changing the other release-acceptance limitations.
+
+### Record interface and work packages — local delivery, 2026-10-07
+
+Implementation commits `aae261e` through `311bf7c` are on `feature/record-ui-packages`, based on `563294e`. They are not merged, pushed or deployed. The documentation reconciliation completes the implementation plan. Earlier hosted acceptance entries above remain historical evidence for their named releases.
+
+Local verification passed TypeScript, production build, 583 unit/server tests in 84 files and 85 Chrome browser tests. The build retains its existing bundle-size warning. Tests cover schema 0007, package lifecycle and membership, record deletion, preserved verification notes and reverse dependencies, reader privacy, current package-name printing, Athens dates and sparse status bars. The final review's evidence-draft and active-upload regressions are included.
+
+A populated synthetic migration/backup/restore rehearsal passed. It preserved pre-existing record fields and children, checked file hashes and membership, invalidated restored access and confirmed rejection of old-schema backups by current tools. This is local verification, not a hosted recovery cutover.
+
+Before deploying this release, complete the [schema-0007 upgrade procedure](deployment.md#upgrade-to-schema-0007-work-packages). Record the actual release commit and these results here:
+
+- [ ] Verify a pre-upgrade backup with the deployed release's matching tooling.
+- [ ] Stop writers, activate migration-aware code and verify schema integrity and preservation of existing data.
+- [ ] Check package CRUD, membership, filtering, all record subtypes and new panels on the live owner interface.
+- [ ] Check contributor and anonymous access boundaries, existing links/files and physical-phone layout.
+- [ ] Verify a fresh schema-0007 server and offsite backup with the updated PC verifier; resume and check schedules.
+- [ ] Retain the previous release and matching recovery point; record hosted acceptance without reusing local results as hosted proof.

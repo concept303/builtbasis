@@ -78,3 +78,17 @@ Administration is available only to the owner and always shows server-backup/sto
 Production activation follows the deployment guide. The [release checklist](release-checklist.md) records completed hosting, backup and recovery checks and the remaining acceptance limitations. Deployment of this UI update does not close the deferred phone JPG investigation or unavailable current-day upstream-log verification. Retain the existing access/evidence guide for key, account, storage and restore rules.
 
 Evidence previews use a consistent dialog width. Close and Download original remain above the independently scrolling preview. Media fills the available width, and email metadata wraps on narrow screens.
+
+## Work packages and record editing
+
+The 2026-10-07 implementation adds Work packages immediately after Records in owner project navigation. Its deployment is tracked separately in the release checklist. Create a package with a name; status defaults to Planned. Add its optional description, responsible person and target date. These values describe the package and do not populate member records.
+
+Choose a package in a record's Work section, or use New record on the package page. A record can have one package or none. Use the Records filter to see all records, ungrouped records or one package. Completed/cancelled packages remain selectable. The owner can change package status without changing records. Completing or cancelling with outstanding records shows a confirmation. To delete a package, first move or ungroup its records; an empty package requires its exact name.
+
+Record reading has Overview, Photos & files, Measurements and Log. Sharing and Activity history open from header actions. On a phone, use More for secondary actions. Printing remains in Sharing, including printing without a QR code. Open Verification history for every check and note. Open Sequence and dates for both outgoing work order and incoming prerequisites.
+
+Edit record groups Work, Decision/instruction where applicable, People and timing, Location, Trades/tags, References/notes and Private fields. Save/Cancel remains at the bottom. Open Measurements or Open Log without saving the record first. Entries save separately; cancelling the record draft does not undo those entries. Location photo uploads also save independently. The plus beside Location photos opens file selection. Choose multiple files, add a caption and upload; failures retain the remaining selection.
+
+Definitions are available from the small dotted info icon by hover, focus or click/tap. Escape or an outside interaction closes them. Trades/tags use searchable selectors with removable chips. Click outside the selector or press Escape to close it. Package selection uses the same control with one choice. Creating a package there saves it immediately; cancelling the record afterwards leaves that package in the project.
+
+Delete record is owner-only and permanent. Type its human ID after checking the warning. If it has an incoming or outgoing sequence link, remove that relationship first. The operation removes its evidence entries, Log, measurements, history and access links, while retained file bytes and record counters remain. Use Cancelled when the history should stay available.

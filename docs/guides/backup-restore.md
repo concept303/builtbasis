@@ -73,3 +73,11 @@ Successful restore emits a system diagnostic with reason `database_restore` and 
 ## Recovery evidence
 
 `npx vitest run tests/server/operations.test.ts tests/server/db.test.ts` performs a synthetic offsite-copy restore drill. It checks access reset, owner preservation, original database isolation, corrupt/missing blobs, schema mismatch, failed candidate cleanup and rotation while pinned. This local drill is not production recovery evidence. Before release, perform and record one operator drill from an actual offsite copy into a fresh isolated directory. Record backup identity, verification output, restore result and representative file checks. Keep production stopped only when doing a real cutover. Windows tests do not establish Linux directory-sync durability; verify that separately on hosting.
+
+## Schema 0007 compatibility
+
+Work-package backups contain the new table and nullable record membership. Restore/export verification remains strict about the exact migration registry. New tools reject an older or future schema even when its manifest hash matches. Never relax schema checks to recover an older point.
+
+For a schema-0006 recovery point, use the retained matching old release/tools to restore into an unused directory. Keep access closed. Apply the new release's migrations offline, verify integrity, foreign keys, files and records, then follow the established cutover and access-reset procedure. An old-code-only rollback over schema-0007 data is not supported.
+
+Before upgrading, keep a verified schema-0006 backup and its release. After upgrading, take a fresh verified schema-0007 backup and update the PC verifier before resuming scheduled pulls. The local rehearsal covers a populated 0006-to-0007 migration, package membership, a private Log/attachment, file hashes, exact-schema rejection and clearing restored sessions/grants/share links. It does not substitute for a hosted deployment check.

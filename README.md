@@ -30,7 +30,7 @@ For development, run `npm run dev` and `npm run web:dev` in separate terminals w
 
 Open Print / Save PDF from a record. Include QR link is off by default; Drafts can be printed without sharing. Administration always shows server backup and storage status. Other owner screens show only warnings. The remaining-file warning defaults to 5 GB (`FILES_WARNING_BELOW_BYTES`); the backup-age warning defaults to 36 hours (`BACKUP_MAX_AGE_HOURS`).
 
-`npm run build` produces the web interface and compiled Node entrypoints under `dist`. See the [deployment guide](docs/guides/deployment.md), [backup guide](docs/guides/backup-restore.md) and [release checklist](docs/guides/release-checklist.md) for live operation and the remaining acceptance checks. The [proposed v1 specification](docs/specs/v1.md) awaits release reconciliation.
+`npm run build` produces the web interface and compiled Node entrypoints under `dist`. See the [deployment guide](docs/guides/deployment.md), [backup guide](docs/guides/backup-restore.md) and [release checklist](docs/guides/release-checklist.md) for live operation and the remaining acceptance checks. The [maintained v1 specification](docs/specs/v1.md) includes the implemented work-package and record-interface contract; its deployment remains pending.
 
 ## Access and evidence contract
 
@@ -49,8 +49,8 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [docs/VISION.md](docs/VISION.md) | What we are building and why |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System structure |
 | [Data model](docs/reference/data-model.md) | Conceptual relationships, logical model and SQLite schema |
-| [Record UI and work packages — consolidated design](docs/designs/2026-10-06-record-ui-and-work-packages-design.md) | Current draft for review, including iteration 7 and accepted wording |
-| [Record UI and work packages — implementation plan](docs/plans/2026-10-06-record-ui-and-work-packages-plan.md) | Draft task sequence, interfaces and verification; not yet executed |
+| [Record UI and work packages — consolidated design](docs/designs/2026-10-06-record-ui-and-work-packages-design.md) | Design provenance for delivered record-interface and work-package requirements |
+| [Record UI and work packages — implementation plan](docs/plans/2026-10-06-record-ui-and-work-packages-plan.md) | Implementation sequence, verification evidence and pending deployment handoff |
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
 | [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |

@@ -1,6 +1,6 @@
 # Architecture
 
-> **Document type:** Architecture · **Status:** Current for implemented Plans 0–5, Plan 6, project/managed-list refresh and record location photos/notes, deployed as `a3ff3e1` (2026-10-04) · Kept deliberately short for the MVP; details in `docs/designs/2026-10-02-v1-records-design.md` §11.
+> **Document type:** Architecture · **Status:** Current implementation, including work packages and the simplified record interface on `feature/record-ui-packages` (2026-10-07). Those changes are not deployed. See the release checklist for hosted evidence.
 
 ## System
 
@@ -14,15 +14,15 @@ Fastify / TypeScript (Node.js) ── serves the built web app
         └── Stored files, by content hash (data folder)
 ```
 
-Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. Release `6247a9f` is active. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
+Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. The last documented deployed release is `a3ff3e1`; this implementation did not inspect or change production. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
 
-## Proposed change
+## Data model and interface
 
-The [record interface and work-package design](designs/2026-10-06-record-ui-and-work-packages-design.md) is the single consolidated draft for review, including iteration 7 and all six accepted owner decisions. The work-package concept is agreed; its database migration and interface have not been implemented.
+The [data model reference](reference/data-model.md) leads with conceptual 1:N/N:N relationships, then logical relations and the generated SQLite schema through migration 0007. A project contains optional work packages; each record can join one same-project package. No linking table or inherited workflow is introduced. The server validates same-project membership/person assignments inside immediate transactions. Package counts are derived in a grouped query using Europe/Athens calendar dates. Package keys and record identities cannot be reused.
 
-## Data model
+Owner package CRUD and membership are separate from per-record reader grants. Public/contributor/print projections include only the package name. Membership activity publishes reviewed name snapshots without IDs. Transactional package deletion requires emptiness. Record deletion rejects either direction of precedence, removes occurrences/access and record children, and retains immutable files and counters.
 
-The [data model reference](reference/data-model.md) leads with the conceptual model for architectural decisions, followed by the logical relational model and SQLite implementation. It describes the implemented schema separately from UI blueprint proposals.
+The browser uses four record sections. Sharing/Activity and entry editing use accessible dialogs. Record drafts remain mounted during separately saved child edits. Compact pickers, info controls and badges are shared across screens. The [maintained specification](specs/v1.md#appendix-c-work-packages-and-simplified-record-interface) owns the contract; the [implementation plan](plans/2026-10-06-record-ui-and-work-packages-plan.md) records delivery evidence.
 
 ## Parts
 

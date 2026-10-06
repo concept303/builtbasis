@@ -1,6 +1,6 @@
 # BuiltBasis data model
 
-> **Document type:** Architecture reference · **Status:** Current implementation reference · **Verified:** 2026-10-06 against migrations 0001–0006 in the repository. No live database was inspected. This document describes the implemented model; UI blueprint proposals do not change it. Section 4 separately records the approved work-package concept and its proposed implementation.
+> **Document type:** Architecture reference · **Status:** Current implementation reference · **Verified:** 2026-10-07 against migrations 0001–0007 in an isolated SQLite database. No live database was inspected. Work packages and record deletion are implemented on the feature branch; deployment remains separate.
 
 The conceptual model is the starting point for architectural decisions. It describes the business concepts, their ownership and their relationships. The logical model explains how they become relations and keys. The physical model records the SQLite implementation.
 
@@ -17,6 +17,9 @@ Related documents: [Architecture](../ARCHITECTURE.md), [v1 specification](../spe
 ```mermaid
 flowchart TB
     Project[Project] ---|"1:N · contains"| Record["Record<br/>Quality Issue / Detail Clarification / Task"]
+    Project ---|"1:N · contains"| Package[Work package]
+    Package ---|"1:N · groups; record membership optional"| Record
+    Person ---|"1:N · coordinates"| Package
     Project ---|"1:N · maintains"| Person[Project person]
     Project ---|"1:N · maintains"| Trade[Trade]
     Project ---|"1:N · maintains"| Tag[Tag]
@@ -30,6 +33,8 @@ flowchart TB
     Location ---|"1:N · parent of"| Location
     Record ---|"N:N · must be done before"| Record
 ```
+
+Each work package belongs to one project. A project may have zero or many packages. Each record belongs to zero or one package in its own project. Packages may be empty. Responsibility, status and target date belong to the package and never propagate to its records. Packages are not nested.
 
 Each record and each managed-list item belongs to exactly one project. A project may have none or many of each. A record may select zero or many trades, tags and locations. Each person role on a record is optional and holds at most one person; the same person may occupy several roles. Each location has at most one parent and at most one zone type. A root location has no parent.
 
@@ -72,6 +77,7 @@ A project person is a contact, not a login account. There is no implemented pers
 
 | Decision | Current model |
 |---|---|
+| Grouping | Optional work package, separate from overlapping trades and tags. |
 | Unit of work | One generic Record with three subtypes. |
 | Managed-list scope | People, trades, tags, locations and zone types belong to a project. |
 | Location structure | A parent/child tree, selected through an N:N record relationship. |
@@ -97,9 +103,25 @@ erDiagram
     projects {
         key id PK
     }
+    work_packages {
+        key id PK
+        key project_id FK
+        key responsible_id FK
+        attribute name
+        attribute name_key
+        attribute description
+        attribute target_date
+        attribute status
+        attribute created_at
+        attribute updated_at
+    }
+    projects ||..o{ work_packages : contains
+    people o|..o{ work_packages : coordinates
+    work_packages o|..o{ records : groups
     records {
         key id PK
         key project_id FK
+        key work_package_id FK
         key ball_in_court_id FK
         key responsible_id FK
         key issued_by_id FK
@@ -350,11 +372,11 @@ The full column inventory follows in the physical model. These logical diagrams 
 | Share tokens | Hash for lookup; encrypted token material in BLOB columns. The encryption key is outside the database. |
 | Integrity | PKs, FKs, unique indexes and CHECK constraints plus server-side domain validation. |
 
-Source: [connection configuration](../../src/server/db/connection.ts), [migration runner](../../src/server/db/migrate.ts), and the six migrations imported by the registry.
+Source: [connection configuration](../../src/server/db/connection.ts), [migration runner](../../src/server/db/migrate.ts), and the seven migrations imported by the registry.
 
 SQLite is not declared in STRICT mode here. A declared column type does not by itself guarantee every business invariant. For example, status transitions and active-status required fields are server rules. A project_id FK and a person_id FK do not by themselves guarantee that the person belongs to the same project.
 
-Deletion behaviour is mixed. Many record child relations use ON DELETE CASCADE, while photos, share links and other relations require explicit application handling. Do not infer a safe record-deletion operation from this diagram. The standalone UI deletion proposal is not documented here as implemented behaviour. Deleting an occurrence does not delete retained blob files.
+Deletion behaviour is mixed. Many record child relations use ON DELETE CASCADE, while photos, share links and other relations require explicit application handling. The owner deletion operation checks both directions of precedence inside an immediate transaction. It refuses deletion while either direction exists. It deletes photo/attachment occurrences and share links explicitly, then cascades record children. Identity counters and immutable blobs remain. Empty-only package deletion is also transactional; a referenced package cannot be deleted. Deleting an occurrence does not delete retained blob files.
 
 ### Supporting relations
 
@@ -367,9 +389,9 @@ Deletion behaviour is mixed. Many record child relations use ON DELETE CASCADE, 
 | schema_migrations | Applied migration IDs and timestamps. |
 | sqlite_sequence | SQLite-managed AUTOINCREMENT state; an internal engine table. |
 
-### Effective schema after migrations 0001–0006
+### Effective schema after migrations 0001–0007
 
-The SQL below was extracted from an in-memory SQLite database after applying the repository migrations on 2026-10-06. It shows the resulting schema, rather than the intermediate tables used during migration. Expand individual tables to see columns, nullability, defaults, keys, constraints and explicitly named indexes. SQLite-generated indexes for PRIMARY KEY and UNIQUE constraints are implicit in the table declarations.
+The original 0001–0006 schema inventory was extracted on 2026-10-06. This inventory was regenerated on 2026-10-07 from `sqlite_schema` after applying all migrations to an in-memory database. Column and foreign-key PRAGMAs were also inspected. Generated indexes are implicit in the declarations; explicitly named indexes follow each table.
 
 <details>
 <summary>activity</summary>
@@ -415,7 +437,6 @@ CREATE TABLE blobs (
       hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'),
       size INTEGER NOT NULL CHECK(size > 0), content_type TEXT NOT NULL
     );
-
 ```
 
 </details>
@@ -531,7 +552,6 @@ CREATE TABLE people (
         active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
         UNIQUE (project_id, code)
       );
-
 ```
 
 </details>
@@ -561,7 +581,6 @@ CREATE TABLE project_id_sequence (
       singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
       last_id INTEGER NOT NULL CHECK(last_id >= 0)
     );
-
 ```
 
 </details>
@@ -576,7 +595,6 @@ CREATE TABLE projects (
         name TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
-
 ```
 
 </details>
@@ -591,7 +609,6 @@ CREATE TABLE record_counters (
       last_sequence INTEGER NOT NULL,
       PRIMARY KEY (project_id, subtype)
     );
-
 ```
 
 </details>
@@ -607,7 +624,6 @@ CREATE TABLE record_grants (
       can_add_log INTEGER NOT NULL CHECK (can_add_log IN (0,1)),
       PRIMARY KEY (record_id, user_id)
     );
-
 ```
 
 </details>
@@ -620,7 +636,6 @@ CREATE TABLE record_id_sequence (
       singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
       last_id INTEGER NOT NULL CHECK(last_id >= 0)
     );
-
 ```
 
 </details>
@@ -723,10 +738,11 @@ CREATE TABLE records (
       created_at TEXT NOT NULL,
       created_by INTEGER NOT NULL REFERENCES users(id),
       updated_at TEXT NOT NULL,
-      updated_by INTEGER NOT NULL REFERENCES users(id), public_notes TEXT, location_notes TEXT,
+      updated_by INTEGER NOT NULL REFERENCES users(id), public_notes TEXT, location_notes TEXT, work_package_id INTEGER REFERENCES work_packages(id),
       UNIQUE (project_id, subtype, sequence),
       UNIQUE (project_id, human_id)
     );
+CREATE INDEX records_project_package ON records(project_id, work_package_id);
 CREATE INDEX records_project_status ON records(project_id, status);
 ```
 
@@ -737,7 +753,6 @@ CREATE INDEX records_project_status ON records(project_id, status);
 
 ```sql
 CREATE TABLE schema_migrations (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
-
 ```
 
 </details>
@@ -762,7 +777,6 @@ CREATE INDEX sessions_user ON sessions(user_id);
 
 ```sql
 CREATE TABLE share_key_state (id INTEGER PRIMARY KEY CHECK(id=1), fingerprint TEXT NOT NULL);
-
 ```
 
 </details>
@@ -817,7 +831,6 @@ CREATE TABLE trades (
         UNIQUE (project_id, code),
         CHECK (name_en <> '' OR name_el <> '')
       );
-
 ```
 
 </details>
@@ -859,6 +872,29 @@ CREATE INDEX verifications_record ON verifications(record_id);
 </details>
 
 <details>
+<summary>work_packages</summary>
+
+```sql
+CREATE TABLE work_packages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id),
+      name TEXT NOT NULL CHECK(length(trim(name)) > 0),
+      name_key TEXT NOT NULL,
+      description TEXT,
+      responsible_id INTEGER REFERENCES people(id),
+      target_date TEXT,
+      status TEXT NOT NULL DEFAULT 'planned'
+        CHECK(status IN ('planned','in_progress','on_hold','completed','cancelled')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(project_id, name_key)
+    );
+CREATE INDEX work_packages_responsible ON work_packages(responsible_id);
+```
+
+</details>
+
+<details>
 <summary>zone_types</summary>
 
 ```sql
@@ -869,64 +905,19 @@ CREATE TABLE zone_types (
         name_el TEXT NOT NULL DEFAULT '',
         CHECK (name_en <> '' OR name_el <> '')
       );
-
 ```
 
 </details>
 
-## 4. Proposed extension: work packages
+## 4. Work-package invariants
 
-**State:** The owner approved the concept, cardinalities and basic attributes on 2026-10-06. The schema and UI are proposed in the [consolidated design](../designs/2026-10-06-record-ui-and-work-packages-design.md). They are not present in migrations 0001–0006 or the physical inventory above.
+`work_packages` uses an integer AUTOINCREMENT key. `UNIQUE(project_id, name_key)` prevents names that normalize to the same case/accent/whitespace-folded key. A package has Name, Description, Responsible person, Target date and Status. Name and Status are required. The five statuses are Planned, In progress, On hold, Completed and Cancelled.
 
-### Conceptual model: architectural decision
+`records.work_package_id` is a nullable foreign key. No linking table is needed. Migration 0007 leaves existing records ungrouped. The API validates both package membership and package responsibility against the same project inside write transactions. These same-project rules are not implied by the individual foreign keys. New assignments cannot select retired people; an unchanged retired responsible person can remain.
 
-```mermaid
-flowchart TB
-    Project[Construction project] ---|"1:N · contains"| Package[Work package]
-    Project ---|"1:N · owns"| Record["Record<br/>Quality Issue / Detail Clarification / Task"]
-    Package ---|"1:N · groups"| Record
-    Person[Project person] ---|"1:N · coordinates"| Package
-```
+Package counts are calculated from records. Draft counts as outstanding; Closed, Cancelled and Superseded do not. Overdue uses the Europe/Athens calendar date. The owner manages packages and membership. Readers receive only the current package name on an accessible record. They receive no package ID, navigation or sibling access. Membership activity retains name snapshots so historical moves survive package renaming or deletion.
 
-Each package belongs to exactly one construction project. A project can contain zero or many packages. A package can contain zero or many records. Each record belongs to zero or one package while retaining its direct project ownership. Its package must belong to the same project. Package responsibility is optional and does not assign responsibility on individual records. A person may coordinate several packages.
-
-Examples are Tiling works and Frame corrections. Packages give a related body of work a name, scope and overview. Tags continue to provide overlapping classification. Packages are not nested and are not sub-projects with their own permissions or managed lists.
-
-Attributes: required Name and Status; optional Description, Responsible person and Target date. Status defaults to Planned, with In progress, On hold, Completed and Cancelled as the other choices. Counts by record subtype/status and overdue records are calculated. Package status and dates do not propagate to records.
-
-### Proposed logical model
-
-```mermaid
-erDiagram
-    projects ||..o{ work_packages : contains
-    projects ||..o{ records : owns
-    people o|..o{ work_packages : coordinates
-    work_packages o|..o{ records : groups
-    work_packages {
-        key id PK
-        key project_id FK
-        text name
-        text description
-        key responsible_id FK
-        date target_date
-        code status
-        timestamp created_at
-        timestamp updated_at
-    }
-    records {
-        key id PK
-        key project_id FK
-        key work_package_id FK
-    }
-```
-
-records.work_package_id is optional. No linking table is needed. Same-project membership and a responsible person from the same project require transactional server validation in addition to declared foreign keys.
-
-### Proposed physical change
-
-Migration 0007 would create work_packages and add nullable records.work_package_id. The draft uses an AUTOINCREMENT integer package key, a normalized name_key with UNIQUE(project_id, name_key), TEXT dates/status, and an index on records(project_id, work_package_id). The complete proposed DDL and migration/restore requirements are in the consolidated design. All existing records start ungrouped.
-
-Empty-only package deletion, manually chosen package status, normalized name uniqueness and owner-only package management are draft implementation defaults. They are not represented as existing behaviour or as separately approved decisions.
+A package may be deleted only when empty. Project deletion includes packages after its records are removed. No status or date cascades exist. Package completion/cancellation is manual and may coexist with outstanding records after confirmation.
 
 ## Maintaining this document
 

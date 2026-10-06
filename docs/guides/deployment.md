@@ -208,3 +208,16 @@ Use synthetic records/files and dedicated temporary test accounts first. Record 
 - Check `https://www.ktimanet.com/` still serves WordPress using a browser User-Agent. After successful acceptance, remove only the explicitly identified spike app/data artifacts from Plan 0. Preserve all application data and backups.
 
 Release only when the hosted checks, real off-site drill and documentation reconciliation pass. Until then record Plan 6 as In progress. The design becomes Historical only after its enduring contracts are consolidated into the maintained v1 specification and Architecture. Planning replay alone is never go-live evidence.
+
+## Upgrade to schema 0007: work packages
+
+This is the prepared upgrade procedure for the locally implemented work-package release. It has not been executed on production.
+
+1. Verify a fresh pre-upgrade backup using the deployed schema-0006 release and its matching tools. Keep the matching release and verified backup together. Confirm the offsite copy contains every referenced file.
+2. Stage and test the new compiled release. Pause the PC pull while updating its schema-aware verifier. Stop application and other database writers using the established cutover procedure.
+3. Take the final pre-upgrade backup. Activate the migration-aware release. Startup backs up the populated database before applying migration 0007. Existing records must have null package membership and retain every previous field/child.
+4. Check integrity, foreign keys, original records/files/access, owner package CRUD, all three record subtypes, membership/filtering, phone panels and reader privacy. Do not record hosted acceptance until checked on the actual deployment.
+5. Produce a fresh verified schema-0007 server backup. Update the PC verifier from the same release. Complete and verify an offsite pull before relying on the normal schedule. Resume schedules and check both server and PC completion/freshness.
+6. Retain the old release and pre-upgrade recovery point. Do not point old code at the new database. Recovery of an old backup uses its matching old tools into a new directory, followed by offline migration using the new release before serving it.
+
+No production cutover, credentials, schedules or hosted data were changed during local implementation. The [release checklist](release-checklist.md) is the handoff for the remaining hosted acceptance.

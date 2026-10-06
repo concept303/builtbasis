@@ -1,23 +1,25 @@
 # Record interface and work packages
 
-> **Document type:** Design · **Status:** Draft for review · **Date:** 2026-10-06
+> **Document type:** Design · **Status:** Historical — implemented · **Date:** 2026-10-06
+> **Implementation:** `aae261e` through `311bf7c` on `feature/record-ui-packages`; reconciled 2026-10-07. No material design deviations. Not yet merged or deployed.
+> **Authority:** Historical design provenance only. The [maintained specification](../specs/v1.md), [Architecture](../ARCHITECTURE.md) and [data model](../reference/data-model.md) govern the delivered behavior. Do not use this historical document as a new execution instruction.
 > **Scope:** Consolidated record-interface changes and project work packages, including the proposed database migration.
 > **Approval boundary:** The owner agreed the UI direction and work-package concept, and accepted all six iteration 7 decisions and the 76-row wording list. This single consolidated document is submitted for review before implementation planning. No application changes are authorised by this document alone.
 > **Consolidation:** Incorporates the base design and iteration 7 amendment as of 2026-10-06. Read this document on its own; the earlier amendment is superseded and retained for provenance.
 
-**Implementation plan:** [Task sequence and verification](../plans/2026-10-06-record-ui-and-work-packages-plan.md) — draft, not executed.
+**Implementation plan:** [Task sequence and verification](../plans/2026-10-06-record-ui-and-work-packages-plan.md) — completed; includes verification and release handoff.
 
 ## 1. Purpose and baseline
 
 Make everyday record work easier to read and edit. Add a named grouping for a related body of work within a construction project. Preserve existing capabilities while reducing visual clutter. Prefer improvements informed by actual use over additional blueprint rounds.
 
-The implemented database baseline is migrations 0001–0006. The [data model](../reference/data-model.md) distinguishes that baseline from the proposed extension. The [v1 specification](../specs/v1.md) continues to govern existing behaviour except for the explicitly proposed changes below.
+The implementation starting baseline was migrations 0001–0006. The [data model](../reference/data-model.md) now documents the delivered schema-0007 extension. The [v1 specification](../specs/v1.md) consolidates its enduring requirements.
 
 The [iteration 7 blueprint](2026-10-06-ui-batch-7.html) is the current visual reference. It is a standalone sample, not application code. The [blue colour preview](2026-10-06-ui-blue-colours.html) and earlier iterations remain comparison references. The written requirements below govern where a blueprint simplifies or omits behaviour.
 
 ### Implementation starting point and blueprint limits
 
-**Starting point.** The application does not yet implement this design. Checked on 2026-10-06 at commit `6b56f4f`:
+**Historical starting point.** Before implementation, the application did not implement this design. Checked on 2026-10-06 at commit `6b56f4f`:
 
 - The record page still has six tabs, including Activity and Sharing ([RecordPage.tsx](../../src/web/record/RecordPage.tsx)).
 - [styles.css](../../src/web/styles.css) still uses the teal palette with an amber focus ring.
