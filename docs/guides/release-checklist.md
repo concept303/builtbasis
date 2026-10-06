@@ -169,3 +169,19 @@ Before deploying this release, complete the [schema-0007 upgrade procedure](depl
 - [ ] Check contributor and anonymous access boundaries, existing links/files and physical-phone layout.
 - [ ] Verify a fresh schema-0007 server and offsite backup with the updated PC verifier; resume and check schedules.
 - [ ] Retain the previous release and matching recovery point; record hosted acceptance without reusing local results as hosted proof.
+
+### Record interface and work packages deployment — 2026-10-07
+
+The owner authorized merge, push and deployment. `main` was fast-forwarded to `e445e1cddcbeb340e6b626d64f10b9cdb5fb45f3` and pushed to GitHub. The merged checkout passed typecheck, build, 583 unit/server tests in 84 files and 85 Chrome browser tests. The existing bundle-size warning remains. Staging installed 78 production packages with no reported vulnerabilities and passed runtime checks. The server entrypoint, browser shell and lockfile hashes matched the tested build.
+
+The pre-upgrade backup from 2026-10-06T13:50:56.124Z was verified offsite in snapshot `448153fa8e3d2a2f256b85d6da807075`. The idle PC task was paused while rebuilding its verifier. The owner disabled Node.js. Process inspection confirmed no application or backup writer remained. A final stopped-service backup completed at 2026-10-06T14:01:44.457Z. The code symlink switched from `a3ff3e1` to `e445e1c`; configuration and the live data directory stayed unchanged. The owner enabled Node.js.
+
+HTTPS health passed. Schema 0007, SQLite integrity and foreign-key checks passed. A comparison with the final stopped-service backup confirmed every prior column and row across 28 business tables remained unchanged. Existing records have null package membership. These comparisons ran before temporary acceptance data was created.
+
+Real HTTPS checks passed for package creation/rename/status/counts, all three record subtypes, blocked populated-package deletion, membership, shared package-name-only output, private-note exclusion, refreshed package name in print output, record deletion and revoked-share rejection. Desktop Chrome rendered the package detail and record editor. A 390px Chrome viewport rendered the record without page overflow and opened/closed the phone More panel. This was browser viewport verification, not a new physical-phone check. Contributor restrictions remain covered by the 583-test suite; a separate live contributor account was not used during this cutover.
+
+The temporary project, package, records, share link and temporary verification session were removed. The original project list was unchanged. WordPress returned HTTPS 200 before and after the cutover. Existing user credentials and access were preserved.
+
+The post-upgrade backup completed at 2026-10-06T14:06:24.734Z. The updated PC verifier checked snapshot `8dc6f9b51d682fd8952b96629f6c7ff7` at 14:06:38.828Z, including the database/schema/freshness and referenced file hashes. The export pin was released. The actual Windows scheduled task returned 0 and is enabled/Ready. The server nightly schedule was unchanged. The prior release and pre-upgrade recovery points remain retained; rollback must follow the schema-aware recovery procedure.
+
+Dates in headings use the owner's Australia/Sydney date. Backup timestamps above are UTC. Private deployment evidence is archived with the development evidence under the owner-selected backup destination; it contains no reusable verification session.

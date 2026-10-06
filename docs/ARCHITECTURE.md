@@ -1,6 +1,6 @@
 # Architecture
 
-> **Document type:** Architecture · **Status:** Current implementation, including work packages and the simplified record interface on `feature/record-ui-packages` (2026-10-07). Those changes are not deployed. See the release checklist for hosted evidence.
+> **Document type:** Architecture · **Status:** Current implementation, including work packages and the simplified record interface deployed at `e445e1c` (2026-10-07). See the release checklist for hosted evidence.
 
 ## System
 
@@ -14,7 +14,7 @@ Fastify / TypeScript (Node.js) ── serves the built web app
         └── Stored files, by content hash (data folder)
 ```
 
-Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. The last documented deployed release is `a3ff3e1`; this implementation did not inspect or change production. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
+Hosting target: Hetzner Webhosting L at `builtbasis.ktimanet.com` (addon domain, Node.js). See ADR 0001. The current deployed release is `e445e1c`, including schema 0007. Data preservation and the post-upgrade offsite backup were verified on 2026-10-07. Final Plan 6 acceptance remains in progress; see the [release checklist](guides/release-checklist.md).
 
 ## Data model and interface
 

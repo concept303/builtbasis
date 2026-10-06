@@ -1,6 +1,6 @@
 # BuiltBasis data model
 
-> **Document type:** Architecture reference · **Status:** Current implementation reference · **Verified:** 2026-10-07 against migrations 0001–0007 in an isolated SQLite database. No live database was inspected. Work packages and record deletion are implemented on the feature branch; deployment remains separate.
+> **Document type:** Architecture reference · **Status:** Current implementation reference · **Verified:** 2026-10-07 against migrations 0001–0007 in an isolated SQLite database. The deployment check on 2026-10-07 verified live schema 0007 and preservation of all prior columns/rows across 28 tables. Release `e445e1c` is deployed.
 
 The conceptual model is the starting point for architectural decisions. It describes the business concepts, their ownership and their relationships. The logical model explains how they become relations and keys. The physical model records the SQLite implementation.
 

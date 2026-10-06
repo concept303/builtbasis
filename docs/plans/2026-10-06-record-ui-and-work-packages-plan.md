@@ -7,7 +7,7 @@
 > **Implements:** [Consolidated design](../designs/2026-10-06-record-ui-and-work-packages-design.md), including corrections at `ae88ee9`.
 > **Implemented by:** `aae261e` through `311bf7c` on `feature/record-ui-packages`, followed by this documentation reconciliation. Base: `563294e`.
 > **Verified:** 2026-10-07. Typecheck, production build, 583 unit/server tests in 84 files and 85 Chrome browser tests passed. See execution evidence below.
-> **Merged to main:** No. Implementation is committed on the feature branch; it has not been pushed or deployed.
+> **Merged to main:** Yes. `e445e1c` was fast-forwarded, pushed and deployed on 2026-10-07. See the release checklist for the subsequent deployment evidence.
 > **Checklist note:** Completed task checklists are retained as execution history. Tests combine related acceptance cases; evidence below records actual suite results.
 
 **Goal:** Deliver the simplified record UI, optional project work packages and safe record deletion while preserving existing evidence, history, permissions and recovery capability.
@@ -382,6 +382,10 @@ One independent Astra Medium review found two dirty-state defects. Entering reco
 
 The maintained [specification](../specs/v1.md), [Architecture](../ARCHITECTURE.md), [data model](../reference/data-model.md) and [web guide](../guides/web-interface.md) now describe the delivered implementation. Deployment and recovery procedures preserve the schema compatibility boundary. The consolidated design is historical provenance.
 
-### Remaining release actions
+### Release handoff at implementation completion
 
 Merge, push and deployment require the owner's execution-stage instruction. Hosted acceptance is pending. Follow the schema-0007 procedure in the [deployment guide](../guides/deployment.md), verify pre/post-upgrade backups with matching tooling, update the PC verifier, and check real owner/contributor/shared behavior and phone layout before recording the release as deployed.
+
+### Subsequent deployment — 2026-10-07
+
+The owner authorized merge, push and deployment. Release `e445e1c` is now live. The merged tree passed the same 583 unit/server and 85 browser checks. Schema 0007 preserved all previous data across 28 tables. Real HTTPS/Chrome checks passed, temporary test data was removed, and the resumed PC schedule verified the post-upgrade backup. See the [release checklist](../guides/release-checklist.md#record-interface-and-work-packages-deployment--2026-10-07). Physical-phone and contributor scenarios were covered locally but were not newly repeated with a physical phone or contributor account during this cutover.

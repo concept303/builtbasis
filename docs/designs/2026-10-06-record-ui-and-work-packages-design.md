@@ -1,7 +1,7 @@
 # Record interface and work packages
 
 > **Document type:** Design · **Status:** Historical — implemented · **Date:** 2026-10-06
-> **Implementation:** `aae261e` through `311bf7c` on `feature/record-ui-packages`; reconciled 2026-10-07. No material design deviations. Not yet merged or deployed.
+> **Implementation:** `aae261e` through `311bf7c` on `feature/record-ui-packages`; reconciled 2026-10-07. No material design deviations. Merged, pushed and deployed at `e445e1c` on 2026-10-07; see the release checklist for evidence.
 > **Authority:** Historical design provenance only. The [maintained specification](../specs/v1.md), [Architecture](../ARCHITECTURE.md) and [data model](../reference/data-model.md) govern the delivered behavior. Do not use this historical document as a new execution instruction.
 > **Scope:** Consolidated record-interface changes and project work packages, including the proposed database migration.
 > **Approval boundary:** The owner agreed the UI direction and work-package concept, and accepted all six iteration 7 decisions and the 76-row wording list. This single consolidated document is submitted for review before implementation planning. No application changes are authorised by this document alone.

@@ -1,7 +1,7 @@
 # Deploy and release BuiltBasis v1
 
 > **Document type:** Operator guide
-> **Status:** Active for deployed release `a3ff3e1`. Remaining release acceptance is tracked in the release checklist.
+> **Status:** Active for deployed release `e445e1c`. Remaining release acceptance is tracked in the release checklist.
 > **Contracts:** [Approved v1 design](../designs/2026-10-02-v1-records-design.md), [access guide](share-key-management.md), [backup and recovery](backup-restore.md).
 
 ## Server directory layout
@@ -211,7 +211,7 @@ Release only when the hosted checks, real off-site drill and documentation recon
 
 ## Upgrade to schema 0007: work packages
 
-This is the prepared upgrade procedure for the locally implemented work-package release. It has not been executed on production.
+This procedure was executed for release `e445e1c` on 2026-10-07. The release checklist records the actual preservation, acceptance and backup results.
 
 1. Verify a fresh pre-upgrade backup using the deployed schema-0006 release and its matching tools. Keep the matching release and verified backup together. Confirm the offsite copy contains every referenced file.
 2. Stage and test the new compiled release. Pause the PC pull while updating its schema-aware verifier. Stop application and other database writers using the established cutover procedure.
@@ -220,4 +220,10 @@ This is the prepared upgrade procedure for the locally implemented work-package 
 5. Produce a fresh verified schema-0007 server backup. Update the PC verifier from the same release. Complete and verify an offsite pull before relying on the normal schedule. Resume schedules and check both server and PC completion/freshness.
 6. Retain the old release and pre-upgrade recovery point. Do not point old code at the new database. Recovery of an old backup uses its matching old tools into a new directory, followed by offline migration using the new release before serving it.
 
-No production cutover, credentials, schedules or hosted data were changed during local implementation. The [release checklist](release-checklist.md) is the handoff for the remaining hosted acceptance.
+Local implementation did not change production. The subsequent owner-authorized cutover is recorded in the [release checklist](release-checklist.md).
+
+## Record-interface deployment evidence and workspace cleanup
+
+Release `e445e1c` was deployed on 2026-10-07. The merged `feature/record-ui-packages` branch and its temporary worktree were removed after preserving unique evidence. The dependency junction was removed without deleting its target in the main checkout.
+
+Private implementation and deployment evidence is retained at `X:\1976KN\Sys\Software\builtbasis\development-archives\2026-10-07-record-ui-packages`. `execution-evidence.zip` contains 76 files; `VERIFIED.json` records the archive hash and the verified SHA-256 hash of every archived file. It includes test logs, schema inventory, preservation results and synthetic deployment screenshots. Temporary server verification scripts and the verification session were removed. This archive supplements the actual pre/post-upgrade backup snapshots; it is not an application-data backup.
