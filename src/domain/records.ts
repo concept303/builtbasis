@@ -38,6 +38,7 @@ const euros = z
 
 /** Every editable record field (design §5, §6). Status changes go through transitions, never through a save. */
 export const RecordPatch = z.strictObject({
+  workPackageId: id.nullable().optional(),
   title: optionalText(200).optional(),
   description: optionalText(20_000).optional(),
   reference: optionalText(2_000).optional(),

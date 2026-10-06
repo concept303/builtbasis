@@ -15,9 +15,12 @@ import type { Db } from '../db/connection';
 import { ProjectParams } from '../http/params';
 import { subtreeIds } from '../lists/locations';
 import { requireProject } from '../lists/projects';
+import { getWorkPackage } from '../work-packages/store';
 
 /** One row of the record list (design §10.2). */
 export interface RecordSummary {
+  workPackageId: number | null;
+  workPackageName: string | null;
   id: number;
   humanId: string;
   subtype: Subtype;
@@ -57,6 +60,7 @@ const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
 /** Filters combine with AND; the values of one filter combine with OR. */
 export const RecordListQuery = z.strictObject({
+  workPackageId: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
   subtype: codes('subtype').optional(),
   status: codes('status').optional(),
   severity: codes('severity').optional(),
@@ -111,6 +115,11 @@ const likePattern = (text: string): string => `%${foldText(text).replace(/[\\%_]
 export function listRecords(db: Db, projectId: number, query: RecordListQueryInput): RecordList {
   const where: string[] = ['r.project_id = ?'];
   const params: unknown[] = [projectId];
+  if (query.workPackageId === 'none') where.push('r.work_package_id IS NULL');
+  else if (query.workPackageId !== undefined) {
+    getWorkPackage(db, projectId, query.workPackageId);
+    where.push('r.work_package_id = ?'); params.push(query.workPackageId);
+  }
   const anyOf = (column: string, values: readonly unknown[] | undefined): void => {
     if (!values) return;
     where.push(`${column} IN (${placeholders(values)})`);
@@ -196,7 +205,8 @@ export function listRecords(db: Db, projectId: number, query: RecordListQueryInp
   const rows = db
     .prepare(
       `SELECT r.id, r.human_id AS humanId, r.subtype, r.status, r.title, r.ball_in_court_id AS ballInCourtId,
-         r.due_date AS dueDate, r.priority, r.severity, r.completion, r.safety, r.updated_at AS updatedAt
+         r.due_date AS dueDate, r.priority, r.severity, r.completion, r.safety, r.updated_at AS updatedAt,
+         r.work_package_id AS workPackageId, (SELECT name FROM work_packages WHERE id=r.work_package_id) AS workPackageName
        FROM records r WHERE ${whereSql} ORDER BY ${orderBy}`,
     )
     .all(...params) as (Omit<RecordSummary, 'safety'> & { safety: number })[];

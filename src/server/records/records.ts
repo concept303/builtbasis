@@ -23,6 +23,7 @@ import { HttpError } from '../errors';
 import { ItemParams, ProjectParams } from '../http/params';
 import { requireUserId } from '../http/user';
 import { requireProject } from '../lists/projects';
+import { getWorkPackage } from '../work-packages/store';
 import { recordActivity } from './activity';
 import {
   LINK_FIELDS,
@@ -38,6 +39,8 @@ import { problemTypesOf, requireRecord, toRecordState, type RecordRow } from './
 
 /** A record as the owner sees it. Sub-collections (options, measurements, verifications, Log, activity) have their own routes. */
 export interface RecordDetail {
+  workPackageId: number | null;
+  workPackageName: string | null;
   id: number;
   projectId: number;
   humanId: string;
@@ -84,6 +87,7 @@ export interface RecordDetail {
 
 /** Changes to these fields are written to the activity log (design §5.12). */
 const TRACKED_FIELDS = [
+  'workPackageId',
   'ballInCourtId',
   'responsibleId',
   'severity',
@@ -110,12 +114,19 @@ function optionSnapshot(db: Db, optionId: number | null): { label: string; descr
   );
 }
 
+function packageSnapshot(db: Db, projectId: number, id: number | null): { id: number; name: string } | null {
+  if (id === null) return null;
+  return { id, name: getWorkPackage(db, projectId, id).name };
+}
+
 export function getRecordDetail(db: Db, projectId: number, recordId: number): RecordDetail {
   const row = requireRecord(db, projectId, recordId);
   const hasReason = row.statusReasonCode !== null || row.statusReasonNote !== null;
   return {
     id: row.id,
     projectId: row.projectId,
+    workPackageId: row.workPackageId,
+    workPackageName: row.workPackageId === null ? null : getWorkPackage(db, projectId, row.workPackageId).name,
     humanId: row.humanId,
     subtype: row.subtype,
     status: row.status,
@@ -178,6 +189,7 @@ function applyPatch(db: Db, current: RecordRow, userId: number, patch: RecordPat
     checkSelection(db, projectId, 'location_nodes', 'locationIds', patch.locationIds, readLinkIds(db, recordId, 'locationIds'));
   }
   checkOption(db, recordId, patch.chosenOptionId);
+  if (patch.workPackageId != null) getWorkPackage(db, projectId, patch.workPackageId);
 
   // An estimate is entered only while Outside contract scope is ticked; unticking keeps it (design §5.4).
   const outsideScope = patch.outsideScope ?? current.outsideScope === 1;
@@ -186,6 +198,7 @@ function applyPatch(db: Db, current: RecordRow, userId: number, patch: RecordPat
   }
 
   updateColumns(db, 'records', projectId, recordId, {
+    work_package_id: patch.workPackageId,
     title: patch.title,
     description: patch.description,
     reference: patch.reference,
@@ -233,7 +246,9 @@ function applyPatch(db: Db, current: RecordRow, userId: number, patch: RecordPat
     const detail =
       field === 'chosenOptionId'
         ? { fromOption: optionSnapshot(db, current.chosenOptionId), toOption: optionSnapshot(db, updated.chosenOptionId) }
-        : undefined;
+        : field === 'workPackageId'
+          ? { fromPackage: packageSnapshot(db, projectId, current.workPackageId), toPackage: packageSnapshot(db, projectId, updated.workPackageId) }
+          : undefined;
     recordActivity(db, { recordId, userId, at, action: 'field_changed', field, from: current[field], to: updated[field], detail });
   }
 }
@@ -267,7 +282,7 @@ export function createRecord(
     recordActivity(db, { recordId, userId, at, action: 'created', to: 'draft' });
     applyPatch(db, requireRecord(db, projectId, recordId), userId, patch, at);
     return getRecordDetail(db, projectId, recordId);
-  })();
+  }).immediate();
 }
 
 export function updateRecord(
@@ -281,7 +296,7 @@ export function updateRecord(
   return db.transaction((): RecordDetail => {
     applyPatch(db, requireRecord(db, projectId, recordId), userId, patch, now.toISOString());
     return getRecordDetail(db, projectId, recordId);
-  })();
+  }).immediate();
 }
 
 export function registerRecordCoreRoutes(app: FastifyInstance, db: Db): void {

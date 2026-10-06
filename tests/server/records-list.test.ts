@@ -122,6 +122,8 @@ describe('record list order and totals (design §10.2)', () => {
     await postRecord(f, { subtype: 'task', title: 'Paint', completion: 40, safety: true });
     const res = await get(f.ctx, f.cookie, `${f.base}/records`);
     expect(res.json().records[0]).toEqual({
+      workPackageId: null,
+      workPackageName: null,
       id: expect.any(Number),
       humanId: 'T-0001',
       subtype: 'task',

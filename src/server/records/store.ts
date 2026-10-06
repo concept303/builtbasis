@@ -14,6 +14,7 @@ import { HttpError } from '../errors';
 
 /** One row of `records`, with camelCase names. */
 export interface RecordRow {
+  workPackageId: number | null;
   id: number;
   projectId: number;
   subtype: Subtype;
@@ -58,6 +59,7 @@ export interface RecordRow {
 
 /** Field name → column name. Column names come from this map only, never from request input. */
 export const RECORD_COLUMNS = {
+  workPackageId: 'work_package_id',
   id: 'id',
   projectId: 'project_id',
   subtype: 'subtype',
