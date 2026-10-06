@@ -1,4 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { PackagePicker } from '../packages/PackagePicker';
+import { PackageForm } from '../packages/PackageForm';
+import { loadPackages } from '../packages/data';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { entriesOf, definitionOf, labelOf, type ListKey, type RecordPatchInput } from '../../domain';
 import type { RecordDetail } from '../../server/records/records';
 import { Field, MultiPick, PersonSelect, VocabSelect, BusyButton } from '../core/forms';
@@ -10,17 +13,21 @@ import { TagPicker } from './TagPicker';
 
 export function RecordEditor({ data, busy, onSave, onCancel, onDirty, locationPhotos, uploadingPhotos, pendingPhotos }: { data: RecordData; busy: boolean; locationPhotos: ReactNode; uploadingPhotos: boolean; pendingPhotos: boolean; onSave: (patch: RecordPatchInput) => Promise<void>; onCancel: () => void; onDirty: () => void }) {
   const { t, lang } = useI18n(); const record = data.record as RecordDetail;
-  const [draft, setDraft] = useState<RecordPatchInput>(() => ({ title: record.title, description: record.description, reference: record.reference, publicNotes: record.publicNotes, locationNotes: record.locationNotes, notes: record.notes, ballInCourtId: record.ballInCourtId, responsibleId: record.responsibleId, tradeIds: record.tradeIds, severity: record.severity, priority: record.priority, dueDate: record.dueDate, completion: record.completion, safety: record.safety, tagIds: record.tagIds, locationIds: record.locationIds, mustBeDoneBeforeIds: record.mustBeDoneBefore.map(item => item.id), outsideScope: record.outsideScope, estimatedCost: record.estimatedCost, ...(record.subtype === 'quality_issue' ? { problemTypes: record.problemTypes, stage: record.stage, disposition: record.disposition, correction: record.correction } : {}), ...(record.subtype === 'detail_clarification' ? { question: record.question, route: record.route, issuedById: record.issuedById } : {}), ...(record.subtype !== 'task' ? { chosenOptionId: record.chosenOptionId, decidedById: record.decidedById, decidedOn: record.decidedOn, instructionText: record.instructionText } : {}) }));
+  const [draft, setDraft] = useState<RecordPatchInput>(() => ({ workPackageId: record.workPackageId, title: record.title, description: record.description, reference: record.reference, publicNotes: record.publicNotes, locationNotes: record.locationNotes, notes: record.notes, ballInCourtId: record.ballInCourtId, responsibleId: record.responsibleId, tradeIds: record.tradeIds, severity: record.severity, priority: record.priority, dueDate: record.dueDate, completion: record.completion, safety: record.safety, tagIds: record.tagIds, locationIds: record.locationIds, mustBeDoneBeforeIds: record.mustBeDoneBefore.map(item => item.id), outsideScope: record.outsideScope, estimatedCost: record.estimatedCost, ...(record.subtype === 'quality_issue' ? { problemTypes: record.problemTypes, stage: record.stage, disposition: record.disposition, correction: record.correction } : {}), ...(record.subtype === 'detail_clarification' ? { question: record.question, route: record.route, issuedById: record.issuedById } : {}), ...(record.subtype !== 'task' ? { chosenOptionId: record.chosenOptionId, decidedById: record.decidedById, decidedOn: record.decidedOn, instructionText: record.instructionText } : {}) }));
   const [initial] = useState(draft);
+  const [packages, setPackages] = useState(data.owner!.packages);
+  const [creatingPackage, setCreatingPackage] = useState(false);
+  const packageTrigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => { const controller = new AbortController(); const refresh = () => { void loadPackages(record.projectId, controller.signal).then(result => setPackages(result.packages)).catch(() => {}); }; window.addEventListener('focus', refresh); return () => { controller.abort(); window.removeEventListener('focus', refresh); }; }, [record.projectId]);
   const set = <K extends keyof RecordPatchInput,>(field: K, value: RecordPatchInput[K]) => { setDraft(old => ({ ...old, [field]: value })); onDirty(); };
   const text = (field: keyof RecordPatchInput, en: string, el: string, multiline = false, maxLength = 20_000) => <Field label={t(en, el)} key={field}>{multiline ? <textarea maxLength={maxLength} value={String(draft[field] ?? '')} onChange={e => set(field, e.target.value)} /> : <input maxLength={maxLength} value={String(draft[field] ?? '')} onChange={e => set(field, e.target.value)} />}</Field>;
   const vocab = (field: keyof RecordPatchInput, list: ListKey, en: string, el: string) => <VocabSelect key={field} list={list} label={t(en, el)} value={draft[field] as string | null} onChange={value => set(field, value as never)} />;
   const person = (field: 'ballInCourtId' | 'responsibleId' | 'decidedById' | 'issuedById', en: string, el: string) => <PersonSelect key={field} label={t(en, el)} people={data.owner!.people} value={draft[field] ?? null} onChange={value => set(field, value)} />;
   const date = (field: 'dueDate' | 'decidedOn', en: string, el: string) => <Field label={t(en, el)}><input type="date" value={draft[field] ?? ''} onChange={e => set(field, e.target.value || null)} /></Field>;
   const name = (item: { nameEn: string; nameEl: string }) => lang === 'el' ? item.nameEl || item.nameEn : item.nameEn || item.nameEl;
-  return <form onSubmit={e => { e.preventDefault(); if (!uploadingPhotos && !pendingPhotos) void onSave(changedPatch(initial, draft)); }}>
+  return <>{creatingPackage && <PackageForm projectId={record.projectId} people={data.owner!.people} inline onSaved={p => { setPackages(old => [...old.filter(item => item.id !== p.id),p]); set('workPackageId',p.id); setCreatingPackage(false); }} onCancel={() => setCreatingPackage(false)}/>}<form onSubmit={e => { e.preventDefault(); if (!uploadingPhotos && !pendingPhotos) void onSave(changedPatch(initial, draft)); }}>
     <fieldset disabled={busy}><legend>{t('Edit record', 'Επεξεργασία εγγραφής')}</legend>
-      {text('title', 'Title', 'Τίτλος', false, 200)}{text('description', 'Description', 'Περιγραφή', true)}{text('reference', 'Reference', 'Αναφορά', false, 2000)}
+      {text('title', 'Title', 'Τίτλος', false, 200)}{text('description', 'Description', 'Περιγραφή', true)}<PackagePicker packages={packages} value={draft.workPackageId ?? null} savedValue={record.workPackageId} onChange={id => set('workPackageId',id)} onCreate={() => setCreatingPackage(true)} triggerRef={packageTrigger}/>{text('reference', 'Reference', 'Αναφορά', false, 2000)}
       <div className="form-grid">{person('ballInCourtId', 'Ball in court', 'Επόμενη ενέργεια από')}{person('responsibleId', 'Responsible', 'Υπεύθυνος')}{vocab('severity', 'severity', 'Severity', 'Σοβαρότητα')}{vocab('priority', 'priority', 'Priority', 'Προτεραιότητα')}{date('dueDate', 'Due date', 'Προθεσμία')}
       <Field label={t('Completion (%)', 'Ολοκλήρωση (%)')}><input type="number" min="0" max="100" step="10" value={draft.completion ?? ''} onChange={e => set('completion', e.target.value === '' ? null : Number(e.target.value))} /></Field></div>
       <label><input type="checkbox" checked={draft.safety} onChange={e => set('safety', e.target.checked)} />{t('Safety implications', 'Θέμα ασφαλείας')}</label>
@@ -38,5 +45,5 @@ export function RecordEditor({ data, busy, onSave, onCancel, onDirty, locationPh
       {pendingPhotos && !uploadingPhotos && <p role="status">{t('Upload or clear the selected location photos before saving the record.', 'Μεταφορτώστε ή αποεπιλέξτε τις φωτογραφίες θέσης πριν αποθηκεύσετε την εγγραφή.')}</p>}
       <BusyButton busy={busy || uploadingPhotos} disabled={pendingPhotos} type="submit">{t('Save record', 'Αποθήκευση εγγραφής')}</BusyButton><button type="button" disabled={uploadingPhotos} onClick={onCancel}>{t('Cancel', 'Ακύρωση')}</button>
     </fieldset>
-  </form>;
+  </form></>;
 }

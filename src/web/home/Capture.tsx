@@ -1,3 +1,8 @@
+import { PackagePicker } from '../packages/PackagePicker';
+import { loadPackages } from '../packages/data';
+import { PackageForm } from '../packages/PackageForm';
+import type { WorkPackage } from '../../domain';
+import type { Person } from '../../server/lists/people';
 import { useEffect, useRef, useState } from 'react';
 import type { RecordDetail } from '../../server/records/records';
 import type { RecordList } from '../../server/records/list';
@@ -8,7 +13,10 @@ import { useI18n } from '../core/i18n';
 import { BusyButton, ErrorNotice, Field, VocabSelect, useDirtyGuard } from '../core/forms';
 import { LocationPicker } from '../core/LocationPicker';
 import { preparePhoto, uploadEvidence } from '../media/upload';
-export function Capture({ projectId, nodes, onClose }: { projectId: number; nodes: LocationNode[]; onClose(): void }) {
+export function Capture({ projectId, nodes, onClose, initialWorkPackageId = null }: { initialWorkPackageId?: number | null; projectId: number; nodes: LocationNode[]; onClose(): void }) {
+  const [workPackageId,setWorkPackageId] = useState<number | null>(initialWorkPackageId);
+  const [packages,setPackages] = useState<WorkPackage[]>([]); const [people,setPeople] = useState<Person[]>([]); const [creatingPackage,setCreatingPackage] = useState(false);
+  useEffect(() => { const controller = new AbortController(); Promise.all([loadPackages(projectId,controller.signal),api<Person[]>(`/api/projects/${projectId}/people`,{signal:controller.signal})]).then(([result,people]) => { setPackages(result.packages);setPeople(people); }).catch(failure => { if (!controller.signal.aborted) setError(failure); });return () => controller.abort(); },[projectId]);
   const { t } = useI18n(); const [subtype, setSubtype] = useState<Subtype>('quality_issue'); const [title, setTitle] = useState(''); const [locations, setLocations] = useState<number[]>([]);
   const [phase, setPhase] = useState<PhotoPhase>('before'); const [files, setFiles] = useState<File[]>([]); const [record, setRecord] = useState<RecordDetail | null>(null);
   const [outcomes, setOutcomes] = useState<{ name: string; ok: boolean }[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null); const [controller, setController] = useState<AbortController | null>(null);
@@ -31,12 +39,12 @@ export function Capture({ projectId, nodes, onClose }: { projectId: number; node
     } catch (failure) { if (!abort.signal.aborted) setError(failure); }
     finally { if (!abort.signal.aborted) setReviewing(false); }
   };
-  const dirty = busy || (!record && Boolean(unknownCreation || title || locations.length || files.length));
+  const dirty = busy || (!record && Boolean(workPackageId !== initialWorkPackageId || unknownCreation || title || locations.length || files.length));
   useDirtyGuard(dirty);
-  return <section className="panel"><h2>{t('New record', 'Νέα καταγραφή')}</h2>{record ? <><p>{t('Draft saved.', 'Το πρόχειρο αποθηκεύτηκε.')} <a href={`/projects/${projectId}/records/${record.id}`}>{record.humanId}</a></p><ul>{outcomes.map((item, index) => <li key={index}>{item.name}: {item.ok ? t('Uploaded', 'Μεταφορτώθηκε') : t('Not uploaded. Open the record before retrying.', 'Δεν μεταφορτώθηκε. Ανοίξτε την καταγραφή πριν δοκιμάσετε ξανά.')}</li>)}</ul></> : <form onSubmit={async event => {
+  return <section className="panel">{creatingPackage && <PackageForm projectId={projectId} people={people} inline onSaved={p=>{setPackages(old=>[...old,p]);setWorkPackageId(p.id);setCreatingPackage(false);}} onCancel={()=>setCreatingPackage(false)}/>}<h2>{t('New record', 'Νέα καταγραφή')}</h2>{record ? <><p>{t('Draft saved.', 'Το πρόχειρο αποθηκεύτηκε.')} <a href={`/projects/${projectId}/records/${record.id}${initialWorkPackageId ? `?from=${encodeURIComponent(`/projects/${projectId}/work-packages/${initialWorkPackageId}`)}` : ''}`}>{record.humanId}</a></p><ul>{outcomes.map((item, index) => <li key={index}>{item.name}: {item.ok ? t('Uploaded', 'Μεταφορτώθηκε') : t('Not uploaded. Open the record before retrying.', 'Δεν μεταφορτώθηκε. Ανοίξτε την καταγραφή πριν δοκιμάσετε ξανά.')}</li>)}</ul></> : <form onSubmit={async event => {
     event.preventDefault(); if (busy || reviewing || (unknownCreation && reviewedRecords === null)) return; setBusy(true); setError(null); const abort = new AbortController(); activeUpload.current = abort; setController(abort);
     try {
-      const saved = await api<RecordDetail>(`/api/projects/${projectId}/records`, { method: 'POST', body: { subtype, title, locationIds: locations } });
+      const saved = await api<RecordDetail>(`/api/projects/${projectId}/records`, { method: 'POST', body: { subtype, title, workPackageId, locationIds: locations } });
       if (!saved || !Number.isSafeInteger(saved.id) || saved.id <= 0 || typeof saved.humanId !== 'string') throw new ApiError(0, 'request_failed');
       setRecord(saved); setUnknownCreation(false); setReviewedRecords(null);
       for (const file of files) {
@@ -46,7 +54,7 @@ export function Capture({ projectId, nodes, onClose }: { projectId: number; node
         catch (failure) { setError(failure); if (failure instanceof ApiError && [401, 403, 404].includes(failure.status)) abort.abort(); setOutcomes(items => [...items, { name: file.name, ok: false }]); }
       }
     } catch (failure) { setError(failure); if (isUnknownOutcome(failure)) { setUnknownCreation(true); setReviewedRecords(null); } } finally { setBusy(false); setController(null); }
-  }}><VocabSelect list="subtype" label={t('Subtype', 'Υποκατηγορία')} required value={subtype} onChange={value => { if (value) setSubtype(value as Subtype); }}/><Field label={t('Title', 'Τίτλος')}><input value={title} maxLength={200} onChange={event => setTitle(event.target.value)}/></Field><details><summary>{t('Location and photos (optional)', 'Θέση και φωτογραφίες (προαιρετικά)')}</summary><LocationPicker nodes={nodes} value={locations} onChange={setLocations}/><Field label={t('Photos', 'Φωτογραφίες')}><input type="file" multiple accept="image/*,.heic,.heif" onChange={event => setFiles(Array.from(event.target.files ?? []))}/></Field><VocabSelect label={t('Photo phase', 'Φάση φωτογραφιών')} list="photoPhase" value={phase} onChange={value => { if (value) setPhase(value as PhotoPhase); }}/><small>{t('A photo bundle, including its copies and metadata, must fit within 100 MB.', 'Η φωτογραφία μαζί με τα αντίγραφα και τα μεταδεδομένα πρέπει να χωρά σε 100 MB.')}</small></details>{unknownCreation && <div>
+  }}><VocabSelect list="subtype" label={t('Subtype', 'Υποκατηγορία')} required value={subtype} onChange={value => { if (value) setSubtype(value as Subtype); }}/><Field label={t('Title', 'Τίτλος')}><input value={title} maxLength={200} onChange={event => setTitle(event.target.value)}/></Field><PackagePicker packages={packages} value={workPackageId} savedValue={null} onChange={setWorkPackageId} onCreate={()=>setCreatingPackage(true)}/><details><summary>{t('Location and photos (optional)', 'Θέση και φωτογραφίες (προαιρετικά)')}</summary><LocationPicker nodes={nodes} value={locations} onChange={setLocations}/><Field label={t('Photos', 'Φωτογραφίες')}><input type="file" multiple accept="image/*,.heic,.heif" onChange={event => setFiles(Array.from(event.target.files ?? []))}/></Field><VocabSelect label={t('Photo phase', 'Φάση φωτογραφιών')} list="photoPhase" value={phase} onChange={value => { if (value) setPhase(value as PhotoPhase); }}/><small>{t('A photo bundle, including its copies and metadata, must fit within 100 MB.', 'Η φωτογραφία μαζί με τα αντίγραφα και τα μεταδεδομένα πρέπει να χωρά σε 100 MB.')}</small></details>{unknownCreation && <div>
     <p role="status">{t('The creation result is unknown. The draft may already have been saved. Reload and review the saved records before creating another draft. Selected photos have not been uploaded.', 'Το αποτέλεσμα της δημιουργίας είναι άγνωστο. Το πρόχειρο μπορεί να έχει ήδη αποθηκευτεί. Ανανεώστε και ελέγξτε τις αποθηκευμένες καταγραφές πριν δημιουργήσετε άλλο πρόχειρο. Οι επιλεγμένες φωτογραφίες δεν έχουν μεταφορτωθεί.')}</p>
     <BusyButton type="button" busy={reviewing} disabled={busy} onClick={() => void reloadSavedRecords()}>{t('Reload saved records', 'Ανανέωση αποθηκευμένων καταγραφών')}</BusyButton>
     {reviewedRecords !== null && <section aria-label={t('Saved records to review', 'Αποθηκευμένες καταγραφές για έλεγχο')}>
