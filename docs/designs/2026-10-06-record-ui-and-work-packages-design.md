@@ -5,6 +5,8 @@
 > **Approval boundary:** The owner agreed the UI direction and work-package concept, and accepted all six iteration 7 decisions and the 76-row wording list. This single consolidated document is submitted for review before implementation planning. No application changes are authorised by this document alone.
 > **Consolidation:** Incorporates the base design and iteration 7 amendment as of 2026-10-06. Read this document on its own; the earlier amendment is superseded and retained for provenance.
 
+**Implementation plan:** [Task sequence and verification](../plans/2026-10-06-record-ui-and-work-packages-plan.md) — draft, not executed.
+
 ## 1. Purpose and baseline
 
 Make everyday record work easier to read and edit. Add a named grouping for a related body of work within a construction project. Preserve existing capabilities while reducing visual clutter. Prefer improvements informed by actual use over additional blueprint rounds.

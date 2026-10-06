@@ -50,6 +50,7 @@ Image, PDF, audio and video attachments have authorized native-view routes with 
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System structure |
 | [Data model](docs/reference/data-model.md) | Conceptual relationships, logical model and SQLite schema |
 | [Record UI and work packages — consolidated design](docs/designs/2026-10-06-record-ui-and-work-packages-design.md) | Current draft for review, including iteration 7 and accepted wording |
+| [Record UI and work packages — implementation plan](docs/plans/2026-10-06-record-ui-and-work-packages-plan.md) | Draft task sequence, interfaces and verification; not yet executed |
 | [docs/adr/0001-v1-stack-and-hosting.md](docs/adr/0001-v1-stack-and-hosting.md) | Stack and hosting decision |
 | [docs/designs/2026-10-02-v1-records-design.md](docs/designs/2026-10-02-v1-records-design.md) | Approved v1 design and reconciled scope decisions |
 | [docs/plans/2026-10-02-v1-roadmap.md](docs/plans/2026-10-02-v1-roadmap.md) | Plan sequence and implementation status |
