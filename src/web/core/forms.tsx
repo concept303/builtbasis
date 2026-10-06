@@ -1,3 +1,4 @@
+import { InfoButton } from './InfoButton';
 import { useEffect, useId, type ReactNode, type ButtonHTMLAttributes } from 'react';
 import { definitionOf, entriesOf, labelOf, type ListKey } from '../../domain';
 import { errorText } from './api';
@@ -9,7 +10,7 @@ export function VocabSelect({ list, value, onChange, label, required = false }: 
   const { lang, t } = useI18n(); const id = useId();
   return <div><div className="field"><label htmlFor={id}>{label ?? list}</label><select id={id} value={value ?? ''} required={required} onChange={event => onChange(event.target.value || null)}>
     <option value="">{t('Not specified', 'Δεν έχει οριστεί')}</option>{entriesOf(list).map(entry => <option key={entry.code} value={entry.code}>{labelOf(list, entry.code, lang)}</option>)}
-  </select></div><details className="help"><summary>{t('Definitions', 'Ορισμοί')}</summary><dl>{entriesOf(list).map(entry => <div key={entry.code}><dt>{labelOf(list, entry.code, lang)}</dt><dd>{definitionOf(list, entry.code, lang)}</dd></div>)}</dl></details></div>;
+  </select></div><InfoButton label={t('Definitions', 'Ορισμοί') + ' — ' + (label ?? list)}><dl>{entriesOf(list).map(entry => <div key={entry.code}><dt>{labelOf(list, entry.code, lang)}</dt><dd>{definitionOf(list, entry.code, lang)}</dd></div>)}</dl></InfoButton></div>;
 }
 export function MultiPick({ label, items, value, onChange }: { label: string; items: { id: number; label: string; active?: boolean }[]; value: number[]; onChange(ids: number[]): void }) {
   const { t } = useI18n();
