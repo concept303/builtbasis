@@ -101,6 +101,8 @@ The record's package appears in the identity line after ID, subtype and status w
 | Measurements | Full existing sets, multiple rows, ordering, editing, deletion and comparison. |
 | Log | Existing entry text, event time, privacy, attachments, authorship and permitted actions. |
 | Change status | Existing subtype-specific transitions, reasons, verification and reopening notes. |
+| Overview: Verification history | Compact collapsible block with every check’s date, checker, method, outcome and full note; retained separately from Activity history. |
+| Overview: Sequence and dates | Read-only Must be done before and Requires first together, followed by Created and Updated. Requires first is the reverse relationship, not another editable field. |
 | Sharing and Activity history | Existing links, grants, print and change history. |
 
 The editor hides duplicate reading content and has a persistent Save/Cancel bar. Opening Measurements or Log from the editor must preserve the record draft. Saving an entry or upload is a separate operation; cancelling the record form does not undo those operations. Explain this at the operation, not with a permanent wall of instructions.
@@ -447,7 +449,11 @@ Blueprint: change map → *Record overview*.
   2. Record details: Priority, Severity, Completion, on one row as described in §3;
   3. Classification (Quality Issue or Detail Clarification);
   4. Decision and instruction, including Options considered;
-  5. Location and references, with the location photos.
+  5. Location and references, with the location photos;
+  6. Sequence and dates (collapsible);
+  7. Public Notes, when populated;
+  8. Private details (owner-only, collapsible);
+  9. Verification history (compact, collapsible, with the check count).
 
   All section headings in the card use the same level and size.
 - **J2 — Two columns** for short values; full width for long text. Render in this DOM order so the grid fills naturally, and do not use `grid-auto-flow: dense`. Empty values are still left out (§3), and phones use one column.
@@ -469,10 +475,14 @@ Blueprint: change map → *Record overview*.
     - nothing otherwise.
   - Print is unchanged.
 - **J5 — Add buttons:** every gallery or section heading with a "+" icon (Location photos, Measurements, Log, Options considered) puts the icon directly after the heading.
+- **J6 — Verification history:** retain the existing read-only Overview block independently of Activity history. Each check shows its date, checker, method, outcome and full note, preserving note line breaks and the existing ordering. Keep method/outcome definitions accessible through the agreed info controls. Use the existing English/Greek labels. Do not reduce the history to the latest result or substitute Activity events, which do not currently render verification notes.
+- **J7 — Sequence and dates:** show Must be done before and Requires first beside one another on desktop, stacked in that order on phones, followed by Created and Updated. Requires first is derived from incoming precedence links and remains read-only. Preserve the existing reader projections: the owner sees the owner detail; contributor/shared readers receive the existing filtered human IDs and titles, excluding Draft references and internal record IDs. Do not add cross-record navigation or access rights through these relationships. Preserve Public Notes and owner-only Private details after this block as listed in J1.
+- **Reader visibility:** J6 and J7 reuse the existing authorized record data and projection rules. Verification notes already included in the reader projection remain visible; private record fields and inaccessible record details must not be introduced by the rearrangement. [Overview.tsx](../../src/web/record/Overview.tsx) and [projection.ts](../../src/server/sharing/projection.ts) are the implementation baseline.
 - *Accept when:*
   - both languages render dates through `dateText`;
   - due chips follow the today boundary in §M1, tested at the date boundary;
-  - the DOM order matches J2.
+  - the DOM order matches J2;
+  - failed and passed checks retain their individual notes in Verification history, and incoming prerequisites remain visible under Requires first with the existing reader restrictions (§9).
 
 ### K. Phone record actions
 
@@ -580,7 +590,8 @@ The blueprint's contrast table covers every pair.
   - The bar has `role="img"` with an `aria-label` listing the counts, and each segment shows its label and count on hover.
 - **Colour check:** the four chromatic fills pass the lightness, chroma and normal-vision checks. Amber against green under protanopia is ΔE 6.3, which is acceptable only with secondary encoding.
   - Therefore the bar is never shown without its text: "N of M outstanding" in the list, and the legend plus table on the package page.
-  - Amber and green must not become adjacent.
+  - Omit zero-count groups. Keep the approved ordering and the 2 px white separator between every pair of rendered segments. Green and amber may consequently be neighbours in sparse packages; the separator and accompanying text are the intended non-colour safeguard, not the presence of intervening status groups.
+  - Do not add artificial segments for zero-count groups. Preserve exact textual counts in the accessible bar label, segment labels and package-page legend/table. For eight Closed and two On hold records, the list reads “2 of 10 outstanding”, the accessible label identifies Closed: 8 and On hold: 2, and the package-page legend/table expose those same counts.
 
 ## 8. Approved English and Greek wording
 
@@ -669,6 +680,8 @@ Use the shared localization and vocabulary systems. Package names and descriptio
 
 ## 9. Verification
 
+- **Read-only history and prerequisites regression:** use a record with a failed verification followed by a passed verification, distinct notes on both checks, and an incoming non-Draft prerequisite. In owner, contributor and shared views, expand Overview’s Verification history and Sequence and dates. Assert both checks’ dates, checkers, methods, outcomes and full notes, plus Requires first. Add a Draft prerequisite and private record fields to the fixture: the owner retains its existing view; contributor/shared projections exclude the Draft reference, internal dependency IDs and private fields. Reading a prerequisite grants no access to that other record. Test in English and Greek, on desktop and phone.
+- **Sparse status-bar regression:** use eight Closed and two On hold records, with all other groups empty. Assert exactly two segments in the approved order with a white separator, no zero-count placeholders, and exact counts in list text, accessible label and package-page legend/table. Keep the existing mixed-status case.
 - Verify every field/action in section 3 against the current application. Preserve real measurement phases, multiple rows, precision, full Log metadata and all subtype rules. Blueprint sample values must not replace domain vocabulary.
 - Exercise keyboard, touch and desktop flows in English and Greek, including long names, empty lists, unsaved drafts, failed saves/uploads, dialog closing and narrow viewports.
 - Test package creation, rename uniqueness, edit/cancel, assignment, reassignment, ungrouping and filters. Test retired people and another project's package/person IDs.
@@ -688,7 +701,7 @@ Extend the existing suites in [tests/browser](../../tests/browser) and [tests/do
   - totals across mixed subtypes and statuses, including Draft, Cancelled and Superseded.
 - **Package list:**
   - active menu state;
-  - counts and status bar text;
+  - counts and status bar text, including the Closed/On hold-only sparse case;
   - Past target only for open package statuses;
   - search ignoring case, accents and final sigma;
   - ordering;
@@ -732,6 +745,7 @@ Extend the existing suites in [tests/browser](../../tests/browser) and [tests/do
 - **Overview:**
   - section order;
   - J2 DOM order;
+  - full Verification history and Requires first under the existing owner/contributor/shared restrictions (J6/J7);
   - the instruction quote;
   - `dateText` everywhere;
   - due chips at the boundaries.
@@ -785,3 +799,7 @@ No dark mode or package-list filters beyond name search are added. The project R
 On 2026-10-06, the standalone preview was exercised in Chrome for package creation, retained unsaved record edits, assignment, rename and ungrouping, including a narrow phone viewport. No script errors or page-level horizontal overflow were observed in those checks. The proposed SQL applied successfully after migrations 0001–0006 in an empty in-memory SQLite database. This is a syntax/integration probe, not a populated migration replay or application test suite. Production and application source files were not changed.
 
 The [iteration 7 review](2026-10-06-record-ui-and-work-packages-iteration-7.md) is retained as superseded review history. Its findings and requirements are incorporated above. The colour contrast figures in §L originate from that review; consolidation does not claim an independent accessibility audit or a full application replay. All six owner decisions and all 76 approved wording rows have been preserved.
+
+### Review corrections after 41ca013
+
+The follow-up review identified missing explicit reading destinations for verification history and reverse dependencies, and a sparse-data contradiction in status-bar colour separation. Sections 3, J, M2 and 9 now specify those destinations, preserve existing reader projections and require sparse/mixed status-bar cases. These are design-only corrections. No application/browser suite was run for this documentation change.
