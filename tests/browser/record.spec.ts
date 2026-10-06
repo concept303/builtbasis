@@ -11,7 +11,11 @@ async function create(page: Page, subtype = 'task', extra: Record<string, unknow
   await expect(page.getByRole('heading', { name: record.title, exact: true })).toBeVisible();
   return { ...record, base: `/api/projects/${projectId}/records/${record.id}` };
 }
-async function tab(page: Page, name: string) { await page.getByRole('navigation', { name: 'Record sections' }).getByRole('button', { name, exact: true }).click(); }
+async function tab(page: Page, name: string) {
+  const panel=page.locator('dialog.side-panel');if(await panel.count())await panel.getByRole('button',{name:'Close',exact:true}).click();
+  if(name==='Sharing')await page.getByRole('button',{name:'Sharing',exact:true}).click();
+  else await page.getByRole('navigation',{name:'Record sections'}).getByRole('button',{name,exact:true}).click();
+}
 async function transition(page: Page, target: string) {
   await page.getByRole('button', { name: 'Change status', exact: true }).click();
   await page.getByRole('combobox', { name: 'New status', exact: true }).selectOption(target);
@@ -206,7 +210,7 @@ test('independent contributor permissions allow uploader attachment and logger p
 });
 
 test('transient refresh failure keeps evidence form and remaining uploads mounted', async ({ page }) => {
-  await login(page); const record = await create(page); await tab(page, 'Evidence');
+  await login(page); const record = await create(page); await tab(page, 'Photos & files');
   await page.getByRole('combobox', { name: 'Upload type', exact: true }).selectOption('attachments');
   await page.getByRole('textbox', { name: 'Attachment title', exact: true }).fill('Pending evidence wording');
   await page.getByLabel('Files', { exact: true }).setInputFiles([
@@ -244,7 +248,7 @@ test('inline tag creation and collision recovery retain unsaved record text', as
   await expect(page.getByRole('button', { name: /Use existing tag/ })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(wording);
   await page.getByRole('button', { name: /Use existing tag/ }).click();
-  await expect(page.getByRole('group', { name: 'Tags', exact: true }).getByRole('checkbox', { name: 'Stone', exact: true })).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Remove Stone', exact: true })).toBeVisible();
   const label = `Synthetic new tag ${Date.now()}`;
   await page.getByRole('combobox', { name: 'Tag name in English', exact: true }).fill(label);
   const tagUrl = `**/api/projects/${seed().projectId}/tags`;
@@ -255,7 +259,7 @@ test('inline tag creation and collision recovery retain unsaved record text', as
   await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(wording);
   await page.unroute(tagUrl);
   await page.getByRole('button', { name: 'Create and select tag', exact: true }).click();
-  await expect(page.getByRole('group', { name: 'Tags', exact: true }).getByRole('checkbox', { name: label, exact: true })).toBeChecked();
+  await expect(page.getByRole('button', { name: `Remove ${label}`, exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(wording);
   await saved(page, 'Save record');
   const result = await (await page.request.get(record.base)).json() as { description: string; tagIds: number[] };

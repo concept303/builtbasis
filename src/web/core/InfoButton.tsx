@@ -13,5 +13,5 @@ export function InfoButton({ label, children }: { label: string; children: React
     return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('focusin', dismiss); document.removeEventListener('keydown', escape, true); };
   }, [open]);
   return <><button ref={button} type="button" className="info-button" aria-label={label} aria-expanded={open} aria-describedby={open ? id : undefined} onMouseEnter={show} onFocus={show} onClick={show}><span aria-hidden="true" className="info-symbol">i</span></button>
-    {open && createPortal(<div ref={popup} id={id} role="tooltip" className="info-popover" style={position}>{children}</div>, document.body)}</>;
+    {open && createPortal(<div ref={popup} id={id} role="tooltip" className="info-popover" style={position}>{children}</div>, button.current?.closest('dialog') ?? document.body)}</>;
 }

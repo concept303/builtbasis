@@ -1,4 +1,4 @@
-﻿import { test, expect, login, seed } from './fixture';
+import { test, expect, login, seed } from './fixture';
 
 test('owner creates, renames and deletes a project after reviewing its contents', async ({ page }, testInfo) => {
   await login(page); await page.goto('/projects');

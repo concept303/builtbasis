@@ -13,9 +13,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 export function VocabSelect({ list, value, onChange, label, required = false }: { list: ListKey; value: string | null; onChange(value: string | null): void; label?: string; required?: boolean }) {
   const { lang, t } = useI18n(); const id = useId();
-  return <div><div className="field"><label htmlFor={id}>{label ?? list}</label><select id={id} value={value ?? ''} required={required} onChange={event => onChange(event.target.value || null)}>
-    <option value="">{t('Not specified', 'Δεν έχει οριστεί')}</option>{entriesOf(list).map(entry => <option key={entry.code} value={entry.code}>{labelOf(list, entry.code, lang)}</option>)}
-  </select></div><InfoButton label={t('Definitions', 'Ορισμοί') + ' — ' + (label ?? list)}><dl>{entriesOf(list).map(entry => <div key={entry.code}><dt>{labelOf(list, entry.code, lang)}</dt><dd>{definitionOf(list, entry.code, lang)}</dd></div>)}</dl></InfoButton></div>;
+  return <div className="field"><div className="label-actions"><label htmlFor={id}>{label ?? list}</label><InfoButton label={t('Definitions', 'Ορισμοί') + ' — ' + (label ?? list)}><dl>{entriesOf(list).map(entry => <div key={entry.code}><dt>{labelOf(list, entry.code, lang)}</dt><dd>{definitionOf(list, entry.code, lang)}</dd></div>)}</dl></InfoButton></div><select id={id} value={value ?? ''} required={required} onChange={event => onChange(event.target.value || null)}><option value="">{t('Not specified', 'Δεν έχει οριστεί')}</option>{entriesOf(list).map(entry => <option key={entry.code} value={entry.code}>{labelOf(list, entry.code, lang)}</option>)}</select></div>;
 }
 export function MultiPick({ label, items, value, onChange }: { label: string; items: { id: number; label: string; active?: boolean }[]; value: number[]; onChange(ids: number[]): void }) {
   const { t } = useI18n();

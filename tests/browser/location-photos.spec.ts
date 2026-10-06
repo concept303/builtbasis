@@ -38,7 +38,7 @@ test('location photos work without the tree and preserve the unsaved record whil
   await expect(page.getByText('Πίσω από το μπάνιο. Follow the marked edge.', { exact: true })).toBeVisible();
   const saved = await (await page.request.get(`/api/projects/${projectId}/records/${record.id}`)).json();
   expect(saved.locationIds).toEqual([]);
-  await page.getByRole('button', { name: 'Evidence', exact: true }).click();
+  await page.getByRole('button', { name: 'Photos & files', exact: true }).click();
   await expect(page.locator('.photo-thumbnail')).toHaveCount(0);
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   page.once('dialog', dialog => dialog.accept());

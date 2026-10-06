@@ -14,13 +14,13 @@ test('creates packages, retains form errors and confirms completion using fresh 
   await dialog.getByLabel('Status', { exact: true }).selectOption('completed');
   await page.request.post(`${base}/records`, { headers: { origin }, data: { subtype: 'task', title: 'Late member', workPackageId: id } });
   await dialog.getByRole('button', { name: 'Save package', exact: true }).click();
-  await expect(dialog).toContainText('1 records in this package are still outstanding');
+  await expect(dialog).toContainText('1 record in this package is still outstanding');
   await dialog.getByRole('button', { name: 'Go back', exact: true }).click(); await expect(dialog.getByLabel('Status', { exact: true })).toBeFocused();
   await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('Keep this description');
   await dialog.getByRole('button', { name: 'Save package', exact: true }).click(); await dialog.getByRole('button', { name: 'Mark as Completed', exact: true }).click();
   await expect(page.getByRole('note')).toContainText('1 record is still outstanding');
   await page.getByRole('button', { name: 'Delete package', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('This package contains 1 records');
+  await expect(page.getByRole('dialog')).toContainText('This package contains 1 record');
   await expect(page.getByRole('link', { name: 'Show its records', exact: true })).toBeVisible();
 });
 test('deletes an empty package only after exact-name confirmation', async ({ page }) => {
@@ -47,7 +47,7 @@ test('a record assigned during deletion switches the confirmation to a blocked e
   await page.goto(`/projects/${projectId}/work-packages/${p.id}`);await page.getByRole('button',{name:'Delete package',exact:true}).click();const dialog=page.getByRole('dialog');
   await dialog.getByLabel('Type the package name to confirm').fill(p.name);
   await page.request.post(`${base}/records`,{headers:{origin},data:{subtype:'task',title:'Arrived late',workPackageId:p.id}});
-  await dialog.getByRole('button',{name:'Delete package',exact:true}).click();await expect(dialog).toContainText('This package contains 1 records');await expect(dialog.getByRole('button',{name:'Delete package',exact:true})).toHaveCount(0);
+  await dialog.getByRole('button',{name:'Delete package',exact:true}).click();await expect(dialog).toContainText('This package contains 1 record');await expect(dialog.getByRole('button',{name:'Delete package',exact:true})).toHaveCount(0);
 });
 test('package pages search Greek, show derived totals, sparse bars and direct navigation on phones', async ({ page }) => {
   await login(page); const { projectId } = seed(); const base = `/api/projects/${projectId}`;

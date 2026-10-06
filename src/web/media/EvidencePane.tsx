@@ -1,3 +1,4 @@
+import { IconButton } from '../core/IconButton';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ACCEPTED_ATTACHMENT_EXTENSIONS, entriesOf, labelOf, type PhotoOut, type PhotoPhase } from '../../domain';
@@ -82,10 +83,10 @@ function EvidenceContent({ purpose = 'evidence', context, photos: allPhotos, att
     <PhotoThumbnail context={context} photo={item} onOpen={() => setSelection({ kind: 'photos', item })} onAccessLost={onAccessLost} />
     {(item.phase || item.caption) && <p>{item.phase && labelOf('photoPhase', item.phase, lang)}{item.phase && item.caption ? ' · ' : ''}{item.caption}</p>}
     <small>{item.uploadedBy} · {new Date(item.uploadedAt).toLocaleString(lang)}{item.takenAt && <> · {t('Taken', 'Λήψη')} {new Date(item.takenAt).toLocaleString(lang)}</>}</small>
-    {owner && <div className="actions"><button type="button" onClick={() => setEditing({ kind: 'photos', item })}>{t('Edit photo', 'Επεξεργασία φωτογραφίας')}</button><button type="button" onClick={() => void remove({ kind: 'photos', item })}>{t('Delete photo', 'Διαγραφή φωτογραφίας')}</button></div>}
+    {owner && <div className="actions"><IconButton icon="edit" label={t('Edit photo','Επεξεργασία φωτογραφίας')} onClick={()=>setEditing({kind:'photos',item})}/><IconButton icon="delete" label={t('Delete photo','Διαγραφή φωτογραφίας')} onClick={()=>void remove({kind:'photos',item})}/></div>}
   </article>)}</div>;
   return <section className={location ? 'evidence-pane location-photos' : 'evidence-pane'} aria-label={title}>
-    <h2>{title}</h2>
+    <div className="heading-actions"><h2>{title}</h2>{location && canUpload && <IconButton icon="add" label={t('Add location photos','Προσθήκη φωτογραφιών θέσης')} disabled={busy} onClick={()=>picker.current?.click()}/>}</div>
     {location && <p>{t('Photos, sketches or drawing snapshots of the exact spot.', 'Φωτογραφίες, σκαριφήματα ή αποσπάσματα σχεδίων που δείχνουν το ακριβές σημείο.')}</p>}
     <ErrorNotice error={error} />
     {!location && <h3>{t('Photos', 'Φωτογραφίες')}</h3>}
@@ -94,7 +95,7 @@ function EvidenceContent({ purpose = 'evidence', context, photos: allPhotos, att
     {!location && <><h3>{t('Attachments', 'Συνημμένα')}</h3>{attachments.length === 0 && <p>{t('No attachments.', 'Δεν υπάρχουν συνημμένα.')}</p>}
       <div className="attachments">{attachments.map(item => <article className="evidence-card" key={item.id}><button type="button" onClick={() => setSelection({ kind: 'attachments', item })}>{item.title ?? item.originalFilename}</button><p>{item.originalFilename} · {item.size.toLocaleString(lang)} {t('bytes', 'byte')}</p><small>{item.uploadedBy} · {new Date(item.uploadedAt).toLocaleString(lang)}</small>{item.logEntry && <p>{t('Log entry', 'Καταχώριση ημερολογίου')} · {new Date(item.logEntry.eventAt).toLocaleString(lang)} · {item.logEntry.text}</p>}{owner && <div className="actions"><button type="button" onClick={() => setEditing({ kind: 'attachments', item })}>{t('Edit attachment', 'Επεξεργασία συνημμένου')}</button><button type="button" onClick={() => void remove({ kind: 'attachments', item })}>{t('Delete attachment', 'Διαγραφή συνημμένου')}</button></div>}</article>)}</div>
     </>}
-    {canUpload && <div className="evidence-upload" onKeyDown={event => { if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'text') event.preventDefault(); }}>
+    {canUpload && <div className="evidence-upload" hidden={location && !files.length && !caption && !busy && !retryBlocked} onKeyDown={event => { if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'text') event.preventDefault(); }}>
       {!location && <h3>{t('Add evidence', 'Προσθήκη τεκμηρίων')}</h3>}
       {location && <p>{t('Photos save immediately when uploaded.', 'Οι φωτογραφίες αποθηκεύονται αμέσως με τη μεταφόρτωση.')}</p>}
       <fieldset disabled={busy}>

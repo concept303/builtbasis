@@ -1,4 +1,4 @@
-﻿import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { foldText, isOutstanding, labelOf, PACKAGE_STATUSES, type WorkPackage, type WorkPackageInput } from '../../domain';
 import type { Person } from '../../server/lists/people';
@@ -47,7 +47,7 @@ export function PackageForm({ projectId, initial, people, inline, onSaved, onCan
   const title = initial ? t('Edit package','Επεξεργασία πακέτου') : t('New work package','Νέο πακέτο εργασιών');
   return createPortal(<dialog ref={dialog} className="management-dialog package-form" aria-label={title} onCancel={e => {e.preventDefault();close();}}><h2>{title}</h2>
     {confirmation ? <section><h3>{draft.status === 'completed' ? t(`Mark “${draft.name}” as Completed?`,`Να οριστεί το πακέτο «${draft.name}» ως ολοκληρωμένο;`) : t(`Mark “${draft.name}” as Cancelled?`,`Να οριστεί το πακέτο «${draft.name}» ως ακυρωμένο;`)}</h3>
-      <p>{t(`${confirmation.detail.counts.outstanding} records in this package are still outstanding, ${confirmation.detail.counts.overdue} of them overdue:`,`${confirmation.detail.counts.outstanding} καταγραφές του πακέτου παραμένουν σε εκκρεμότητα, από τις οποίες ${confirmation.detail.counts.overdue} είναι εκπρόθεσμες:`)}</p>
+      <p>{t(`${confirmation.detail.counts.outstanding} ${confirmation.detail.counts.outstanding===1?'record in this package is':'records in this package are'} still outstanding, ${confirmation.detail.counts.overdue} of them overdue:`,`${confirmation.detail.counts.outstanding} ${confirmation.detail.counts.outstanding===1?'καταγραφή του πακέτου παραμένει σε εκκρεμότητα, από την οποία':'καταγραφές του πακέτου παραμένουν σε εκκρεμότητα, από τις οποίες'} ${confirmation.detail.counts.overdue} ${confirmation.detail.counts.overdue===1?'είναι εκπρόθεσμη':'είναι εκπρόθεσμες'}:`)}</p>
       <ul>{outstanding.slice(0,5).map(r => <li key={r.id}>{r.humanId} · {labelOf('status',r.status,lang)}</li>)}</ul>{outstanding.length>5 && <p>{t(`And ${outstanding.length-5} more`,`Και ${outstanding.length-5} ακόμη`)}</p>}
       <p>{t('Their statuses, due dates and people do not change.','Οι καταστάσεις, οι προθεσμίες και τα πρόσωπα που έχουν οριστεί στις καταγραφές δεν αλλάζουν.')}</p><ErrorNotice error={error}/>
       <BusyButton className="primary" busy={busy} disabled={uncertain} onClick={() => void save(true)}>{draft.status === 'completed' ? t('Mark as Completed','Ορισμός ως ολοκληρωμένο') : t('Mark as Cancelled','Ορισμός ως ακυρωμένο')}</BusyButton><button disabled={busy} onClick={close}>{t('Go back','Επιστροφή')}</button>

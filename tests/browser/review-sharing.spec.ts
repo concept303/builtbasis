@@ -4,7 +4,9 @@ import { test, expect, login, seed } from './fixture';
 
 const origin = 'http://127.0.0.1:3490';
 async function tab(page: Page, name: string) {
-  await page.getByRole('navigation', { name: 'Record sections' }).getByRole('button', { name, exact: true }).click();
+  const panel=page.locator('dialog.side-panel');if(await panel.count())await panel.getByRole('button',{name:'Close',exact:true}).click();
+  if(name==='Sharing')await page.getByRole('button',{name:'Sharing',exact:true}).click();
+  else await page.getByRole('navigation',{name:'Record sections'}).getByRole('button',{name,exact:true}).click();
 }
 async function draft(page: Page) {
   const base = `/api/projects/${seed().projectId}/records`;

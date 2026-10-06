@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 test('owner uploads genuine photo and CAD attachment, edits metadata and deletes occurrences', async({page})=>{
   await login(page);const {projectId,recordId}=seed();
   await page.goto(`/projects/${projectId}/records/${recordId}`);
-  await page.getByRole('button',{name:'Evidence',exact:true}).click();
+  await page.getByRole('button',{name:'Photos & files',exact:true}).click();
   await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-synthetic.heic'));
   await page.getByLabel('Caption',{exact:true}).fill('Oriented test capture');
   await page.getByRole('button',{name:'Upload evidence',exact:true}).click();
@@ -33,7 +33,7 @@ test('owner uploads genuine photo and CAD attachment, edits metadata and deletes
   await expect(page.locator('.photo-grid .evidence-card')).toHaveCount(0);
 });
 test('upload failures retain selections and localize capacity and envelope errors', async({page})=>{
-  await login(page);const {projectId,recordId}=seed();await page.goto(`/projects/${projectId}/records/${recordId}`);await page.getByRole('button',{name:'Evidence',exact:true}).click();
+  await login(page);const {projectId,recordId}=seed();await page.goto(`/projects/${projectId}/records/${recordId}`);await page.getByRole('button',{name:'Photos & files',exact:true}).click();
   await page.getByRole('combobox',{name:'Upload type',exact:true}).selectOption('attachments');
   await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-design.dwg'));
   await page.route(`**/api/projects/${projectId}/records/${recordId}/attachments`,route=>route.request().method()==='POST'?route.fulfill({status:507,json:{error:'storage_capacity'}}):route.continue());
@@ -50,7 +50,7 @@ test('upload failures retain selections and localize capacity and envelope error
 
 
 test('uncertain upload failure requires evidence refresh before a user retry', async({page})=>{
-  await login(page);const {projectId,recordId}=seed();await page.goto(`/projects/${projectId}/records/${recordId}`);await page.getByRole('button',{name:'Evidence',exact:true}).click();
+  await login(page);const {projectId,recordId}=seed();await page.goto(`/projects/${projectId}/records/${recordId}`);await page.getByRole('button',{name:'Photos & files',exact:true}).click();
   await page.getByRole('combobox',{name:'Upload type',exact:true}).selectOption('attachments');
   await page.getByLabel('Files',{exact:true}).setInputFiles(resolve('tests/browser/fixtures/media-design.dwg'));
   await page.route(`**/api/projects/${projectId}/records/${recordId}/attachments`,route=>route.request().method()==='POST'?route.abort():route.continue());

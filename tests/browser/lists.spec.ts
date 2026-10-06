@@ -60,7 +60,7 @@ test('five managed lists expose named controls; people and trades preserve field
   await page.getByLabel('Code', { exact: true }).fill('UI-PERSON');
   await page.getByLabel('Name', { exact: true }).fill('List test engineer');
   await page.getByLabel('Role', { exact: true }).selectOption({ label: 'Engineer' });
-  await page.getByText('Definitions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Definitions — Role', exact: true }).click();
   await expect(page.getByText('Structural, mechanical or electrical engineer.', { exact: true })).toBeVisible();
   await page.getByLabel('Company', { exact: true }).fill('Test engineering');
   await page.getByLabel('Email', { exact: true }).fill('engineer@example.test');

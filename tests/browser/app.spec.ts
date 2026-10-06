@@ -11,7 +11,7 @@ test('owner login, desktop list, deep reload and phone quick capture retain lang
   await page.reload(); await expect(page.getByLabel('Search title, description or ID')).toHaveValue('Public sample');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'New record', exact: true }).click();
-  await page.getByLabel('Subtype', { exact: true }).selectOption('task');
+  await page.getByRole('combobox', { name: 'Subtype', exact: true }).selectOption('task');
   await page.getByLabel('Title', { exact: true }).fill('Phone capture exact text');
   await page.getByLabel('Language', { exact: true }).selectOption('el');
   await expect(page.getByLabel('Τίτλος', { exact: true })).toHaveValue('Phone capture exact text');

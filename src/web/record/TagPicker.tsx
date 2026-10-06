@@ -1,6 +1,7 @@
+import { SearchPicker } from '../core/SearchPicker';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../core/api';
-import { BusyButton, ErrorNotice, Field, MultiPick } from '../core/forms';
+import { BusyButton, ErrorNotice, Field } from '../core/forms';
 import { useI18n } from '../core/i18n';
 import type { Named } from './data';
 
@@ -26,7 +27,7 @@ export function TagPicker({ projectId, initial, value, onChange, onDirty }: { pr
       }
     } finally { if (!signal.aborted) setBusy(false); }
   };
-  return <><MultiPick label={t('Tags', 'Ετικέτες')} items={tags.map(tag => ({ ...tag, label: name(tag) }))} value={value} onChange={onChange} />
+  return <><SearchPicker mode="multiple" emptyLabel={t('No tags','Χωρίς ετικέτες')} label={t('Choose tags…', 'Επιλογή ετικετών…')} items={tags.filter(tag => tag.active !== false || value.includes(tag.id)).map(tag => ({ id:tag.id, disabled:tag.active===false, label: name(tag) }))} value={value} onChange={onChange} />
     <details><summary>{t('Add a new tag', 'Προσθήκη νέας ετικέτας')}</summary><p>{t('New tags are added to the project immediately. Save the record to keep its tag selections.', 'Οι νέες ετικέτες προστίθενται αμέσως στο έργο. Αποθηκεύστε την εγγραφή για να διατηρηθούν οι επιλογές της.')}</p><ErrorNotice error={error} />
       <Field label={t('Tag name in English', 'Όνομα ετικέτας στα αγγλικά')}><input list="record-tag-en" maxLength={200} disabled={busy} value={nameEn} onChange={e => { setEn(e.target.value); onDirty(); }} /></Field>
       <Field label={t('Tag name in Greek', 'Όνομα ετικέτας στα ελληνικά')}><input list="record-tag-el" maxLength={200} disabled={busy} value={nameEl} onChange={e => { setEl(e.target.value); onDirty(); }} /></Field>

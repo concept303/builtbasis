@@ -34,7 +34,7 @@ test('quick capture keeps its saved draft when a later photo fails without repea
   page.on('request', request => { if (request.method() !== 'POST') return; if (request.url().endsWith(`/api/projects/${projectId}/records`)) creates++; if (/\/photos$/.test(request.url())) photos++; });
   await page.goto(`/projects/${projectId}/records`);
   await page.getByRole('button', { name: 'New record', exact: true }).click();
-  await page.getByLabel('Subtype', { exact: true }).selectOption('task');
+  await page.getByRole('combobox', { name: 'Subtype', exact: true }).selectOption('task');
   await page.getByLabel('Title', { exact: true }).fill('Partial photo capture');
   await page.getByText('Location and photos (optional)', { exact: true }).click();
   await page.getByLabel('Photos', { exact: true }).setInputFiles([
@@ -49,7 +49,7 @@ test('quick capture keeps its saved draft when a later photo fails without repea
   expect(creates).toBe(1); expect(photos).toBe(1);
   await page.locator(`a[href^="/projects/${projectId}/records/"]`).filter({ hasText: /^T-/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Partial photo capture', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Evidence', exact: true }).click();
+  await page.getByRole('button', { name: 'Photos & files', exact: true }).click();
   await expect(page.locator('.photo-grid .evidence-card')).toHaveCount(1);
 });
 

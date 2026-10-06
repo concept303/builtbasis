@@ -8,7 +8,7 @@ export function RecordCard({ record, people, packageName, hidePackage = false, t
   const { lang, t } = useI18n();
   return <article className="record-card"><a href={href}><strong>{record.humanId}</strong><h2>{record.title || t('Untitled draft', 'Πρόχειρο χωρίς τίτλο')}</h2></a><div className="record-facts">
     <span>{labelOf('subtype', record.subtype, lang)}</span><StatusBadge kind="record" status={record.status}/>
-    {!hidePackage && (packageName ?? record.workPackageName) && <span>{t('Work package', 'Πακέτο εργασιών')}: {packageName ?? record.workPackageName}</span>}
+    {!hidePackage && (packageName ?? record.workPackageName) && <span><span aria-hidden="true">▣ </span><span className="sr-only">{t('Work package','Πακέτο εργασιών')}: </span>{packageName ?? record.workPackageName}</span>}
     <span>{t('Next action by', 'Επόμενη ενέργεια από')}: {people.find(p => p.id === record.ballInCourtId)?.name ?? '—'}</span>
     <span>{t('Due', 'Προθεσμία')}: {dateText(record.dueDate, lang)} <DueChip status={record.status} dueDate={record.dueDate} today={today}/></span>
     <span>{t('Priority', 'Προτεραιότητα')}: {record.priority ? labelOf('priority', record.priority, lang) : '—'}</span>
