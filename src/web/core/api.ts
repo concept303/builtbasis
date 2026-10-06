@@ -28,6 +28,10 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   return data as T;
 }
 const messages: Record<string, [string, string]> = {
+  work_package_not_found: ['This work package is no longer available. Refresh the package choices.', 'Το πακέτο εργασιών δεν είναι πλέον διαθέσιμο. Ανανεώστε τις επιλογές πακέτων.'],
+  work_package_not_empty: ['The package contains records and cannot be deleted.', 'Το πακέτο περιέχει καταγραφές και δεν μπορεί να διαγραφεί.'],
+  work_package_confirmation_mismatch: ['The package name changed. Check the current name and confirm again.', 'Το όνομα του πακέτου άλλαξε. Ελέγξτε το τρέχον όνομα και επιβεβαιώστε ξανά.'],
+
   photo_conversion_failed: ['This photo could not be prepared. Upload the original as an attachment instead.', 'Η φωτογραφία δεν ήταν δυνατό να προετοιμαστεί. Μεταφορτώστε το πρωτότυπο ως συνημμένο.'],
   rule_violation: ['Complete the required record fields before saving.', 'Συμπληρώστε τα απαιτούμενα πεδία της εγγραφής πριν την αποθήκευση.'],
   duplicate_measurement_rows: ['Each item, quantity and unit combination must appear only once in a measurement set. Check for labels that differ only by spaces or letter case.', 'Κάθε συνδυασμός αντικειμένου, μεγέθους και μονάδας πρέπει να εμφανίζεται μόνο μία φορά στο σύνολο. Ελέγξτε ονομασίες που διαφέρουν μόνο σε κενά ή πεζά και κεφαλαία.'],

@@ -1,9 +1,14 @@
 import { InfoButton } from './InfoButton';
-import { useEffect, useId, type ReactNode, type ButtonHTMLAttributes } from 'react';
+import { cloneElement, isValidElement, useEffect, useId, type ReactNode, type ButtonHTMLAttributes } from 'react';
 import { definitionOf, entriesOf, labelOf, type ListKey } from '../../domain';
 import { errorText } from './api';
 import { useI18n } from './i18n';
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+  const generatedId = useId();
+  if (isValidElement<{ id?: string }>(children) && typeof children.type === 'string' && ['input', 'select', 'textarea'].includes(children.type)) {
+    const id = children.props.id ?? generatedId;
+    return <div className="field"><label htmlFor={id}>{label}</label>{cloneElement(children, { id })}{hint && <small>{hint}</small>}</div>;
+  }
   return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>;
 }
 export function VocabSelect({ list, value, onChange, label, required = false }: { list: ListKey; value: string | null; onChange(value: string | null): void; label?: string; required?: boolean }) {

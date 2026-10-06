@@ -1,3 +1,5 @@
+import { PackageForm } from './PackageForm';
+import { DeletePackageDialog } from './DeletePackageDialog';
 ﻿import { useEffect, useState } from 'react';
 import { codesOf, isOutstanding, isPastTarget, labelOf, PACKAGE_STATUSES } from '../../domain';
 import { ErrorNotice } from '../core/forms';
@@ -9,7 +11,8 @@ import { dateText } from '../record/helpers';
 import { loadPackage, usePackageRefresh } from './data';
 import { PackageStatusBar } from './PackageStatusBar';
 export function PackagePage({ projectId, packageId }: { projectId: number; packageId: number }) {
-  const { lang, t } = useI18n(); const { today, revision } = usePackageRefresh();
+  const { lang, t } = useI18n(); const { today, revision, refresh } = usePackageRefresh();
+  const [editing,setEditing] = useState(false); const [deleting,setDeleting] = useState(false);
   const [data, setData] = useState<Awaited<ReturnType<typeof loadPackage>> | null>(null); const [error, setError] = useState<unknown>(null);
   useEffect(() => { const controller = new AbortController(); setError(null); loadPackage(projectId, packageId, controller.signal).then(result => { if (!controller.signal.aborted) setData(result); }).catch(failure => { if (!controller.signal.aborted) { setError(failure); setData(null); } }); return () => controller.abort(); }, [projectId, packageId, today, revision]);
   if (!data) return <><ErrorNotice error={error}/>{!error && <p role="status">{t('Loading…','Φόρτωση…')}</p>}</>;
@@ -18,7 +21,7 @@ export function PackagePage({ projectId, packageId }: { projectId: number; packa
   const subtypes = codesOf('subtype').filter(s => p.bySubtypeStatus.some(row => row.subtype === s));
   const rows = [...data.records].sort((a,b) => Number(isOutstanding(b.status)) - Number(isOutstanding(a.status)) || a.humanId.localeCompare(b.humanId) || a.id - b.id);
   return <section className="package-page"><nav aria-label={t('Breadcrumb','Διαδρομή πλοήγησης')}><a href={`/projects/${projectId}/work-packages`}>{t('Work packages','Πακέτα εργασιών')}</a> › <span aria-current="page">{p.name}</span></nav>
-    <p className="identity-line">{t('Work package','Πακέτο εργασιών')} <StatusBadge kind="package" status={p.status}/><InfoButton label={t('Package status definition','Ορισμός κατάστασης πακέτου')}>{lang === 'en' ? definition.defEn : definition.defEl}</InfoButton></p><h1>{p.name}</h1>
+    <p className="identity-line">{t('Work package','Πακέτο εργασιών')} <StatusBadge kind="package" status={p.status}/><InfoButton label={t('Package status definition','Ορισμός κατάστασης πακέτου')}>{lang === 'en' ? definition.defEn : definition.defEl}</InfoButton></p><h1>{p.name}</h1><div className="toolbar package-actions"><button className="primary" onClick={()=>setEditing(true)}>{t('Edit package','Επεξεργασία πακέτου')}</button><button className="destructive" onClick={()=>setDeleting(true)}>{t('Delete package','Διαγραφή πακέτου')}</button></div>{editing&&<PackageForm projectId={projectId} initial={p} people={data.people} inline={false} onSaved={()=>{setEditing(false);refresh();}} onCancel={()=>setEditing(false)}/>} {deleting&&<DeletePackageDialog projectId={projectId} packageId={packageId} onClose={()=>setDeleting(false)}/>}
     <dl className="summary-grid">{p.responsibleId !== null && <div><dt>{t('Responsible person','Υπεύθυνος')}</dt><dd>{data.people.find(person => person.id === p.responsibleId)?.name}</dd></div>}{p.targetDate && <div><dt>{t('Target date','Ημερομηνία στόχου')}</dt><dd>{dateText(p.targetDate,lang)}{isPastTarget(p.status,p.targetDate,p.today) && <small className="past-target">{t('Past target','Υπέρβαση ημερομηνίας στόχου')}</small>}</dd></div>}<div><dt>{t('Outstanding records','Καταγραφές σε εκκρεμότητα')}</dt><dd>{p.counts.total ? t(`${p.counts.outstanding} of ${p.counts.total}`,`${p.counts.outstanding} από ${p.counts.total}`) : t('None yet','Καμία ακόμη')}{p.counts.overdue > 0 && <small className="overdue-text">{t(`${p.counts.overdue} overdue`,`${p.counts.overdue} ${p.counts.overdue === 1 ? 'εκπρόθεσμη' : 'εκπρόθεσμες'}`)}</small>}</dd></div></dl>
     {['completed','cancelled'].includes(p.status) && p.counts.outstanding > 0 && <p className="attention-notice" role="note"><strong>{p.status === 'completed' ? t('Marked Completed','Έχει οριστεί ως ολοκληρωμένο') : t('Marked Cancelled','Έχει οριστεί ως ακυρωμένο')}</strong> · {t(`${p.counts.outstanding} ${p.counts.outstanding === 1 ? 'record is' : 'records are'} still outstanding.`,`${p.counts.outstanding} ${p.counts.outstanding === 1 ? 'καταγραφή παραμένει' : 'καταγραφές παραμένουν'} σε εκκρεμότητα.`)} {t('Package status is set by hand and never changes records.','Η κατάσταση του πακέτου ορίζεται χειροκίνητα και δεν αλλάζει τις επιμέρους καταγραφές.')}</p>}
     {p.description && <section className="panel"><h2>{t('Description','Περιγραφή')}</h2><p className="user-text">{p.description}</p></section>}
