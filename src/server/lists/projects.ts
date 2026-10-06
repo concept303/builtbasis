@@ -6,6 +6,7 @@ import { ProjectParams } from '../http/params';
 
 export interface Project { id: number; code: string; name: string; createdAt: string }
 export interface ProjectUsage {
+  workPackages: number;
   records: number; photos: number; attachments: number;
   people: number; trades: number; tags: number; locations: number; zoneTypes: number;
 }
@@ -47,6 +48,7 @@ export function projectUsage(db: Db, projectId: number): ProjectUsage {
   const count = (table: string, condition: string) => db.prepare(`SELECT count(*) FROM ${table} WHERE ${condition}`).pluck().get(projectId) as number;
   return {
     records: count('records', 'project_id = ?'),
+    workPackages: count('work_packages', 'project_id = ?'),
     photos: count('photos', 'record_id IN (SELECT id FROM records WHERE project_id = ?)'),
     attachments: count('attachments', 'record_id IN (SELECT id FROM records WHERE project_id = ?)'),
     people: count('people', 'project_id = ?'), trades: count('trades', 'project_id = ?'),
@@ -60,6 +62,7 @@ export function deleteProject(db: Db, projectId: number, confirmName: string): v
     // File occurrences and access belong to this project. Immutable blob rows/files remain for backups.
     for (const table of ['photos', 'attachments', 'share_links']) db.prepare(`DELETE FROM ${table} WHERE record_id IN (SELECT id FROM records WHERE project_id = ?)`).run(projectId);
     db.prepare('DELETE FROM records WHERE project_id = ?').run(projectId);
+    db.prepare('DELETE FROM work_packages WHERE project_id = ?').run(projectId);
     db.prepare('DELETE FROM record_counters WHERE project_id = ?').run(projectId);
     // Records and their cascade-owned history are gone before removing referenced managed-list entries.
     for (const table of ['location_nodes', 'zone_types', 'people', 'trades', 'tags']) db.prepare(`DELETE FROM ${table} WHERE project_id = ?`).run(projectId);

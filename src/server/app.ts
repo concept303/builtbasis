@@ -1,4 +1,5 @@
 import { registerPrintRoutes } from './printing/routes';
+import { registerWorkPackageRoutes } from './work-packages/routes';
 import { resolve } from 'node:path';
 import { registerWeb } from './web';
 import cookie from '@fastify/cookie';
@@ -79,6 +80,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerOperationsStatus(app, config, capacity);
   registerAuthRoutes(app, { config, db, limiter: deps.limiter ?? new LoginLimiter(DEFAULT_LOGIN_LIMITS) });
   registerProjectRoutes(app, db);
+  registerWorkPackageRoutes(app, db);
   registerPeopleRoutes(app, db);
   registerTradeRoutes(app, db);
   registerZoneTypeRoutes(app, db);
