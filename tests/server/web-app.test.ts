@@ -15,7 +15,7 @@ it('serves explicit SPA routes and assets without replacing API errors or exposi
     await writeFile(join(dir, 'secret.txt'), 'PRIVATE');
     app.get('/api/health', async () => ({ ok: true }));
     await registerWeb(app, dir);
-    for (const url of ['/', '/login', '/projects/1/records/2', '/share', '/assigned/2']) {
+    for (const url of ['/', '/login', '/projects/1/records/2', '/share', '/assigned/2', '/projects/1/work-packages', '/projects/1/work-packages/2']) {
       const response = await app.inject(url);
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toContain('text/html');
