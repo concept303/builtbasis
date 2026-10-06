@@ -8,3 +8,5 @@ export * from './text';
 export * from './records';
 export * from './files';
 export * from './sharing';
+export * from './work-packages';
+export * from './calendar';
