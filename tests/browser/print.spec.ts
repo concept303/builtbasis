@@ -255,6 +255,23 @@ test('printing waits for photo resources and excludes revoked and expired QR cho
 });
 
 
+test('printing refreshes a renamed package even when the record timestamp is unchanged', async ({ page }) => {
+  await login(page);
+  const { projectId } = seed();
+  const packageUrl = `/api/projects/${projectId}/work-packages`;
+  const p = await (await page.request.post(packageUrl, { headers: { origin }, data: { name: 'Print package original' } })).json();
+  const base = `/api/projects/${projectId}/records`;
+  const r = await (await page.request.post(base, { headers: { origin }, data: { subtype: 'task', title: 'Package freshness', workPackageId: p.id } })).json();
+  await page.goto(`/projects/${projectId}/records/${r.id}/print`);
+  await expect(page.locator('.print-sheet')).toContainText('Print package original');
+  expect((await page.request.patch(`${packageUrl}/${p.id}`, { headers: { origin }, data: { name: 'Print package corrected' } })).status()).toBe(200);
+  expect((await (await page.request.get(`${base}/${r.id}`)).json()).updatedAt).toBe(r.updatedAt);
+  await page.evaluate(() => { window.print = () => { document.body.dataset.printSnapshot = document.querySelector('.print-sheet')?.textContent ?? ''; }; });
+  await page.getByRole('button', { name: 'Print / Save PDF', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-print-snapshot', /Print package corrected/);
+  await expect(page.locator('body')).not.toHaveAttribute('data-print-snapshot', /Print package original/);
+});
+
 test('native printing cannot bypass refresh or reuse a completed print authorization', async ({ page }) => {
   await login(page);
   const { projectId } = seed();

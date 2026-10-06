@@ -99,6 +99,7 @@ function PrintSheet({ data, base, qr, shareUrl, onLoaded, onError }: { data: Pri
   const field = (en: string, el: string, value: ReactNode) => <div><dt>{t(en, el)}</dt><dd>{value || '—'}</dd></div>;
   return <article className="print-sheet" lang={lang}>
     <h1>{r.humanId} · {r.title}</h1>
+    {r.workPackageName && <p>{t('Work package', 'Πακέτο εργασιών')}: {r.workPackageName}</p>}
     <dl className="print-header">{field('Subtype', 'Υποκατηγορία', fixed('subtype', r.subtype))}{field('Status', 'Κατάσταση', fixed('status', r.status))}{field('Severity', 'Σοβαρότητα', fixed('severity', r.severity))}{field('Priority', 'Προτεραιότητα', fixed('priority', r.priority))}{field('Due date', 'Προθεσμία', dateText(r.dueDate, lang))}{field('Ball in court', 'Επόμενη ενέργεια από', person(r.ballInCourtId))}{field('Responsible', 'Υπεύθυνος', person(r.responsibleId))}</dl>
     <dl className="print-header">{field('Location', 'Θέση', data.locations.map(path => path.map(name).join(' / ')).join('\n'))}{field('Trades', 'Ειδικότητες', data.trades.map(name).join(', '))}{field('Tags', 'Ετικέτες', data.tags.map(name).join(', '))}{field('Reference', 'Αναφορά', r.reference)}</dl>
     {r.locationNotes && <section><h2>{t('Location Notes', 'Σημειώσεις θέσης')}</h2><p className="print-text">{r.locationNotes}</p></section>}

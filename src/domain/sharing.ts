@@ -10,6 +10,7 @@ export interface ShareLinkOut {
 }
 
 export interface SharedRecordFields {
+  workPackageName: string | null;
   humanId: string;
   subtype: Subtype;
   status: Status;

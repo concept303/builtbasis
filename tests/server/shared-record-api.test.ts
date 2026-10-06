@@ -20,6 +20,26 @@ function read(token: string, method: 'GET' | 'HEAD' = 'GET') {
 }
 const keys = (value: object) => Object.keys(value).sort();
 
+it('shares only current package name and historical name changes, never package metadata or identifiers', async () => {
+  const p = (await send(f.ctx, f.cookie, 'POST', `${f.base}/work-packages`, { name: 'Tiles', description: 'SECRET PACKAGE DESCRIPTION', responsibleId: f.people.retired === f.people.architect ? null : f.people.architect, targetDate: '2030-12-31' })).json();
+  const record = await postRecord(f, { subtype: 'task', title: 'Public work', workPackageId: p.id });
+  forceStatus(f, record.id, 'open');
+  const link = await share(record.id);
+  const body = (await read(link.token)).json();
+  expect(body.record.workPackageName).toBe('Tiles');
+  expect(body.record).not.toHaveProperty('workPackageId');
+  expect(JSON.stringify(body)).not.toContain('SECRET PACKAGE DESCRIPTION');
+  expect(JSON.stringify(body)).not.toContain('2030-12-31');
+  const event = body.activity.find((e: { field: string }) => e.field === 'workPackageName');
+  expect(event).toMatchObject({ from: null, to: 'Tiles', detail: null });
+  expect(JSON.stringify(body.activity)).not.toContain('fromPackage');
+  await patchRecord(f, record.id, { workPackageId: null });
+  await send(f.ctx, f.cookie, 'DELETE', `${f.base}/work-packages/${p.id}`, { confirmName: 'Tiles' });
+  const cleared = (await read(link.token)).json();
+  expect(cleared.record.workPackageName).toBeNull();
+  expect(cleared.activity).toContainEqual(expect.objectContaining({ field: 'workPackageName', from: 'Tiles', to: null, detail: null }));
+});
+
 it('projects all visible sections and only their referenced labels, omitting private content and login identities', async () => {
   f.ctx.db.exec("UPDATE users SET username='PRIVATE_SENTINEL_LOGIN'");
   const foreignProject = createProject(f.ctx.db, { code: 'other', name: 'PRIVATE_SENTINEL project' }).id;

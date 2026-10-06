@@ -32,6 +32,7 @@ export function buildPrintRecord(db: Db, projectId: number, recordId: number) {
   const photos = listPhotos(db, recordId);
   return {
     record: {
+      workPackageName: r.workPackageName,
       humanId: r.humanId, title: r.title, subtype: r.subtype, status: r.status, severity: r.severity, priority: r.priority,
       dueDate: r.dueDate, ballInCourtId: r.ballInCourtId, responsibleId: r.responsibleId, reference: r.reference,
       description: r.subtype === 'detail_clarification' ? null : r.description, question: r.subtype === 'detail_clarification' ? r.question : null,

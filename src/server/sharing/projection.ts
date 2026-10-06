@@ -22,6 +22,8 @@ const scalarFields = new Map<string, 'number' | 'string'>([
 ]);
 const snapshot = z.object({ label: z.string(), description: z.string().nullable() }).nullable();
 const optionDetail = z.object({ fromOption: snapshot.optional(), toOption: snapshot.optional() });
+const packageSnapshot = z.object({ id: z.number().int().positive(), name: z.string() }).nullable();
+const packageDetail = z.object({ fromPackage: packageSnapshot, toPackage: packageSnapshot });
 const statusDetail = z.object({
   reasonCode: z.string().nullable().optional(),
   reasonNote: z.string().nullable().optional(),
@@ -36,6 +38,11 @@ const statusDetail = z.object({
 });
 
 function publicActivity(entry: ActivityEntry): SharedActivity | null {
+  if (entry.action === 'field_changed' && entry.field === 'workPackageId') {
+    const parsed = packageDetail.safeParse(entry.detail);
+    if (!parsed.success) return null;
+    return { id: entry.id, at: entry.at, action: 'field_changed', field: 'workPackageName', from: parsed.data.fromPackage?.name ?? null, to: parsed.data.toPackage?.name ?? null, detail: null };
+  }
   let detail: SharedActivity['detail'] = null;
   if (entry.action === 'created') {
     if (entry.from !== null || entry.to !== 'draft') return null;
@@ -67,6 +74,7 @@ export function buildSharedRecord(db: Db, access: Pick<ShareAccess, 'projectId' 
   const { projectId, recordId } = access;
   const r = getRecordDetail(db, projectId, recordId);
   const record: SharedRecord['record'] = {
+    workPackageName: r.workPackageName,
     humanId: r.humanId,
     subtype: r.subtype,
     status: r.status,
