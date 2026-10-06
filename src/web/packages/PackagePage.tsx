@@ -1,5 +1,32 @@
+﻿import { useEffect, useState } from 'react';
+import { codesOf, isOutstanding, isPastTarget, labelOf, PACKAGE_STATUSES } from '../../domain';
+import { ErrorNotice } from '../core/forms';
 import { useI18n } from '../core/i18n';
+import { InfoButton } from '../core/InfoButton';
+import { StatusBadge } from '../core/StatusBadge';
+import { RecordCard } from '../home/RecordCard';
+import { dateText } from '../record/helpers';
+import { loadPackage, usePackageRefresh } from './data';
+import { PackageStatusBar } from './PackageStatusBar';
 export function PackagePage({ projectId, packageId }: { projectId: number; packageId: number }) {
-  const { t } = useI18n();
-  return <section data-package={packageId}><a href={`/projects/${projectId}/work-packages`}>{t('Work packages', 'Πακέτα εργασιών')}</a></section>;
+  const { lang, t } = useI18n(); const { today, revision } = usePackageRefresh();
+  const [data, setData] = useState<Awaited<ReturnType<typeof loadPackage>> | null>(null); const [error, setError] = useState<unknown>(null);
+  useEffect(() => { const controller = new AbortController(); setError(null); loadPackage(projectId, packageId, controller.signal).then(result => { if (!controller.signal.aborted) setData(result); }).catch(failure => { if (!controller.signal.aborted) { setError(failure); setData(null); } }); return () => controller.abort(); }, [projectId, packageId, today, revision]);
+  if (!data) return <><ErrorNotice error={error}/>{!error && <p role="status">{t('Loading…','Φόρτωση…')}</p>}</>;
+  const p = data.detail; const definition = PACKAGE_STATUSES.find(s => s.code === p.status)!;
+  const statuses = codesOf('status').filter(s => p.counts.byStatus[s] > 0);
+  const subtypes = codesOf('subtype').filter(s => p.bySubtypeStatus.some(row => row.subtype === s));
+  const rows = [...data.records].sort((a,b) => Number(isOutstanding(b.status)) - Number(isOutstanding(a.status)) || a.humanId.localeCompare(b.humanId) || a.id - b.id);
+  return <section className="package-page"><nav aria-label={t('Breadcrumb','Διαδρομή πλοήγησης')}><a href={`/projects/${projectId}/work-packages`}>{t('Work packages','Πακέτα εργασιών')}</a> › <span aria-current="page">{p.name}</span></nav>
+    <p className="identity-line">{t('Work package','Πακέτο εργασιών')} <StatusBadge kind="package" status={p.status}/><InfoButton label={t('Package status definition','Ορισμός κατάστασης πακέτου')}>{lang === 'en' ? definition.defEn : definition.defEl}</InfoButton></p><h1>{p.name}</h1>
+    <dl className="summary-grid">{p.responsibleId !== null && <div><dt>{t('Responsible person','Υπεύθυνος')}</dt><dd>{data.people.find(person => person.id === p.responsibleId)?.name}</dd></div>}{p.targetDate && <div><dt>{t('Target date','Ημερομηνία στόχου')}</dt><dd>{dateText(p.targetDate,lang)}{isPastTarget(p.status,p.targetDate,p.today) && <small className="past-target">{t('Past target','Υπέρβαση ημερομηνίας στόχου')}</small>}</dd></div>}<div><dt>{t('Outstanding records','Καταγραφές σε εκκρεμότητα')}</dt><dd>{p.counts.total ? t(`${p.counts.outstanding} of ${p.counts.total}`,`${p.counts.outstanding} από ${p.counts.total}`) : t('None yet','Καμία ακόμη')}{p.counts.overdue > 0 && <small className="overdue-text">{t(`${p.counts.overdue} overdue`,`${p.counts.overdue} ${p.counts.overdue === 1 ? 'εκπρόθεσμη' : 'εκπρόθεσμες'}`)}</small>}</dd></div></dl>
+    {['completed','cancelled'].includes(p.status) && p.counts.outstanding > 0 && <p className="attention-notice" role="note"><strong>{p.status === 'completed' ? t('Marked Completed','Έχει οριστεί ως ολοκληρωμένο') : t('Marked Cancelled','Έχει οριστεί ως ακυρωμένο')}</strong> · {t(`${p.counts.outstanding} ${p.counts.outstanding === 1 ? 'record is' : 'records are'} still outstanding.`,`${p.counts.outstanding} ${p.counts.outstanding === 1 ? 'καταγραφή παραμένει' : 'καταγραφές παραμένουν'} σε εκκρεμότητα.`)} {t('Package status is set by hand and never changes records.','Η κατάσταση του πακέτου ορίζεται χειροκίνητα και δεν αλλάζει τις επιμέρους καταγραφές.')}</p>}
+    {p.description && <section className="panel"><h2>{t('Description','Περιγραφή')}</h2><p className="user-text">{p.description}</p></section>}
+    {p.counts.total > 0 && <section className="panel"><h2>{t('Progress','Πρόοδος')}</h2><div className="progress-figures"><span>{p.counts.outstanding} {t('Outstanding','Σε εκκρεμότητα')} / {p.counts.total}</span><span className={p.counts.overdue ? 'overdue-text' : ''}>{p.counts.overdue} {t('overdue','εκπρόθεσμες')}</span><span>{p.counts.byStatus.closed} {t('Closed','Κλειστές')}</span></div><PackageStatusBar counts={p.counts} variant="detail"/>
+      <h3>{t('By subtype and status','Ανά τύπο καταγραφής και κατάσταση')}</h3><div className="table-wrap"><table><thead><tr><th>{t('Subtype','Υποκατηγορία')}</th>{statuses.map(s => <th key={s}>{labelOf('status',s,lang)}</th>)}<th>{t('Outstanding','Σε εκκρεμότητα')}</th><th>{t('Total','Σύνολο')}</th></tr></thead><tbody>{subtypes.map(subtype => { const groups = p.bySubtypeStatus.filter(row => row.subtype === subtype); return <tr key={subtype}><th scope="row">{labelOf('subtype',subtype,lang)}</th>{statuses.map(s => { const n = groups.find(row => row.status === s)?.count ?? 0; return <td className={n ? undefined : 'muted'} key={s}>{n}</td>; })}<td>{groups.filter(row => isOutstanding(row.status)).reduce((n,row) => n+row.count,0)}</td><td>{groups.reduce((n,row) => n+row.count,0)}</td></tr>; })}</tbody><tfoot><tr><th>{t('All records','Όλες οι καταγραφές')}</th>{statuses.map(s => <td key={s}>{p.counts.byStatus[s]}</td>)}<td>{p.counts.outstanding}</td><td>{p.counts.total}</td></tr></tfoot></table></div><small>{t('Calculated from the records each time the page opens. Draft counts as outstanding.','Τα στοιχεία υπολογίζονται από τις καταγραφές κάθε φορά που ανοίγει η σελίδα. Οι πρόχειρες καταγραφές υπολογίζονται στις εκκρεμότητες.')}</small>
+    </section>}
+    <section className="panel"><div className="title-row"><h2>{t(`Records (${p.counts.total})`,`Καταγραφές (${p.counts.total})`)}</h2><a href={`/projects/${projectId}/records?workPackageId=${p.id}`}>{t('Open in Records with all filters','Άνοιγμα στη λίστα καταγραφών με όλα τα φίλτρα')}</a></div>
+      {!rows.length ? <><p>{t('No records in this package yet.','Δεν υπάρχουν ακόμη καταγραφές σε αυτό το πακέτο.')}</p><p>{t('Choose this package in a record’s Work package field, or create a record here.','Επιλέξτε αυτό το πακέτο στο πεδίο «Πακέτο εργασιών» μιας καταγραφής ή δημιουργήστε μια νέα καταγραφή εδώ.')}</p></> : <div className="record-list">{rows.map(record => <RecordCard key={record.id} record={record} people={data.people} hidePackage today={p.today} href={`/projects/${projectId}/records/${record.id}?from=${encodeURIComponent(`/projects/${projectId}/work-packages/${p.id}`)}`}/>)}</div>}
+    </section>
+  </section>;
 }
