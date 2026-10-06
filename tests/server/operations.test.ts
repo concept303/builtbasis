@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { openDatabase, type Db } from '../../src/server/db/connection';
 import { migrate } from '../../src/server/db/migrate';
+import { MIGRATIONS } from '../../src/server/db/migrations';
 import { backupDatabase } from '../../src/server/db/backup';
 import { blobPath } from '../../src/server/files/storage';
 import { completedBackups, nightlyBackup, retainedBackups, withBackupLock } from '../../src/server/operations/backups';
@@ -97,7 +98,7 @@ function fixture() {
   const files = join(dir, 'files');
   const db = openDatabase(join(dir, 'builtbasis.db'));
   databases.push(db);
-  migrate(db, { backupsDir: backups });
+  migrate(db, { backupsDir: backups, migrations:MIGRATIONS.filter(m=>m.id<='0006_location_photos') });
   db.exec(`INSERT INTO users (id, username, password_hash, created_at, updated_at, is_owner) VALUES
     (1,'owner','owner-secret','2026','2026',1),(2,'contributor','old-secret','2026','2026',0);
     INSERT INTO projects VALUES (1,'p1','Synthetic drill','2026');
@@ -113,6 +114,10 @@ function fixture() {
   fs.mkdirSync(dirname(path), { recursive: true });
   fs.writeFileSync(path, bytes);
   db.prepare('INSERT INTO blobs VALUES (?, ?, ?)').run(hash, bytes.length, 'text/plain');
+  db.exec("INSERT INTO log_entries VALUES(1,1,'2026-10-01T00:00:00Z','Preserved private note',1,1,'2026-10-01T00:00:00Z',NULL)");
+  db.prepare("INSERT INTO attachments(record_id,blob_hash,original_filename,log_entry_id,uploaded_by,uploaded_at) VALUES(1,?,'drill.txt',1,1,'2026')").run(hash);
+  expect(migrate(db,{backupsDir:backups,now:new Date('2026-10-01T00:00:00Z')})).toEqual(['0007_work_packages']);
+  db.exec("INSERT INTO work_packages(id,project_id,name,name_key,created_at,updated_at) VALUES(1,1,'Restored package','restored package','2026','2026'); UPDATE records SET work_package_id=1 WHERE id=1");
   nightlyBackup(db, backups, new Date('2026-10-01T01:00:00Z'));
   return { dir, backups, files, db, path, hash };
 }
@@ -138,6 +143,12 @@ it('drills restore from a separate offsite copy and resets all restored access b
   expect(restored.prepare('SELECT password_hash FROM users WHERE id=1').pluck().get()).toBe('owner-secret');
   expect(fs.readFileSync(blobPath(join(destination, 'files'), f.hash))).toEqual(fs.readFileSync(f.path));
   expect(f.db.prepare('SELECT count(*) FROM sessions').pluck().get()).toBe(1);
+  expect(restored.prepare('SELECT work_package_id FROM records WHERE id=1').pluck().get()).toBe(1);
+  expect(restored.prepare('SELECT name FROM work_packages WHERE id=1').pluck().get()).toBe('Restored package');
+  expect(restored.prepare('SELECT text FROM log_entries WHERE id=1').pluck().get()).toBe('Preserved private note');
+  expect(restored.prepare('SELECT blob_hash FROM attachments WHERE log_entry_id=1').pluck().get()).toBe(f.hash);
+  expect(restored.pragma('foreign_key_check')).toEqual([]);
+  expect(restored.pragma('integrity_check',{simple:true})).toBe('ok');
 });
 
 it('reports only newly reset access and does not disclose credentials or rewrite earlier revocations', async () => {
