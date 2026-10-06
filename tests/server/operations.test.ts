@@ -176,12 +176,13 @@ it('refuses incomplete and corrupt database bundles', async () => {
   expect(() => withBackupLock(f.backups, () => withBackupLock(f.backups, () => null))).toThrow();
 });
 
-it('rejects a database from a different schema even when its manifest hash matches', async () => {
+it.each(['older', 'future'])('rejects a %s schema even when its manifest hash matches', async version => {
   const f = fixture();
   const exported = await beginExport(f.backups, f.files);
   const path = join(exported.path, 'builtbasis.db');
   const db = openDatabase(path);
-  db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run('9999_future', '2026');
+  if (version === 'future') db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run('9999_future', '2026');
+  else db.prepare("DELETE FROM schema_migrations WHERE id = '0007_work_packages'").run();
   db.close();
   const manifestPath = join(exported.path, 'manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
